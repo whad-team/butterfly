@@ -12,7 +12,10 @@ PB_BIND(discovery_DeviceResetQuery, discovery_DeviceResetQuery, AUTO)
 PB_BIND(discovery_DeviceReadyResp, discovery_DeviceReadyResp, AUTO)
 
 
-PB_BIND(discovery_DeviceInfoResp, discovery_DeviceInfoResp, AUTO)
+PB_BIND(discovery_SetTransportSpeed, discovery_SetTransportSpeed, AUTO)
+
+
+PB_BIND(discovery_DeviceInfoResp, discovery_DeviceInfoResp, 2)
 
 
 PB_BIND(discovery_DeviceDomainInfoResp, discovery_DeviceDomainInfoResp, AUTO)
@@ -24,7 +27,7 @@ PB_BIND(discovery_DeviceInfoQuery, discovery_DeviceInfoQuery, AUTO)
 PB_BIND(discovery_DeviceDomainInfoQuery, discovery_DeviceDomainInfoQuery, AUTO)
 
 
-PB_BIND(discovery_Message, discovery_Message, AUTO)
+PB_BIND(discovery_Message, discovery_Message, 2)
 
 
 

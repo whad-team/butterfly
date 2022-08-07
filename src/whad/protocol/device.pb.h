@@ -72,6 +72,8 @@ typedef struct _discovery_DeviceInfoQuery {
     uint32_t proto_ver;
 } discovery_DeviceInfoQuery;
 
+typedef PB_BYTES_ARRAY_T(64) discovery_DeviceInfoResp_fw_author_t;
+typedef PB_BYTES_ARRAY_T(256) discovery_DeviceInfoResp_fw_url_t;
 typedef struct _discovery_DeviceInfoResp { 
     /* Device type. */
     uint32_t type;
@@ -79,12 +81,20 @@ typedef struct _discovery_DeviceInfoResp {
     pb_byte_t devid[16];
     /* Supported minimal protocol version. */
     uint32_t proto_min_ver;
-    /* Device firmware version. */
+    /* Maximum supported speed (if useful). */
+    uint32_t max_speed;
+    /* Device firmware info. */
+    discovery_DeviceInfoResp_fw_author_t fw_author;
+    discovery_DeviceInfoResp_fw_url_t fw_url;
     uint32_t fw_version_major;
     uint32_t fw_version_minor;
     uint32_t fw_version_rev;
     pb_callback_t capabilities;
 } discovery_DeviceInfoResp;
+
+typedef struct _discovery_SetTransportSpeed { 
+    uint32_t speed;
+} discovery_SetTransportSpeed;
 
 typedef struct _discovery_Message { 
     pb_size_t which_msg;
@@ -95,6 +105,7 @@ typedef struct _discovery_Message {
         discovery_DeviceInfoResp info_resp;
         discovery_DeviceDomainInfoQuery domain_query;
         discovery_DeviceDomainInfoResp domain_resp;
+        discovery_SetTransportSpeed set_speed;
     } msg;
 } discovery_Message;
 
@@ -120,14 +131,16 @@ extern "C" {
 /* Initializer values for message structs */
 #define discovery_DeviceResetQuery_init_default  {0}
 #define discovery_DeviceReadyResp_init_default   {0}
-#define discovery_DeviceInfoResp_init_default    {0, {0}, 0, 0, 0, 0, {{NULL}, NULL}}
+#define discovery_SetTransportSpeed_init_default {0}
+#define discovery_DeviceInfoResp_init_default    {0, {0}, 0, 0, {0, {0}}, {0, {0}}, 0, 0, 0, {{NULL}, NULL}}
 #define discovery_DeviceDomainInfoResp_init_default {0, 0}
 #define discovery_DeviceInfoQuery_init_default   {0}
 #define discovery_DeviceDomainInfoQuery_init_default {0}
 #define discovery_Message_init_default           {0, {discovery_DeviceResetQuery_init_default}}
 #define discovery_DeviceResetQuery_init_zero     {0}
 #define discovery_DeviceReadyResp_init_zero      {0}
-#define discovery_DeviceInfoResp_init_zero       {0, {0}, 0, 0, 0, 0, {{NULL}, NULL}}
+#define discovery_SetTransportSpeed_init_zero    {0}
+#define discovery_DeviceInfoResp_init_zero       {0, {0}, 0, 0, {0, {0}}, {0, {0}}, 0, 0, 0, {{NULL}, NULL}}
 #define discovery_DeviceDomainInfoResp_init_zero {0, 0}
 #define discovery_DeviceInfoQuery_init_zero      {0}
 #define discovery_DeviceDomainInfoQuery_init_zero {0}
@@ -141,16 +154,21 @@ extern "C" {
 #define discovery_DeviceInfoResp_type_tag        1
 #define discovery_DeviceInfoResp_devid_tag       2
 #define discovery_DeviceInfoResp_proto_min_ver_tag 3
-#define discovery_DeviceInfoResp_fw_version_major_tag 4
-#define discovery_DeviceInfoResp_fw_version_minor_tag 5
-#define discovery_DeviceInfoResp_fw_version_rev_tag 6
-#define discovery_DeviceInfoResp_capabilities_tag 7
+#define discovery_DeviceInfoResp_max_speed_tag   4
+#define discovery_DeviceInfoResp_fw_author_tag   5
+#define discovery_DeviceInfoResp_fw_url_tag      6
+#define discovery_DeviceInfoResp_fw_version_major_tag 7
+#define discovery_DeviceInfoResp_fw_version_minor_tag 8
+#define discovery_DeviceInfoResp_fw_version_rev_tag 9
+#define discovery_DeviceInfoResp_capabilities_tag 10
+#define discovery_SetTransportSpeed_speed_tag    1
 #define discovery_Message_reset_query_tag        1
 #define discovery_Message_ready_resp_tag         2
 #define discovery_Message_info_query_tag         3
 #define discovery_Message_info_resp_tag          4
 #define discovery_Message_domain_query_tag       5
 #define discovery_Message_domain_resp_tag        6
+#define discovery_Message_set_speed_tag          7
 
 /* Struct field encoding specification for nanopb */
 #define discovery_DeviceResetQuery_FIELDLIST(X, a) \
@@ -163,14 +181,22 @@ extern "C" {
 #define discovery_DeviceReadyResp_CALLBACK NULL
 #define discovery_DeviceReadyResp_DEFAULT NULL
 
+#define discovery_SetTransportSpeed_FIELDLIST(X, a) \
+X(a, STATIC,   SINGULAR, UINT32,   speed,             1)
+#define discovery_SetTransportSpeed_CALLBACK NULL
+#define discovery_SetTransportSpeed_DEFAULT NULL
+
 #define discovery_DeviceInfoResp_FIELDLIST(X, a) \
 X(a, STATIC,   SINGULAR, UINT32,   type,              1) \
 X(a, STATIC,   SINGULAR, FIXED_LENGTH_BYTES, devid,             2) \
 X(a, STATIC,   SINGULAR, UINT32,   proto_min_ver,     3) \
-X(a, STATIC,   SINGULAR, UINT32,   fw_version_major,   4) \
-X(a, STATIC,   SINGULAR, UINT32,   fw_version_minor,   5) \
-X(a, STATIC,   SINGULAR, UINT32,   fw_version_rev,    6) \
-X(a, CALLBACK, REPEATED, UINT32,   capabilities,      7)
+X(a, STATIC,   SINGULAR, UINT32,   max_speed,         4) \
+X(a, STATIC,   SINGULAR, BYTES,    fw_author,         5) \
+X(a, STATIC,   SINGULAR, BYTES,    fw_url,            6) \
+X(a, STATIC,   SINGULAR, UINT32,   fw_version_major,   7) \
+X(a, STATIC,   SINGULAR, UINT32,   fw_version_minor,   8) \
+X(a, STATIC,   SINGULAR, UINT32,   fw_version_rev,    9) \
+X(a, CALLBACK, REPEATED, UINT32,   capabilities,     10)
 #define discovery_DeviceInfoResp_CALLBACK pb_default_field_callback
 #define discovery_DeviceInfoResp_DEFAULT NULL
 
@@ -196,7 +222,8 @@ X(a, STATIC,   ONEOF,    MESSAGE,  (msg,ready_resp,msg.ready_resp),   2) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (msg,info_query,msg.info_query),   3) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (msg,info_resp,msg.info_resp),   4) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (msg,domain_query,msg.domain_query),   5) \
-X(a, STATIC,   ONEOF,    MESSAGE,  (msg,domain_resp,msg.domain_resp),   6)
+X(a, STATIC,   ONEOF,    MESSAGE,  (msg,domain_resp,msg.domain_resp),   6) \
+X(a, STATIC,   ONEOF,    MESSAGE,  (msg,set_speed,msg.set_speed),   7)
 #define discovery_Message_CALLBACK NULL
 #define discovery_Message_DEFAULT NULL
 #define discovery_Message_msg_reset_query_MSGTYPE discovery_DeviceResetQuery
@@ -205,9 +232,11 @@ X(a, STATIC,   ONEOF,    MESSAGE,  (msg,domain_resp,msg.domain_resp),   6)
 #define discovery_Message_msg_info_resp_MSGTYPE discovery_DeviceInfoResp
 #define discovery_Message_msg_domain_query_MSGTYPE discovery_DeviceDomainInfoQuery
 #define discovery_Message_msg_domain_resp_MSGTYPE discovery_DeviceDomainInfoResp
+#define discovery_Message_msg_set_speed_MSGTYPE discovery_SetTransportSpeed
 
 extern const pb_msgdesc_t discovery_DeviceResetQuery_msg;
 extern const pb_msgdesc_t discovery_DeviceReadyResp_msg;
+extern const pb_msgdesc_t discovery_SetTransportSpeed_msg;
 extern const pb_msgdesc_t discovery_DeviceInfoResp_msg;
 extern const pb_msgdesc_t discovery_DeviceDomainInfoResp_msg;
 extern const pb_msgdesc_t discovery_DeviceInfoQuery_msg;
@@ -217,6 +246,7 @@ extern const pb_msgdesc_t discovery_Message_msg;
 /* Defines for backwards compatibility with code written before nanopb-0.4.0 */
 #define discovery_DeviceResetQuery_fields &discovery_DeviceResetQuery_msg
 #define discovery_DeviceReadyResp_fields &discovery_DeviceReadyResp_msg
+#define discovery_SetTransportSpeed_fields &discovery_SetTransportSpeed_msg
 #define discovery_DeviceInfoResp_fields &discovery_DeviceInfoResp_msg
 #define discovery_DeviceDomainInfoResp_fields &discovery_DeviceDomainInfoResp_msg
 #define discovery_DeviceInfoQuery_fields &discovery_DeviceInfoQuery_msg
@@ -231,6 +261,7 @@ extern const pb_msgdesc_t discovery_Message_msg;
 #define discovery_DeviceInfoQuery_size           6
 #define discovery_DeviceReadyResp_size           0
 #define discovery_DeviceResetQuery_size          0
+#define discovery_SetTransportSpeed_size         6
 
 #ifdef __cplusplus
 } /* extern "C" */

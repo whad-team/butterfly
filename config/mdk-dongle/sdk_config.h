@@ -1247,7 +1247,7 @@
 // <i> Setting string to NULL disables that string.
 // <i> The order of manufacturer names must be the same like in @ref APP_USBD_STRINGS_LANGIDS.
 #ifndef APP_USBD_STRINGS_MANUFACTURER
-#define APP_USBD_STRINGS_MANUFACTURER APP_USBD_STRING_DESC("Nordic Semiconductor")
+#define APP_USBD_STRINGS_MANUFACTURER APP_USBD_STRING_DESC("WHAD")
 #endif
 
 // </e>
@@ -1271,7 +1271,7 @@
 // <i> Note: This value is not editable in Configuration Wizard.
 // <i> List of product names that is defined the same way like in @ref APP_USBD_STRINGS_MANUFACTURER.
 #ifndef APP_USBD_STRINGS_PRODUCT
-#define APP_USBD_STRINGS_PRODUCT APP_USBD_STRING_DESC("nRF52 USB CDC Demo")
+#define APP_USBD_STRINGS_PRODUCT APP_USBD_STRING_DESC("ButteRFly dongle")
 #endif
 
 // </e>

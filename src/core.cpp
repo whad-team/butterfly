@@ -42,7 +42,6 @@ void Core::processDiscoveryInputMessage(discovery_Message msg) {
       this->radio->disable();
       this->currentController = NULL;
       this->radio->setController(NULL);
-
       // Send Ready Response
       response = Whad::buildDiscoveryReadyResponseMessage();
       this->pushMessageToQueue(response);
@@ -664,6 +663,8 @@ void Core::handleCommand(Command *cmd) {
 */
 
 void Core::loop() {
+
+
 	while (true) {
 		this->serialModule->process();
     Message *msg = this->popMessageFromQueue();

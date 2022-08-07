@@ -95,6 +95,13 @@ Message* Whad::buildDiscoveryDeviceInfoMessage() {
   msg->msg.discovery.msg.info_resp.devid[14] = (NRF_FICR->DEVICEADDR[1] & 0x00FF0000) >> 16;
   msg->msg.discovery.msg.info_resp.devid[15] = (NRF_FICR->DEVICEADDR[1] & 0xFF000000) >> 24;
 
+  msg->msg.discovery.msg.info_resp.fw_author.size = strlen(FIRMWARE_AUTHOR);
+  memcpy(msg->msg.discovery.msg.info_resp.fw_author.bytes, FIRMWARE_AUTHOR, strlen(FIRMWARE_AUTHOR));
+
+  msg->msg.discovery.msg.info_resp.fw_url.size = strlen(FIRMWARE_URL);
+  memcpy(msg->msg.discovery.msg.info_resp.fw_url.bytes, FIRMWARE_URL, strlen(FIRMWARE_URL));
+
+  msg->msg.discovery.msg.info_resp.max_speed = 115200;
   msg->msg.discovery.msg.info_resp.proto_min_ver = WHAD_MIN_VERSION;
   msg->msg.discovery.msg.info_resp.fw_version_major = VERSION_MAJOR;
   msg->msg.discovery.msg.info_resp.fw_version_minor = VERSION_MINOR;

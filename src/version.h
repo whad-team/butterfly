@@ -7,4 +7,6 @@
 
 #define WHAD_MIN_VERSION 0x0100
 
+#define FIRMWARE_AUTHOR "Romain Cayre"
+#define FIRMWARE_URL    "https://github.com/whad-team/butterfly"
 #endif
