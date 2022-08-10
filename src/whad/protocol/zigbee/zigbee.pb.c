@@ -18,6 +18,9 @@ PB_BIND(zigbee_JamCmd, zigbee_JamCmd, AUTO)
 PB_BIND(zigbee_SendCmd, zigbee_SendCmd, 2)
 
 
+PB_BIND(zigbee_SendRawCmd, zigbee_SendRawCmd, 2)
+
+
 PB_BIND(zigbee_EndDeviceCmd, zigbee_EndDeviceCmd, AUTO)
 
 

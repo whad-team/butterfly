@@ -43,13 +43,17 @@ void Dot15d4Controller::send(uint8_t *data, size_t size) {
 				Core::instance->getLinkModule()->sendSignalToSlave(STOP_SLAVE_RADIO);
 				this->setNativeConfiguration();
 				this->radio->send(data,size,Dot15d4Controller::channelToFrequency(this->channel), 0x00);
-				nrf_delay_us(1000);
+				nrf_delay_us((size+6)*8*1000/250);
 				this->setWazabeeConfiguration();
 				Core::instance->getLinkModule()->sendSignalToSlave(START_SLAVE_RADIO);
 			}
 			else {
+				this->setRawConfiguration();
+
 				this->radio->send(data,size,Dot15d4Controller::channelToFrequency(this->channel), 0x00);
-				nrf_delay_us(1000);
+				nrf_delay_us((size+6)*8*1000/250);
+				this->setNativeConfiguration();
+
 			}
 }
 
@@ -106,6 +110,27 @@ void Dot15d4Controller::setWazabeeConfiguration() {
 }
 
 void Dot15d4Controller::setNativeConfiguration() {
+	this->radio->setPrefixes();
+  this->radio->setMode(MODE_NORMAL);
+  this->radio->setFastRampUpTime(true);
+  this->radio->setTxPower(POS0_DBM);
+  this->radio->disableRssi();
+	this->radio->setEndianness(LITTLE);
+  this->radio->setPhy(DOT15D4_NATIVE);
+	this->radio->disableJammingPatterns();
+  this->radio->setCrc(HARDWARE_CRC);
+  this->radio->setCrcSkipAddress(false);
+  this->radio->setCrcSize(2);
+  this->radio->setCrcInit(0x0000);
+  this->radio->setCrcPoly(0x11021);
+  this->radio->setPayloadLength(255);
+  //this->radio->setInterFrameSpacing(0);
+  //this->radio->setExpandPayloadLength(255);
+  this->radio->setFrequency(Dot15d4Controller::channelToFrequency(this->channel));
+  this->radio->reload();
+}
+
+void Dot15d4Controller::setRawConfiguration() {
 	this->radio->setPrefixes();
   this->radio->setMode(MODE_NORMAL);
   this->radio->setFastRampUpTime(true);

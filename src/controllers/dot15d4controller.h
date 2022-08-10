@@ -38,6 +38,7 @@ class Dot15d4Controller : public Controller {
 		void setWazabeeConfiguration();
 		void setNativeConfiguration();
 		void setJammerConfiguration();
+		void setRawConfiguration();
 
 		void startAttack(Dot15d4Attack attack);
 		void sendJammingReport(uint32_t timestamp);
