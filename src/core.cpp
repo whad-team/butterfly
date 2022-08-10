@@ -92,8 +92,7 @@ void Core::processZigbeeInputMessage(zigbee_Message msg) {
     this->currentController->stop();
     response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
   }
-
-  else if (msg.which_msg == zigbee_Message_send_raw_tag) {
+  else if (msg.which_msg == zigbee_Message_send_tag) {
     int channel = msg.msg.send.channel;
     generic_ResultCode code = generic_ResultCode_SUCCESS;
     if (channel >= 11 && channel <= 26) {
@@ -103,11 +102,32 @@ void Core::processZigbeeInputMessage(zigbee_Message msg) {
       code = generic_ResultCode_PARAMETER_ERROR;
     }
     if (code == generic_ResultCode_SUCCESS) {
+      size_t size = msg.msg.send.pdu.size;
+      uint8_t *packet = (uint8_t*)malloc(1 + size);
+      packet[0] = size;
+      memcpy(packet+1,msg.msg.send.pdu.bytes, size);
+      this->dot15d4Controller->send(packet, size+1, false);
+      free(packet);
+      code = generic_ResultCode_SUCCESS;
+    }
+    response = Whad::buildResultMessage(code);
+  }
+  else if (msg.which_msg == zigbee_Message_send_raw_tag) {
+    int channel = msg.msg.send_raw.channel;
+    generic_ResultCode code = generic_ResultCode_SUCCESS;
+    if (channel >= 11 && channel <= 26) {
+      this->dot15d4Controller->setChannel(channel);
+    }
+    else {
+      code = generic_ResultCode_PARAMETER_ERROR;
+    }
+    if (code == generic_ResultCode_SUCCESS) {
       size_t size = msg.msg.send_raw.pdu.size;
-      uint8_t *packet = (uint8_t*)malloc(2 + size);
-      memcpy(packet,msg.msg.send_raw.pdu.bytes, size);
-      memcpy(packet+size, &msg.msg.send_raw.fcs, 2);
-      this->dot15d4Controller->send(packet, size+2);
+      uint8_t *packet = (uint8_t*)malloc(3 + size);
+      packet[0] = size+2;
+      memcpy(packet+1,msg.msg.send_raw.pdu.bytes, size);
+      memcpy(packet+1+size, &msg.msg.send_raw.fcs, 2);
+      this->dot15d4Controller->send(packet, size+3, true);
       free(packet);
       code = generic_ResultCode_SUCCESS;
     }

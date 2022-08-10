@@ -45,7 +45,7 @@ class Dot15d4Controller : public Controller {
 
 		Dot15d4Packet* wazabeeDecoder(uint8_t *buffer, uint8_t size, uint32_t timestamp, CrcValue crcValue, uint8_t rssi);
 
-    void send(uint8_t* data, size_t size);
+    void send(uint8_t* data, size_t size, bool raw);
 
     // Reception callback
     void onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi);

@@ -38,7 +38,7 @@ void Dot15d4Controller::setChannel(int channel) {
     this->radio->fastFrequencyChange(Dot15d4Controller::channelToFrequency(channel),channel);
 }
 
-void Dot15d4Controller::send(uint8_t *data, size_t size) {
+void Dot15d4Controller::send(uint8_t *data, size_t size, bool raw) {
 			if (this->attackStatus.attack == DOT15D4_ATTACK_CORRECTION) {
 				Core::instance->getLinkModule()->sendSignalToSlave(STOP_SLAVE_RADIO);
 				this->setNativeConfiguration();
@@ -47,13 +47,17 @@ void Dot15d4Controller::send(uint8_t *data, size_t size) {
 				this->setWazabeeConfiguration();
 				Core::instance->getLinkModule()->sendSignalToSlave(START_SLAVE_RADIO);
 			}
-			else {
+			else if (raw) {
 				this->setRawConfiguration();
-
 				this->radio->send(data,size,Dot15d4Controller::channelToFrequency(this->channel), 0x00);
 				nrf_delay_us((size+6)*8*1000/250);
 				this->setNativeConfiguration();
 
+			}
+			else {
+				this->setNativeConfiguration();
+				this->radio->send(data,size,Dot15d4Controller::channelToFrequency(this->channel), 0x00);
+				nrf_delay_us((size+6)*8*1000/250);
 			}
 }
 
