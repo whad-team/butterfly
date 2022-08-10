@@ -114,7 +114,7 @@ void Dot15d4Controller::setNativeConfiguration() {
 	this->radio->setEndianness(LITTLE);
   this->radio->setPhy(DOT15D4_NATIVE);
 	this->radio->disableJammingPatterns();
-  this->radio->setCrc(HARDWARE_CRC);
+  this->radio->setCrc(NO_CRC);
   this->radio->setCrcSkipAddress(false);
   this->radio->setCrcSize(2);
   this->radio->setCrcInit(0x0000);
