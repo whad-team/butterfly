@@ -8,7 +8,7 @@ uint32_t bytewise_bit_swap(uint32_t inp);
 void sort_array(uint32_t tab[], size_t size);
 
 bool compareBuffers(uint8_t *buffer1, uint8_t *buffer2,size_t size);
-
+int is_access_address_valid(uint32_t aa);
 
 
 uint8_t dewhiten_byte_ble(uint8_t byte, int position, int channel);

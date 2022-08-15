@@ -225,3 +225,18 @@ Message* Whad::buildBLEHijackedMessage(bool success, uint32_t accessAddress) {
   msg->msg.ble.msg.hijacked.access_address = accessAddress;
   return msg;
 }
+
+
+Message* Whad::buildBLEAccessAddressDiscoveredMessage(uint32_t accessAddress, uint32_t timestamp, int32_t rssi) {
+  Message* msg = Whad::buildMessage();
+  msg->which_msg = Message_ble_tag;
+  msg->msg.ble.which_msg = ble_Message_aa_disc_tag;
+
+  msg->msg.ble.msg.aa_disc.access_address = accessAddress;
+  msg->msg.ble.msg.aa_disc.has_timestamp = true;
+  msg->msg.ble.msg.aa_disc.timestamp = timestamp;
+  msg->msg.ble.msg.aa_disc.has_rssi = true;
+  msg->msg.ble.msg.aa_disc.rssi = rssi;
+
+  return msg;
+}

@@ -69,6 +69,54 @@ void dewhiten_ble(uint8_t *data, int len, int channel){
 	}
 }
 
+// Function extracted from btlejack firmware
+int is_access_address_valid(uint32_t aa)
+{
+    uint8_t a,b,c,d;
+    uint32_t bb;
+    int i, t;
+
+    /* Four different bytes. */
+    a = (aa & 0xff000000)>>24;
+    b = (aa & 0x00ff0000)>>16;
+    c = (aa & 0x0000ff00)>>8;
+    d = (aa & 0x000000ff);
+    if ((a==b) && (b==c) && (c==d))
+        return 0;
+
+    /* Not the advertising access address. */
+    if (aa == 0x8E89BED6)
+        return 0;
+
+    /* Check consecutive bits. */
+    bb = aa;
+    for (i=0; i<26; i++)
+    {
+        if (((bb&0x3F) == 0) || ((bb&0x3F)==0x3F))
+            return 0;
+        bb >>= 1;
+    }
+
+    /* Check transitions. */
+    bb = aa;
+    t = 0;
+    a = (bb & 0x80000000)>>31;
+    for (i=30; i>=0; i--)
+    {
+        if (((bb & (1<<i))>>i) != a)
+        {
+            a = ((bb & (1<<i))>>i);
+            t++;
+            if (t>24)
+                return 0;
+        }
+        if ((i < 26) && (t<2))
+            return 0;
+    }
+
+    return 1;
+}
+
 int hamming(uint8_t *demod_buffer,uint8_t *pattern) {
 	int count = 0;
 	for (int i=0;i<4;i++) {

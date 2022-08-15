@@ -35,6 +35,8 @@ class Whad {
     static Message* buildBLEDesynchronizedMessage(uint32_t accessAddress);
     static Message* buildBLEInjectedMessage(bool success, uint32_t injectionAttempts, uint32_t accessAddress);
     static Message* buildBLEHijackedMessage(bool success, uint32_t accessAddress);
+    static Message* buildBLEAccessAddressDiscoveredMessage(uint32_t accessAddress, uint32_t timestamp, int32_t rssi);
+
 };
 
 #endif

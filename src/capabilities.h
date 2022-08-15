@@ -29,7 +29,8 @@ const DeviceCapability CAPABILITIES[] = {
       CMD(ble_BleCommand_HijackSlave) |
       CMD(ble_BleCommand_HijackBoth) |
       CMD(ble_BleCommand_CentralMode) |
-      CMD(ble_BleCommand_PeripheralMode)
+      CMD(ble_BleCommand_PeripheralMode) |
+      CMD(ble_BleCommand_SniffAccessAddress)
 
       )
   },

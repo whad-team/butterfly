@@ -31,7 +31,8 @@ typedef enum _discovery_Domain {
 typedef enum _discovery_DeviceType { 
     discovery_DeviceType_Esp32BleFuzzer = 0, 
     discovery_DeviceType_Butterfly = 1, 
-    discovery_DeviceType_BtleJack = 2 
+    discovery_DeviceType_BtleJack = 2, 
+    discovery_DeviceType_VirtualDevice = 4 
 } discovery_DeviceType;
 
 typedef enum _discovery_Capability { 
@@ -116,8 +117,8 @@ typedef struct _discovery_Message {
 #define _discovery_Domain_ARRAYSIZE ((discovery_Domain)(discovery_Domain_ANT_FS+1))
 
 #define _discovery_DeviceType_MIN discovery_DeviceType_Esp32BleFuzzer
-#define _discovery_DeviceType_MAX discovery_DeviceType_BtleJack
-#define _discovery_DeviceType_ARRAYSIZE ((discovery_DeviceType)(discovery_DeviceType_BtleJack+1))
+#define _discovery_DeviceType_MAX discovery_DeviceType_VirtualDevice
+#define _discovery_DeviceType_ARRAYSIZE ((discovery_DeviceType)(discovery_DeviceType_VirtualDevice+1))
 
 #define _discovery_Capability_MIN discovery_Capability__CapNone
 #define _discovery_Capability_MAX discovery_Capability_RouterRole

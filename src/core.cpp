@@ -31,7 +31,6 @@ void Core::processInputMessage(Message msg) {
 }
 
 void Core::processGenericInputMessage(generic_Message msg) {
-  this->sendVerbose("generic");
 }
 
 void Core::processDiscoveryInputMessage(discovery_Message msg) {
@@ -159,7 +158,7 @@ void Core::processBLEInputMessage(ble_Message msg) {
                                     msg.msg.sniff_adv.bd_address[0]
     );
     this->bleController->setFollowMode(false);
-
+    this->bleController->sniff();
     response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
   }
   else if (msg.which_msg == ble_Message_sniff_connreq_tag) {
@@ -178,16 +177,22 @@ void Core::processBLEInputMessage(ble_Message msg) {
                                     msg.msg.sniff_connreq.bd_address[0]
     );
     this->bleController->setFollowMode(true);
+    this->bleController->sniff();
+    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+  }
+  else if (msg.which_msg == ble_Message_sniff_aa_tag) {
+    this->bleController->setChannel(0);
+    this->bleController->sniffAccessAddresses();
 
     response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
   }
   else if (msg.which_msg == ble_Message_start_tag) {
-    this->currentController->start();
+    this->bleController->start();
     response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
   }
 
   else if (msg.which_msg == ble_Message_stop_tag) {
-    this->currentController->stop();
+    this->bleController->stop();
     response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
   }
 
@@ -322,6 +327,8 @@ void Core::init() {
 
 	this->currentController = NULL;
 	this->radio->setController(this->currentController);
+  Message* response = Whad::buildDiscoveryReadyResponseMessage();
+  this->pushMessageToQueue(response);
 
 }
 

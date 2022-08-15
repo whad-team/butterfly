@@ -16,6 +16,8 @@
 #define CRC_SIZE								3
 #define BLE_IFS 								150
 
+#define MAX_AA_CANDIDATES 12
+
 typedef enum ConnectionStatus {
 	CONNECTION_STARTED = 0x00,
 	CONNECTION_LOST = 0x01,
@@ -28,6 +30,7 @@ typedef enum ControllerState {
 	SNIFFING_ADVERTISEMENTS,
 	COLLECTING_ADVINTERVAL,
 	FOLLOWING_ADVERTISEMENTS,
+	SNIFFING_ACCESS_ADDRESS,
 	SNIFFING_CONNECTION,
 	INJECTING_TO_SLAVE,
 	INJECTING_TO_MASTER,
@@ -96,6 +99,11 @@ typedef struct BLEPayload {
 	bool transmitted;
 } BLEPayload;
 
+typedef struct CandidateAccessAddresses {
+	uint32_t candidates[MAX_AA_CANDIDATES];
+	uint8_t pointer;
+} CandidateAccessAddresses;
+
 class BLEController : public Controller {
 	protected:
 		TimerModule *timerModule;
@@ -103,6 +111,7 @@ class BLEController : public Controller {
 		Timer* connectionTimer;
 		Timer* injectionTimer;
 		Timer* masterTimer;
+		Timer* discoveryTimer;
 
 		uint32_t lastAnchorPoint;
 		bool emptyTransmitIndicator;
@@ -163,12 +172,17 @@ class BLEController : public Controller {
 
 		BLEAddress filter;
 
+		// Discovery related data
+		CandidateAccessAddresses candidates;
+
 	public:
 		static int channelToFrequency(int channel);
 
 		BLEController(Radio *radio);
 		void start();
 		void stop();
+
+		void sniff();
 
 		void setAnchorPoint(uint32_t timestamp);
 
@@ -179,6 +193,11 @@ class BLEController : public Controller {
 		void sendInjectionReport(bool status, uint32_t injectionCount);
 		void sendAdvIntervalReport(uint32_t interval);
 		void sendConnectionReport(ConnectionStatus status);
+		void sendAccessAddressReport(uint32_t accessAddress, uint32_t timestamp, int32_t rssi);
+
+		void resetAccessAddressesCandidates();
+		bool isAccessAddressKnown(uint32_t accessAddress);
+		void addCandidateAccessAddress(uint32_t accessAddress);
 
 		void followAdvertisingDevice(uint8_t a,uint8_t b,uint8_t c,uint8_t d,uint8_t e,uint8_t f);
 		void calculateAdvertisingIntervals();
@@ -186,9 +205,13 @@ class BLEController : public Controller {
 		// Hardware configuration manager
 		void setHardwareConfiguration(uint32_t accessAddress,uint32_t crcInit);
 		void setJammerConfiguration();
-
+		void setAccessAddressDiscoveryConfiguration();
 		// Follow mode setter
 		void setFollowMode(bool follow);
+
+		// Existing connections discovery
+		void sniffAccessAddresses();
+		void hopToNextDataChannel();
 
 		// Connection specific methods
 		void followConnection(uint16_t hopInterval, uint8_t hopIncrement, uint8_t *channelMap,uint32_t accessAddress,uint32_t crcInit,  int masterSCA,uint16_t latency);
@@ -262,6 +285,8 @@ class BLEController : public Controller {
 		void releaseTimers();
 
 		// Packets processing methods
+		void accessAddressProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi);
+
 		void advertisementPacketProcessing(BLEPacket *pkt);
 		void connectionPacketProcessing(BLEPacket *pkt);
 
