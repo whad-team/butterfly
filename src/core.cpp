@@ -724,6 +724,6 @@ void Core::loop() {
 		__WFE();
 		// Clear SEV flag if CPU was woken up by event
 		__SEV();
-		__WFE();
+
 	}
 }
