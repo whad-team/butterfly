@@ -108,7 +108,7 @@ typedef struct CandidateAccessAddresses {
 typedef struct ActiveConnectionRecovery {
 	bool monitoredChannels[37];
 	int monitoredChannelsCount;
-	
+
 	uint8_t accessAddressPreamble;
 	CandidateAccessAddresses accessAddressCandidates;
 

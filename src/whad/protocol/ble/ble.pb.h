@@ -119,13 +119,11 @@ typedef struct _ble_AdvModeCmd {
 } ble_AdvModeCmd;
 
 typedef PB_BYTES_ARRAY_T(31) ble_AdvPduReceived_adv_data_t;
-typedef PB_BYTES_ARRAY_T(31) ble_AdvPduReceived_scanrsp_data_t;
 typedef struct _ble_AdvPduReceived { 
     ble_BleAdvType adv_type;
     int32_t rssi;
     pb_byte_t bd_address[6];
     ble_AdvPduReceived_adv_data_t adv_data;
-    ble_AdvPduReceived_scanrsp_data_t scanrsp_data;
 } ble_AdvPduReceived;
 
 /* *
@@ -422,7 +420,7 @@ extern "C" {
 #define ble_HijackSlaveCmd_init_default          {0}
 #define ble_HijackBothCmd_init_default           {0}
 #define ble_AccessAddressDiscovered_init_default {0, false, 0, false, 0}
-#define ble_AdvPduReceived_init_default          {_ble_BleAdvType_MIN, 0, {0}, {0, {0}}, {0, {0}}}
+#define ble_AdvPduReceived_init_default          {_ble_BleAdvType_MIN, 0, {0}, {0, {0}}}
 #define ble_Connected_init_default               {{0}, {0}, 0, 0}
 #define ble_Disconnected_init_default            {0, 0}
 #define ble_Synchronized_init_default            {0, 0, 0, 0, {0}}
@@ -455,7 +453,7 @@ extern "C" {
 #define ble_HijackSlaveCmd_init_zero             {0}
 #define ble_HijackBothCmd_init_zero              {0}
 #define ble_AccessAddressDiscovered_init_zero    {0, false, 0, false, 0}
-#define ble_AdvPduReceived_init_zero             {_ble_BleAdvType_MIN, 0, {0}, {0, {0}}, {0, {0}}}
+#define ble_AdvPduReceived_init_zero             {_ble_BleAdvType_MIN, 0, {0}, {0, {0}}}
 #define ble_Connected_init_zero                  {{0}, {0}, 0, 0}
 #define ble_Disconnected_init_zero               {0, 0}
 #define ble_Synchronized_init_zero               {0, 0, 0, 0, {0}}
@@ -478,7 +476,6 @@ extern "C" {
 #define ble_AdvPduReceived_rssi_tag              2
 #define ble_AdvPduReceived_bd_address_tag        3
 #define ble_AdvPduReceived_adv_data_tag          4
-#define ble_AdvPduReceived_scanrsp_data_tag      5
 #define ble_ConnectToCmd_bd_address_tag          1
 #define ble_Connected_initiator_tag              1
 #define ble_Connected_advertiser_tag             2
@@ -718,8 +715,7 @@ X(a, STATIC,   OPTIONAL, UINT32,   timestamp,         3)
 X(a, STATIC,   SINGULAR, UENUM,    adv_type,          1) \
 X(a, STATIC,   SINGULAR, INT32,    rssi,              2) \
 X(a, STATIC,   SINGULAR, FIXED_LENGTH_BYTES, bd_address,        3) \
-X(a, STATIC,   SINGULAR, BYTES,    adv_data,          4) \
-X(a, STATIC,   SINGULAR, BYTES,    scanrsp_data,      5)
+X(a, STATIC,   SINGULAR, BYTES,    adv_data,          4)
 #define ble_AdvPduReceived_CALLBACK NULL
 #define ble_AdvPduReceived_DEFAULT NULL
 
@@ -929,7 +925,7 @@ extern const pb_msgdesc_t ble_Message_msg;
 /* ble_Message_size depends on runtime parameters */
 #define ble_AccessAddressDiscovered_size         23
 #define ble_AdvModeCmd_size                      66
-#define ble_AdvPduReceived_size                  87
+#define ble_AdvPduReceived_size                  54
 #define ble_CentralModeCmd_size                  0
 #define ble_ConnectToCmd_size                    8
 #define ble_Connected_size                       28

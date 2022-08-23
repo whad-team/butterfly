@@ -318,7 +318,7 @@ void BLEController::start() {
 			this->discoveryTimer = this->timerModule->getTimer();
 			this->discoveryTimer->setMode(REPEATED);
 			this->discoveryTimer->setCallback((ControllerCallback)&BLEController::hopToNextDataChannel, this);
-			this->discoveryTimer->update(50000);
+			this->discoveryTimer->update(2000000);
 			if (!this->discoveryTimer->isStarted()) this->discoveryTimer->start();
 		}
 	}
@@ -329,7 +329,7 @@ void BLEController::start() {
 			this->discoveryTimer = this->timerModule->getTimer();
 			this->discoveryTimer->setMode(REPEATED);
 			this->discoveryTimer->setCallback((ControllerCallback)&BLEController::hopToNextDataChannel, this);
-			this->discoveryTimer->update(50000);
+			this->discoveryTimer->update(4000000);
 			if (!this->discoveryTimer->isStarted()) this->discoveryTimer->start();
 		}
 	}
@@ -1301,7 +1301,7 @@ void BLEController::accessAddressProcessing(uint32_t timestamp, uint8_t size, ui
 
 
 	dewhiten_ble(buffer+4, size-4, this->channel);
-	if (is_access_address_valid(accessAddress) && buffer[5] == 0) {
+	if (is_access_address_valid(accessAddress) && buffer[5] == 0x00) {
 		if (this->isAccessAddressKnown(accessAddress)) {
 			// We report the access address if we saw it twice
 			this->sendAccessAddressReport(accessAddress, timestamp, -1 * rssi);

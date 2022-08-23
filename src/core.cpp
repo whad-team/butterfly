@@ -182,14 +182,17 @@ void Core::processBLEInputMessage(ble_Message msg) {
   }
   else if (msg.which_msg == ble_Message_sniff_aa_tag) {
     this->bleController->setChannel(0);
+    this->bleController->setMonitoredChannels(msg.msg.sniff_aa.monitored_channels);
     this->bleController->sniffAccessAddresses();
 
     response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
   }
   else if (msg.which_msg == ble_Message_sniff_conn_tag) {
     this->bleController->setChannel(0);
+
+    this->bleController->setMonitoredChannels(msg.msg.sniff_conn.monitored_channels);
     this->bleController->recoverCrcInit(msg.msg.sniff_conn.access_address);
-    
+
     response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
   }
   else if (msg.which_msg == ble_Message_start_tag) {
