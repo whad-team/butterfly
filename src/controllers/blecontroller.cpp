@@ -76,6 +76,23 @@ void BLEController::updateHopIncrement(uint8_t hopIncrement) {
 	this->hopIncrement = hopIncrement;
 }
 
+void BLEController::setMonitoredChannels(uint8_t *channels) {
+	this->activeConnectionRecovery.monitoredChannelsCount = 0;
+	for (int i=0; i<5; i++) {
+		for (int j=0; j<8; j++) {
+			if ((8*i + j) < 37) {
+				if (channels[i] & (1<<j)) {
+					this->activeConnectionRecovery.monitoredChannels[8*i + j] = true;
+					this->activeConnectionRecovery.monitoredChannelsCount++;
+				}
+				else {
+					this->activeConnectionRecovery.monitoredChannels[8*i + j] = false;
+				}
+			}
+		}
+	}
+}
+
 void BLEController::updateChannelsInUse(uint8_t* channelMap) {
 	memcpy(this->channelMap, channelMap, 5);
 	// This method extracts the channels in use from the channel map and build the remapping Table
@@ -294,28 +311,40 @@ void BLEController::start() {
 		this->setHardwareConfiguration(0x8e89bed6,0x555555);
 	}
 	else if (this->controllerState == SNIFFING_ACCESS_ADDRESS) {
-		this->setAccessAddressDiscoveryConfiguration();
+		this->activeConnectionRecovery.accessAddressPreamble = 0xAA;
+		this->setAccessAddressDiscoveryConfiguration(0xAA);
 		this->resetAccessAddressesCandidates();
 		if (this->discoveryTimer == NULL) {
 			this->discoveryTimer = this->timerModule->getTimer();
 			this->discoveryTimer->setMode(REPEATED);
 			this->discoveryTimer->setCallback((ControllerCallback)&BLEController::hopToNextDataChannel, this);
-			this->discoveryTimer->update(500000);
+			this->discoveryTimer->update(50000);
+			if (!this->discoveryTimer->isStarted()) this->discoveryTimer->start();
+		}
+	}
+	else if (this->controllerState == RECOVERING_CRC_INIT) {
+		this->setCrcRecoveryConfiguration(this->accessAddress);
+
+		if (this->discoveryTimer == NULL) {
+			this->discoveryTimer = this->timerModule->getTimer();
+			this->discoveryTimer->setMode(REPEATED);
+			this->discoveryTimer->setCallback((ControllerCallback)&BLEController::hopToNextDataChannel, this);
+			this->discoveryTimer->update(50000);
 			if (!this->discoveryTimer->isStarted()) this->discoveryTimer->start();
 		}
 	}
 }
 
 void BLEController::resetAccessAddressesCandidates() {
-	this->candidates.pointer = 0;
+	this->activeConnectionRecovery.accessAddressCandidates.pointer = 0;
 	for (int i=0;i<MAX_AA_CANDIDATES;i++) {
-		this->candidates.candidates[i] = 0x00000000;
+		this->activeConnectionRecovery.accessAddressCandidates.candidates[i] = 0x00000000;
 	}
 }
 bool BLEController::isAccessAddressKnown(uint32_t accessAddress) {
 	bool found = false;
 	for (int i=0;i<MAX_AA_CANDIDATES;i++) {
-		if (this->candidates.candidates[i] == accessAddress) {
+		if (this->activeConnectionRecovery.accessAddressCandidates.candidates[i] == accessAddress) {
 			found = true;
 			break;
 		}
@@ -324,13 +353,33 @@ bool BLEController::isAccessAddressKnown(uint32_t accessAddress) {
 }
 
 void BLEController::addCandidateAccessAddress(uint32_t accessAddress) {
-		this->candidates.candidates[this->candidates.pointer] = accessAddress;
-		this->candidates.pointer = (this->candidates.pointer + 1) % MAX_AA_CANDIDATES;
+		this->activeConnectionRecovery.accessAddressCandidates.candidates[this->activeConnectionRecovery.accessAddressCandidates.pointer] = accessAddress;
+		this->activeConnectionRecovery.accessAddressCandidates.pointer = (this->activeConnectionRecovery.accessAddressCandidates.pointer + 1) % MAX_AA_CANDIDATES;
 }
 
 
 void BLEController::hopToNextDataChannel() {
-	this->setChannel((this->channel + 1) % 37);
+	bsp_board_led_invert(1);
+	if (this->controllerState == SNIFFING_ACCESS_ADDRESS) {
+		if (this->activeConnectionRecovery.accessAddressPreamble == 0xAA) {
+			this->activeConnectionRecovery.accessAddressPreamble = 0x55;
+			this->setAccessAddressDiscoveryConfiguration(0x55);
+		}
+		else {
+			int new_channel = (this->channel + 1) % 37;
+			while (!this->activeConnectionRecovery.monitoredChannels[new_channel]) {
+				int new_channel = (new_channel + 1) % 37;
+			}
+			this->setChannel(new_channel);
+		}
+	}
+	else if (this->controllerState == RECOVERING_CRC_INIT) {
+		int new_channel = (this->channel + 1) % 37;
+		while (!this->activeConnectionRecovery.monitoredChannels[new_channel]) {
+			int new_channel = (new_channel + 1) % 37;
+		}
+		this->setChannel(new_channel);
+	}
 }
 
 bool BLEController::whitelistAdvAddress(bool enable,uint8_t a, uint8_t b, uint8_t c,uint8_t d, uint8_t e, uint8_t f) {
@@ -399,13 +448,18 @@ void BLEController::stop() {
 void BLEController::sniff() {
 	this->controllerState = SNIFFING_ADVERTISEMENTS;
 }
+
+void BLEController::recoverCrcInit(uint32_t accessAddress) {
+	this->controllerState = RECOVERING_CRC_INIT;
+	this->accessAddress = accessAddress;
+}
 void BLEController::sniffAccessAddresses() {
 	this->controllerState	= SNIFFING_ACCESS_ADDRESS;
 }
 
-void BLEController::setAccessAddressDiscoveryConfiguration() {
-	uint8_t preamble[] = {0xAA, 0x00};
-  this->radio->setPreamble(preamble,2);
+void BLEController::setAccessAddressDiscoveryConfiguration(uint8_t preamble) {
+	uint8_t two_bytes_preamble[] = {preamble, 0x00};
+  this->radio->setPreamble(two_bytes_preamble,2);
 	this->radio->setPrefixes();
   this->radio->setMode(MODE_NORMAL);
   this->radio->setFastRampUpTime(true);
@@ -451,6 +505,36 @@ void BLEController::setJammerConfiguration() {
 	this->radio->setPayloadLength(20);
 	this->radio->setInterFrameSpacing(0);
 	this->radio->setExpandPayloadLength(20);
+	this->radio->setFrequency(BLEController::channelToFrequency(channel));
+	this->radio->reload();
+}
+
+void BLEController::setCrcRecoveryConfiguration(uint32_t accessAddress) {
+	this->accessAddress = accessAddress;
+	uint8_t accessAddressPreamble[4] = {(uint8_t)((accessAddress & 0xFF000000) >> 24),
+						(uint8_t)((accessAddress & 0x00FF0000) >> 16),
+						(uint8_t)((accessAddress & 0x0000FF00) >> 8),
+						(uint8_t)(accessAddress & 0x000000FF)};
+	this->radio->setPreamble(accessAddressPreamble,4);
+	this->radio->setPrefixes();
+	this->radio->setMode(MODE_NORMAL);
+	this->radio->setFastRampUpTime(true);
+	this->radio->setEndianness(LITTLE);
+	this->radio->setTxPower(POS8_DBM);
+	this->radio->disableRssi(); // prevent time overhead in connected mode
+	this->radio->setPhy(BLE_1MBITS);
+	this->radio->setHeader(0,0,0);
+	this->radio->setWhitening(HARDWARE_WHITENING);
+	this->radio->setWhiteningDataIv(this->channel);
+	this->radio->disableJammingPatterns();
+	this->radio->setCrc(NO_CRC);
+	this->radio->setCrcSkipAddress(true);
+	this->radio->setCrcSize(3);
+	this->radio->setCrcInit(0);
+	this->radio->setCrcPoly(0x100065B);
+	this->radio->setPayloadLength(10);
+	this->radio->setInterFrameSpacing(0);
+	this->radio->setExpandPayloadLength(10);
 	this->radio->setFrequency(BLEController::channelToFrequency(channel));
 	this->radio->reload();
 }
@@ -898,6 +982,11 @@ void BLEController::sendAccessAddressReport(uint32_t accessAddress, uint32_t tim
 	Core::instance->pushMessageToQueue(msg);
 }
 
+void BLEController::sendExistingConnectionReport(uint32_t accessAddress, uint32_t crcInit) {
+	Message* msg = Whad::buildBLESynchronizedMessage(accessAddress, crcInit,0,0,0);
+	Core::instance->pushMessageToQueue(msg);
+}
+
 void BLEController::sendConnectionReport(ConnectionStatus status) {
 	if (status == CONNECTION_STARTED) {
 			Message* msg = Whad::buildBLESynchronizedMessage(this->accessAddress, this->crcInit, this->hopInterval, this->hopIncrement, this->channelMap);
@@ -1222,10 +1311,32 @@ void BLEController::accessAddressProcessing(uint32_t timestamp, uint8_t size, ui
 		}
 	}
 }
+void BLEController::crcInitRecoveryProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
+		// If we got an empty packet, extract the CRC and reverse the CRCInit
+		if ((buffer[0] & 0xF3) == 1 && buffer[1] == 0x00) {
+			uint32_t crc = buffer[2] | (buffer[3] << 8) | (buffer[4] << 16);
+			uint32_t crcInit = reverse_crc_ble(crc, buffer, 2);
+
+
+			if (this->crcInit != crcInit) {
+				this->crcInit = crcInit;
+				this->activeConnectionRecovery.validPacketOccurences = 0;
+			}
+			else {
+				this->activeConnectionRecovery.validPacketOccurences++;
+				if (this->activeConnectionRecovery.validPacketOccurences >= 3) {
+					this->sendExistingConnectionReport(this->accessAddress, this->crcInit);
+				}
+			}
+		}
+}
 
 void BLEController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
 	if (this->controllerState == SNIFFING_ACCESS_ADDRESS) {
 		this->accessAddressProcessing(timestamp, size , buffer, crcValue, rssi);
+	}
+	else if (this->controllerState == RECOVERING_CRC_INIT) {
+		this->crcInitRecoveryProcessing(timestamp, size, buffer, crcValue, rssi);
 	}
 	else if (crcValue.validity == VALID_CRC) {
 		BLEPacket *pkt = new BLEPacket(this->accessAddress,buffer, size,timestamp, (this->accessAddress != 0x8e89bed6 ? (int32_t)(timestamp - this->lastAnchorPoint) : 0), 0, this->channel,rssi, crcValue);

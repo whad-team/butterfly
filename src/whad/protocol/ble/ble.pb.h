@@ -88,17 +88,6 @@ typedef struct _ble_SetAdvDataCmd {
 } ble_SetAdvDataCmd;
 
 /* *
- SniffAccessAddressCmd
-
- Sniff Access Addresses sent over BLE.
-
- Will send AccessAddressDiscovered notifications each
- time an AccessAddress has been found. */
-typedef struct _ble_SniffAccessAddressCmd { 
-    char dummy_field;
-} ble_SniffAccessAddressCmd;
-
-/* *
  StartCmd
 
  Enable peripheral advertising and accept connections. */
@@ -306,8 +295,24 @@ typedef struct _ble_SetBdAddressCmd {
     pb_byte_t bd_address[6];
 } ble_SetBdAddressCmd;
 
+/* *
+ SniffAccessAddressCmd
+
+ Sniff Access Addresses sent over BLE.
+
+ Will send AccessAddressDiscovered notifications each
+ time an AccessAddress has been found. */
+typedef struct _ble_SniffAccessAddressCmd { 
+    pb_byte_t monitored_channels[5];
+} ble_SniffAccessAddressCmd;
+
 typedef struct _ble_SniffActiveConnCmd { 
     uint32_t access_address;
+    uint32_t crc_init;
+    pb_byte_t channel_map[5];
+    uint32_t hop_interval;
+    uint32_t hop_increment;
+    pb_byte_t monitored_channels[5];
 } ble_SniffActiveConnCmd;
 
 typedef struct _ble_SniffAdvCmd { 
@@ -399,8 +404,8 @@ extern "C" {
 #define ble_JamAdvCmd_init_default               {0}
 #define ble_JamAdvOnChannelCmd_init_default      {0}
 #define ble_SniffConnReqCmd_init_default         {0, 0, 0, {0}}
-#define ble_SniffAccessAddressCmd_init_default   {0}
-#define ble_SniffActiveConnCmd_init_default      {0}
+#define ble_SniffAccessAddressCmd_init_default   {{0}}
+#define ble_SniffActiveConnCmd_init_default      {0, 0, {0}, 0, 0, {0}}
 #define ble_JamConnCmd_init_default              {0}
 #define ble_ScanModeCmd_init_default             {0}
 #define ble_AdvModeCmd_init_default              {{0, {0}}, {0, {0}}}
@@ -432,8 +437,8 @@ extern "C" {
 #define ble_JamAdvCmd_init_zero                  {0}
 #define ble_JamAdvOnChannelCmd_init_zero         {0}
 #define ble_SniffConnReqCmd_init_zero            {0, 0, 0, {0}}
-#define ble_SniffAccessAddressCmd_init_zero      {0}
-#define ble_SniffActiveConnCmd_init_zero         {0}
+#define ble_SniffAccessAddressCmd_init_zero      {{0}}
+#define ble_SniffActiveConnCmd_init_zero         {0, 0, {0}, 0, 0, {0}}
 #define ble_JamConnCmd_init_zero                 {0}
 #define ble_ScanModeCmd_init_zero                {0}
 #define ble_AdvModeCmd_init_zero                 {{0, {0}}, {0, {0}}}
@@ -520,7 +525,13 @@ extern "C" {
 #define ble_SendRawPDUCmd_pdu_tag                4
 #define ble_SendRawPDUCmd_crc_tag                5
 #define ble_SetBdAddressCmd_bd_address_tag       1
+#define ble_SniffAccessAddressCmd_monitored_channels_tag 6
 #define ble_SniffActiveConnCmd_access_address_tag 1
+#define ble_SniffActiveConnCmd_crc_init_tag      2
+#define ble_SniffActiveConnCmd_channel_map_tag   3
+#define ble_SniffActiveConnCmd_hop_interval_tag  4
+#define ble_SniffActiveConnCmd_hop_increment_tag 5
+#define ble_SniffActiveConnCmd_monitored_channels_tag 6
 #define ble_SniffAdvCmd_use_extended_adv_tag     1
 #define ble_SniffAdvCmd_channel_tag              2
 #define ble_SniffAdvCmd_bd_address_tag           3
@@ -598,12 +609,17 @@ X(a, STATIC,   SINGULAR, FIXED_LENGTH_BYTES, bd_address,        4)
 #define ble_SniffConnReqCmd_DEFAULT NULL
 
 #define ble_SniffAccessAddressCmd_FIELDLIST(X, a) \
-
+X(a, STATIC,   SINGULAR, FIXED_LENGTH_BYTES, monitored_channels,   6)
 #define ble_SniffAccessAddressCmd_CALLBACK NULL
 #define ble_SniffAccessAddressCmd_DEFAULT NULL
 
 #define ble_SniffActiveConnCmd_FIELDLIST(X, a) \
-X(a, STATIC,   SINGULAR, UINT32,   access_address,    1)
+X(a, STATIC,   SINGULAR, UINT32,   access_address,    1) \
+X(a, STATIC,   SINGULAR, UINT32,   crc_init,          2) \
+X(a, STATIC,   SINGULAR, FIXED_LENGTH_BYTES, channel_map,       3) \
+X(a, STATIC,   SINGULAR, UINT32,   hop_interval,      4) \
+X(a, STATIC,   SINGULAR, UINT32,   hop_increment,     5) \
+X(a, STATIC,   SINGULAR, FIXED_LENGTH_BYTES, monitored_channels,   6)
 #define ble_SniffActiveConnCmd_CALLBACK NULL
 #define ble_SniffActiveConnCmd_DEFAULT NULL
 
@@ -935,8 +951,8 @@ extern const pb_msgdesc_t ble_Message_msg;
 #define ble_SendPDUCmd_size                      311
 #define ble_SendRawPDUCmd_size                   323
 #define ble_SetBdAddressCmd_size                 8
-#define ble_SniffAccessAddressCmd_size           0
-#define ble_SniffActiveConnCmd_size              6
+#define ble_SniffAccessAddressCmd_size           7
+#define ble_SniffActiveConnCmd_size              38
 #define ble_SniffAdvCmd_size                     16
 #define ble_SniffConnReqCmd_size                 18
 #define ble_StartCmd_size                        0

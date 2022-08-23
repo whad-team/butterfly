@@ -186,6 +186,12 @@ void Core::processBLEInputMessage(ble_Message msg) {
 
     response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
   }
+  else if (msg.which_msg == ble_Message_sniff_conn_tag) {
+    this->bleController->setChannel(0);
+    this->bleController->recoverCrcInit(msg.msg.sniff_conn.access_address);
+    
+    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+  }
   else if (msg.which_msg == ble_Message_start_tag) {
     this->bleController->start();
     response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);

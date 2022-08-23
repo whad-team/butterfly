@@ -117,6 +117,32 @@ int is_access_address_valid(uint32_t aa)
     return 1;
 }
 
+uint32_t reverse_crc_ble(uint32_t crc, uint8_t *data, int len) {
+	uint32_t state = crc;
+	uint32_t lfsr_mask = 0xb4c000;
+	uint32_t ret;
+    uint8_t cur;
+	int i, j, top_bit;
+
+	for (i = len - 1; i >= 0; --i) {
+		cur = data[i];
+		for (j = 0; j < 8; ++j) {
+			top_bit = state >> 23;
+			state = (state << 1) & 0xffffff;
+			state |= top_bit ^ ((cur >> (7 - j)) & 1);
+			if (top_bit)
+				state ^= lfsr_mask;
+		}
+	}
+
+	ret = 0;
+	for (i = 0; i < 24; ++i)
+		ret |= ((state >> i) & 1) << (23 - i);
+
+	return ret;
+}
+
+
 int hamming(uint8_t *demod_buffer,uint8_t *pattern) {
 	int count = 0;
 	for (int i=0;i<4;i++) {

@@ -13,7 +13,7 @@ int is_access_address_valid(uint32_t aa);
 
 uint8_t dewhiten_byte_ble(uint8_t byte, int position, int channel);
 void dewhiten_ble(uint8_t *data, int len, int channel);
-
+uint32_t reverse_crc_ble(uint32_t crc, uint8_t *data, int len);
 
 int hamming(uint8_t *demod_buffer, uint8_t *pattern);
 void shift_buffer(uint8_t *demod_buffer, int size);
