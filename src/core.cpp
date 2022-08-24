@@ -197,6 +197,9 @@ void Core::processBLEInputMessage(ble_Message msg) {
     else if (msg.msg.sniff_conn.channel_map[0] == 0 && msg.msg.sniff_conn.channel_map[1] == 0 && msg.msg.sniff_conn.channel_map[2] == 0 && msg.msg.sniff_conn.channel_map[3] == 0 && msg.msg.sniff_conn.channel_map[4] == 0) {
       this->bleController->recoverChannelMap(msg.msg.sniff_conn.access_address, msg.msg.sniff_conn.crc_init);
     }
+    else if (msg.msg.sniff_conn.hop_interval == 0) {
+      this->bleController->recoverHopInterval(msg.msg.sniff_conn.access_address, msg.msg.sniff_conn.crc_init, msg.msg.sniff_conn.channel_map);
+    }
 
     response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
   }

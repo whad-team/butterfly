@@ -33,6 +33,7 @@ typedef enum ControllerState {
 	SNIFFING_ACCESS_ADDRESS,
 	RECOVERING_CRC_INIT,
 	RECOVERING_CHANNEL_MAP,
+	RECOVERING_HOP_INTERVAL,
 
 	SNIFFING_CONNECTION,
 	INJECTING_TO_SLAVE,
@@ -124,7 +125,10 @@ typedef struct ActiveConnectionRecovery {
 	int validPacketOccurences;
 
 	ChannelState mappedChannels[37];
+	uint32_t lastTimestamp;
 
+	uint8_t* hoppingSequences[12];
+	int lookUpTables[12];
 } ActiveConnectionRecovery;
 
 class BLEController : public Controller {
@@ -216,7 +220,7 @@ class BLEController : public Controller {
 		void sendAdvIntervalReport(uint32_t interval);
 		void sendConnectionReport(ConnectionStatus status);
 		void sendAccessAddressReport(uint32_t accessAddress, uint32_t timestamp, int32_t rssi);
-		void sendExistingConnectionReport(uint32_t accessAddress, uint32_t crcInit, uint8_t *channelMap);
+		void sendExistingConnectionReport(uint32_t accessAddress, uint32_t crcInit, uint8_t *channelMap, uint16_t hopInterval);
 
 		void setMonitoredChannels(uint8_t *channels);
 
@@ -240,6 +244,7 @@ class BLEController : public Controller {
 		void hopToNextDataChannel();
 		void recoverCrcInit(uint32_t accessAddress);
 		void recoverChannelMap(uint32_t accessAddress, uint32_t crcInit);
+		void recoverHopInterval(uint32_t accessAddress, uint32_t crcInit, uint8_t *channelMap);
 
 		// Connection specific methods
 		void followConnection(uint16_t hopInterval, uint8_t hopIncrement, uint8_t *channelMap,uint32_t accessAddress,uint32_t crcInit,  int masterSCA,uint16_t latency);
@@ -251,6 +256,14 @@ class BLEController : public Controller {
 		void updateHopInterval(uint16_t hopInterval);
 		void updateHopIncrement(uint8_t hopIncrement);
 		void updateChannelsInUse(uint8_t* channelMap);
+
+  	int findChannelIndexInHoppingSequence(uint8_t hopIncrement, uint8_t channel, uint8_t start);
+		int computeDistanceBetweenChannels(uint8_t hopIncrement, uint8_t firstChannel, uint8_t secondChannel);
+		void generateLegacyHoppingLookUpTables(uint8_t firstChannel, uint8_t secondChannel);
+		void findUniqueChannels(uint8_t *firstChannel, uint8_t* secondChannel);
+
+		void generateLegacyHoppingSequence(uint8_t hopIncrement, uint8_t *sequence);
+		void generateAllHoppingSequences();
 
 		void clearConnectionUpdate();
 		void prepareConnectionUpdate(uint16_t instant, uint16_t hopInterval, uint8_t windowSize, uint8_t windowOffset,uint16_t latency);
@@ -316,6 +329,7 @@ class BLEController : public Controller {
 		void accessAddressProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi);
 		void crcInitRecoveryProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi);
 		void channelMapRecoveryProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi);
+		void hopIntervalRecoveryProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi);
 
 		void advertisementPacketProcessing(BLEPacket *pkt);
 		void connectionPacketProcessing(BLEPacket *pkt);
