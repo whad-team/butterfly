@@ -196,7 +196,16 @@ Message* Whad::buildBLESynchronizedMessage(uint32_t accessAddress, uint32_t crcI
   msg->msg.ble.msg.synchronized.crc_init = crcInit;
   msg->msg.ble.msg.synchronized.hop_interval = hopInterval;
   msg->msg.ble.msg.synchronized.hop_increment = hopIncrement;
-  memcpy(msg->msg.ble.msg.synchronized.channel_map, channelMap, 5);
+  if (channelMap != NULL) {
+    memcpy(msg->msg.ble.msg.synchronized.channel_map, channelMap, 5);
+  }
+  else {
+    msg->msg.ble.msg.synchronized.channel_map[0] = 0;
+    msg->msg.ble.msg.synchronized.channel_map[1] = 0;
+    msg->msg.ble.msg.synchronized.channel_map[2] = 0;
+    msg->msg.ble.msg.synchronized.channel_map[3] = 0;
+    msg->msg.ble.msg.synchronized.channel_map[4] = 0;
+  }
   return msg;
 }
 Message* Whad::buildBLEDesynchronizedMessage(uint32_t accessAddress) {

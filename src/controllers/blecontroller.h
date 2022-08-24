@@ -16,7 +16,7 @@
 #define CRC_SIZE								3
 #define BLE_IFS 								150
 
-#define MAX_AA_CANDIDATES 30
+#define MAX_AA_CANDIDATES 25
 
 typedef enum ConnectionStatus {
 	CONNECTION_STARTED = 0x00,
@@ -32,6 +32,8 @@ typedef enum ControllerState {
 	FOLLOWING_ADVERTISEMENTS,
 	SNIFFING_ACCESS_ADDRESS,
 	RECOVERING_CRC_INIT,
+	RECOVERING_CHANNEL_MAP,
+
 	SNIFFING_CONNECTION,
 	INJECTING_TO_SLAVE,
 	INJECTING_TO_MASTER,
@@ -105,6 +107,13 @@ typedef struct CandidateAccessAddresses {
 	uint8_t pointer;
 } CandidateAccessAddresses;
 
+typedef enum ChannelState {
+	NOT_MAPPED = 0,
+	MAPPED = 1,
+	NOT_ANALYZED = 2,
+	NOT_MONITORED = 3
+} ChannelState;
+
 typedef struct ActiveConnectionRecovery {
 	bool monitoredChannels[37];
 	int monitoredChannelsCount;
@@ -114,6 +123,7 @@ typedef struct ActiveConnectionRecovery {
 
 	int validPacketOccurences;
 
+	ChannelState mappedChannels[37];
 
 } ActiveConnectionRecovery;
 
@@ -206,7 +216,7 @@ class BLEController : public Controller {
 		void sendAdvIntervalReport(uint32_t interval);
 		void sendConnectionReport(ConnectionStatus status);
 		void sendAccessAddressReport(uint32_t accessAddress, uint32_t timestamp, int32_t rssi);
-		void sendExistingConnectionReport(uint32_t accessAddress, uint32_t crcInit);
+		void sendExistingConnectionReport(uint32_t accessAddress, uint32_t crcInit, uint8_t *channelMap);
 
 		void setMonitoredChannels(uint8_t *channels);
 
@@ -229,6 +239,7 @@ class BLEController : public Controller {
 		void sniffAccessAddresses();
 		void hopToNextDataChannel();
 		void recoverCrcInit(uint32_t accessAddress);
+		void recoverChannelMap(uint32_t accessAddress, uint32_t crcInit);
 
 		// Connection specific methods
 		void followConnection(uint16_t hopInterval, uint8_t hopIncrement, uint8_t *channelMap,uint32_t accessAddress,uint32_t crcInit,  int masterSCA,uint16_t latency);
@@ -304,6 +315,7 @@ class BLEController : public Controller {
 		// Packets processing methods
 		void accessAddressProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi);
 		void crcInitRecoveryProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi);
+		void channelMapRecoveryProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi);
 
 		void advertisementPacketProcessing(BLEPacket *pkt);
 		void connectionPacketProcessing(BLEPacket *pkt);
