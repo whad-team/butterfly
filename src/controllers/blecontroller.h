@@ -34,6 +34,7 @@ typedef enum ControllerState {
 	RECOVERING_CRC_INIT,
 	RECOVERING_CHANNEL_MAP,
 	RECOVERING_HOP_INTERVAL,
+	RECOVERING_HOP_INCREMENT,
 
 	SNIFFING_CONNECTION,
 	INJECTING_TO_SLAVE,
@@ -129,6 +130,11 @@ typedef struct ActiveConnectionRecovery {
 
 	uint8_t* hoppingSequences[12];
 	int lookUpTables[12];
+	int reverseLookUpTables[37];
+	int numberOfMeasures;
+
+	uint8_t firstChannel;
+	uint8_t secondChannel;
 } ActiveConnectionRecovery;
 
 class BLEController : public Controller {
@@ -220,7 +226,7 @@ class BLEController : public Controller {
 		void sendAdvIntervalReport(uint32_t interval);
 		void sendConnectionReport(ConnectionStatus status);
 		void sendAccessAddressReport(uint32_t accessAddress, uint32_t timestamp, int32_t rssi);
-		void sendExistingConnectionReport(uint32_t accessAddress, uint32_t crcInit, uint8_t *channelMap, uint16_t hopInterval);
+		void sendExistingConnectionReport(uint32_t accessAddress, uint32_t crcInit, uint8_t *channelMap, uint16_t hopInterval, uint8_t hopIncrement);
 
 		void setMonitoredChannels(uint8_t *channels);
 
@@ -245,6 +251,7 @@ class BLEController : public Controller {
 		void recoverCrcInit(uint32_t accessAddress);
 		void recoverChannelMap(uint32_t accessAddress, uint32_t crcInit);
 		void recoverHopInterval(uint32_t accessAddress, uint32_t crcInit, uint8_t *channelMap);
+		void recoverHopIncrement(uint32_t accessAddress, uint32_t crcInit, uint8_t *channelMap, uint16_t interval);
 
 		// Connection specific methods
 		void followConnection(uint16_t hopInterval, uint8_t hopIncrement, uint8_t *channelMap,uint32_t accessAddress,uint32_t crcInit,  int masterSCA,uint16_t latency);
@@ -330,6 +337,7 @@ class BLEController : public Controller {
 		void crcInitRecoveryProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi);
 		void channelMapRecoveryProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi);
 		void hopIntervalRecoveryProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi);
+		void hopIncrementRecoveryProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi);
 
 		void advertisementPacketProcessing(BLEPacket *pkt);
 		void connectionPacketProcessing(BLEPacket *pkt);

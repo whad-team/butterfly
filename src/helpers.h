@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#define DIVIDE_ROUND(N, D) ((N) + (D)/2) / (D)
+
 uint32_t bytewise_bit_swap(uint32_t inp);
 void sort_array(uint32_t tab[], size_t size);
 
