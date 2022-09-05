@@ -27,6 +27,7 @@ int Dot15d4Controller::channelToFrequency(int channel) {
 
 Dot15d4Controller::Dot15d4Controller(Radio *radio) : Controller(radio) {
 	this->channel = 11;
+	this->controllerState = RECEIVING;
 }
 
 int Dot15d4Controller::getChannel() {
@@ -134,6 +135,29 @@ void Dot15d4Controller::setNativeConfiguration() {
   this->radio->reload();
 }
 
+
+void Dot15d4Controller::setEnergyDetectionConfiguration() {
+	this->radio->setPrefixes();
+  this->radio->setMode(MODE_ENERGY_DETECTION);
+  this->radio->setFastRampUpTime(true);
+  this->radio->setTxPower(POS0_DBM);
+  this->radio->disableRssi();
+	this->radio->setEndianness(LITTLE);
+  this->radio->setPhy(DOT15D4_NATIVE);
+	this->radio->disableJammingPatterns();
+  this->radio->setCrc(NO_CRC);
+  this->radio->setCrcSkipAddress(false);
+  this->radio->setCrcSize(2);
+  this->radio->setCrcInit(0x0000);
+  this->radio->setCrcPoly(0x11021);
+  this->radio->setPayloadLength(0);
+  this->radio->setInterFrameSpacing(0);
+  this->radio->setExpandPayloadLength(0);
+  this->radio->setFrequency(Dot15d4Controller::channelToFrequency(this->channel));
+  this->radio->reload();
+
+}
+
 void Dot15d4Controller::setRawConfiguration() {
 	this->radio->setPrefixes();
   this->radio->setMode(MODE_NORMAL);
@@ -156,10 +180,26 @@ void Dot15d4Controller::setRawConfiguration() {
 }
 
 void Dot15d4Controller::start() {
-    this->setNativeConfiguration();
+	this->started = true;
+	if (this->controllerState == RECEIVING) {
+		this->setNativeConfiguration();
+	}
+	else if (this->controllerState == ENERGY_DETECTION_SCANNING) {
+		this->setEnergyDetectionConfiguration();
+	}
+}
+void Dot15d4Controller::enterReceptionMode() {
+	this->controllerState = RECEIVING;
+	if (this->started) this->setNativeConfiguration();
+}
+
+void Dot15d4Controller::enterEDScanMode() {
+	this->controllerState = ENERGY_DETECTION_SCANNING;
+	if (this->started) this->setEnergyDetectionConfiguration();
 }
 
 void Dot15d4Controller::stop() {
+		this->started = false;
     this->radio->disable();
 }
 
@@ -350,7 +390,9 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
 
 	if (pkt != NULL) {
 		this->addPacket(pkt);
+		delete pkt;
 	}
+
 
 }
 
@@ -361,4 +403,7 @@ void Dot15d4Controller::onJam(uint32_t timestamp) {
 		}
 }
 
-void Dot15d4Controller::onEnergyDetection(uint32_t timestamp, uint8_t value) {}
+void Dot15d4Controller::onEnergyDetection(uint32_t timestamp, uint8_t value) {
+	Message* msg = Whad::buildDot15d4EnergyDetectionSampleMessage(value, timestamp);
+	Core::instance->pushMessageToQueue(msg);
+}

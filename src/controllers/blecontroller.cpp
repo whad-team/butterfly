@@ -464,7 +464,22 @@ void BLEController::start() {
 				this->discoveryTimer = NULL;
 			}
 		}
-	//}
+		else if (this->controllerState == ATTACH_TO_EXISTING_CONNECTION) {
+			if (this->discoveryTimer != NULL) {
+				this->discoveryTimer->stop();
+				this->discoveryTimer->release();
+				this->discoveryTimer = NULL;
+			}
+			this->followConnection(
+				this->hopInterval,
+				this->hopIncrement,
+				this->channelMap,
+				this->accessAddress,
+				this->crcInit,
+				20,
+				0
+			);
+	}
 }
 
 void BLEController::resetAccessAddressesCandidates() {
@@ -661,7 +676,7 @@ void BLEController::recoverHopInterval(uint32_t accessAddress, uint32_t crcInit,
 
 }
 
-void BLEController::recoverHopIncrement(uint32_t accessAddress, uint32_t crcInit, uint8_t *channelMap, uint16_t interval) {
+void BLEController::recoverHopIncrement(uint32_t accessAddress, uint32_t crcInit, uint8_t *channelMap, uint16_t hopInterval) {
 	this->controllerState = RECOVERING_HOP_INCREMENT;
 	this->accessAddress = accessAddress;
 	this->crcInit = crcInit;
@@ -669,6 +684,14 @@ void BLEController::recoverHopIncrement(uint32_t accessAddress, uint32_t crcInit
 	this->updateHopInterval(hopInterval);
 }
 
+void BLEController::attachToExistingConnection(uint32_t accessAddress, uint32_t crcInit, uint8_t *channelMap, uint16_t hopInterval, uint8_t hopIncrement) {
+	this->controllerState = ATTACH_TO_EXISTING_CONNECTION;
+	this->accessAddress = accessAddress;
+	this->crcInit = crcInit;
+	this->updateChannelsInUse(channelMap);
+	this->updateHopInterval(hopInterval);
+	this->updateHopIncrement(hopIncrement);
+}
 
 void BLEController::sniffAccessAddresses() {
 	this->controllerState	= SNIFFING_ACCESS_ADDRESS;
@@ -1182,7 +1205,7 @@ bool BLEController::inject() {
 	return false;
 }
 
-ControllerState BLEController::getState() {
+BLEControllerState BLEController::getState() {
 	return this->controllerState;
 }
 
@@ -1353,6 +1376,8 @@ void BLEController::connectionSynchronizationProcessing(BLEPacket *pkt) {
 		// Process the packet as a master's packet
 		this->masterPacketProcessing(pkt);
 
+		bsp_board_led_invert(1);
+
 		// Update the anchor point
 		this->setAnchorPoint(pkt->getTimestamp());
 	}
@@ -1470,6 +1495,7 @@ void BLEController::roleSimulationProcessing(BLEPacket* pkt) {
 }
 
 void BLEController::connectionPacketProcessing(BLEPacket *pkt) {
+	bsp_board_led_invert(0);
 	// Increment the packet counter
 	this->packetCount++;
 
@@ -1573,7 +1599,9 @@ void BLEController::hopIntervalRecoveryProcessing(uint32_t timestamp, uint8_t si
 			else {
 				this->activeConnectionRecovery.numberOfMeasures++;
 				if (this->activeConnectionRecovery.numberOfMeasures > 2) {
-					this->sendExistingConnectionReport(this->accessAddress, this->crcInit, this->channelMap, hopInterval,0);
+					this->hopInterval = this->hopInterval; // hop interval seems too small by one
+					this->sendExistingConnectionReport(this->accessAddress, this->crcInit, this->channelMap, this->hopInterval,0);
+					this->recoverHopIncrement(this->accessAddress, this->crcInit, this->channelMap, this->hopInterval);
 				}
 			}
 			this->activeConnectionRecovery.validPacketOccurences = 0;
@@ -1582,7 +1610,6 @@ void BLEController::hopIntervalRecoveryProcessing(uint32_t timestamp, uint8_t si
 }
 void BLEController::hopIncrementRecoveryProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
 	if (crcValue.validity == VALID_CRC) {
-		bsp_board_led_invert(0);
 
 		this->activeConnectionRecovery.validPacketOccurences++;
 		if (this->channel == this->activeConnectionRecovery.firstChannel) {
@@ -1593,7 +1620,19 @@ void BLEController::hopIncrementRecoveryProcessing(uint32_t timestamp, uint8_t s
 			uint16_t interval = (((timestamp - this->activeConnectionRecovery.lastTimestamp)/1250) / this->hopInterval);
 			uint8_t increment = this->activeConnectionRecovery.reverseLookUpTables[interval];
 			if (increment > 0) {
-				this->sendExistingConnectionReport(this->accessAddress, this->crcInit, this->channelMap, hopInterval, increment);
+				this->sendExistingConnectionReport(this->accessAddress, this->crcInit, this->channelMap, this->hopInterval, increment);
+				this->updateHopIncrement(increment);
+				this->hopInterval++;
+				this->followConnection(
+					this->hopInterval,
+					this->hopIncrement,
+					this->channelMap,
+					this->accessAddress,
+					this->crcInit,
+					20,
+					0
+				);
+
 			}
 			else {
 				this->setChannel(this->activeConnectionRecovery.firstChannel);

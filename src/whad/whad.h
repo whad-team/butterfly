@@ -29,6 +29,7 @@ class Whad {
     static Message* buildDiscoveryDomainInfoMessage(discovery_Domain domain);
 
     static Message* buildMessageFromPacket(Packet* packet);
+    static Message* buildDot15d4EnergyDetectionSampleMessage(uint32_t sample, uint32_t timestamp);
     static Message* buildDot15d4RawPduMessage(Dot15d4Packet* packet);
     static Message* buildBLERawPduMessage(BLEPacket* packet);
     static Message* buildBLESynchronizedMessage(uint32_t accessAddress, uint32_t crcInit, uint32_t hopInterval, uint32_t hopIncrement, uint8_t *channelMap);

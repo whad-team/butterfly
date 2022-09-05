@@ -41,6 +41,7 @@ const DeviceCapability CAPABILITIES[] = {
     (
       CMD(zigbee_ZigbeeCommand_Sniff) |
       CMD(zigbee_ZigbeeCommand_Jam) |
+      CMD(zigbee_ZigbeeCommand_EnergyDetection) |
       CMD(zigbee_ZigbeeCommand_Send) |
       CMD(zigbee_ZigbeeCommand_Start) |
       CMD(zigbee_ZigbeeCommand_Stop) |

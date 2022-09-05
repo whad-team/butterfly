@@ -16,7 +16,8 @@ typedef enum _generic_ResultCode {
     generic_ResultCode_PARAMETER_ERROR = 2, 
     generic_ResultCode_DISCONNECTED = 3, 
     generic_ResultCode_WRONG_MODE = 4, 
-    generic_ResultCode_UNSUPPORTED_DOMAIN = 5 
+    generic_ResultCode_UNSUPPORTED_DOMAIN = 5, 
+    generic_ResultCode_BUSY = 6 
 } generic_ResultCode;
 
 /* Struct definitions */
@@ -51,8 +52,8 @@ typedef struct _generic_Message {
 
 /* Helper constants for enums */
 #define _generic_ResultCode_MIN generic_ResultCode_SUCCESS
-#define _generic_ResultCode_MAX generic_ResultCode_UNSUPPORTED_DOMAIN
-#define _generic_ResultCode_ARRAYSIZE ((generic_ResultCode)(generic_ResultCode_UNSUPPORTED_DOMAIN+1))
+#define _generic_ResultCode_MAX generic_ResultCode_BUSY
+#define _generic_ResultCode_ARRAYSIZE ((generic_ResultCode)(generic_ResultCode_BUSY+1))
 
 
 #ifdef __cplusplus

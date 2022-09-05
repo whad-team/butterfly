@@ -72,6 +72,9 @@ PB_BIND(ble_HijackSlaveCmd, ble_HijackSlaveCmd, AUTO)
 PB_BIND(ble_HijackBothCmd, ble_HijackBothCmd, AUTO)
 
 
+PB_BIND(ble_SetEncryptionCmd, ble_SetEncryptionCmd, AUTO)
+
+
 PB_BIND(ble_AccessAddressDiscovered, ble_AccessAddressDiscovered, AUTO)
 
 
@@ -103,6 +106,7 @@ PB_BIND(ble_PduReceived, ble_PduReceived, 2)
 
 
 PB_BIND(ble_Message, ble_Message, 2)
+
 
 
 

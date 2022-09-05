@@ -26,7 +26,7 @@ typedef enum ConnectionStatus {
 	ATTACK_FAILURE = 0x04
 } ConnectionStatus;
 
-typedef enum ControllerState {
+typedef enum BLEControllerState {
 	SNIFFING_ADVERTISEMENTS,
 	COLLECTING_ADVINTERVAL,
 	FOLLOWING_ADVERTISEMENTS,
@@ -35,7 +35,7 @@ typedef enum ControllerState {
 	RECOVERING_CHANNEL_MAP,
 	RECOVERING_HOP_INTERVAL,
 	RECOVERING_HOP_INCREMENT,
-
+	ATTACH_TO_EXISTING_CONNECTION,
 	SNIFFING_CONNECTION,
 	INJECTING_TO_SLAVE,
 	INJECTING_TO_MASTER,
@@ -47,7 +47,7 @@ typedef enum ControllerState {
 	SYNCHRONIZING_MITM,
 	PERFORMING_MITM,
 	JAMMING_CONNECT_REQ
-} ControllerState;
+} BLEControllerState;
 
 // Connection update definitions
 typedef enum {
@@ -193,7 +193,7 @@ class BLEController : public Controller {
 		// Attack related
 		BLEAttackStatus attackStatus;
 
-		ControllerState controllerState;
+		BLEControllerState controllerState;
 
 		BLEPayload slavePayload;
 		BLEPayload masterPayload;
@@ -252,6 +252,7 @@ class BLEController : public Controller {
 		void recoverChannelMap(uint32_t accessAddress, uint32_t crcInit);
 		void recoverHopInterval(uint32_t accessAddress, uint32_t crcInit, uint8_t *channelMap);
 		void recoverHopIncrement(uint32_t accessAddress, uint32_t crcInit, uint8_t *channelMap, uint16_t interval);
+		void attachToExistingConnection(uint32_t accessAddress, uint32_t crcInit, uint8_t *channelMap, uint16_t interval, uint8_t hopIncrement);
 
 		// Connection specific methods
 		void followConnection(uint16_t hopInterval, uint8_t hopIncrement, uint8_t *channelMap,uint32_t accessAddress,uint32_t crcInit,  int masterSCA,uint16_t latency);
@@ -323,7 +324,7 @@ class BLEController : public Controller {
 		bool slaveRoleCallback(BLEPacket *pkt);
 		bool masterRoleCallback(BLEPacket *pkt);
 
-		ControllerState getState();
+		BLEControllerState getState();
 
 		// Timers callbacks
 		bool goToNextChannel();

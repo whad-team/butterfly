@@ -69,6 +69,11 @@ typedef enum _ble_BleDirection {
     ble_BleDirection_INJECTION_TO_MASTER = 4 
 } ble_BleDirection;
 
+typedef enum _ble_BleAddrType { 
+    ble_BleAddrType_PUBLIC = 0, 
+    ble_BleAddrType_RANDOM = 1 
+} ble_BleAddrType;
+
 /* Struct definitions */
 /* *
  CentralModeCmd
@@ -124,6 +129,7 @@ typedef struct _ble_AdvPduReceived {
     int32_t rssi;
     pb_byte_t bd_address[6];
     ble_AdvPduReceived_adv_data_t adv_data;
+    ble_BleAddrType addr_type;
 } ble_AdvPduReceived;
 
 /* *
@@ -132,6 +138,7 @@ typedef struct _ble_AdvPduReceived {
  Connect to a specific target device. */
 typedef struct _ble_ConnectToCmd { 
     pb_byte_t bd_address[6];
+    ble_BleAddrType addr_type;
 } ble_ConnectToCmd;
 
 typedef struct _ble_Connected { 
@@ -143,6 +150,8 @@ uint32 hop_interval = 5;
 uint32 hop_increment = 6;
 bytes channel_map = 7; */
     uint32_t conn_handle;
+    ble_BleAddrType adv_addr_type;
+    ble_BleAddrType init_addr_type;
 } ble_Connected;
 
 /* *
@@ -217,6 +226,7 @@ typedef struct _ble_PduReceived {
     ble_PduReceived_pdu_t pdu;
     uint32_t conn_handle;
     bool processed;
+    bool decrypted;
 } ble_PduReceived;
 
 typedef PB_BYTES_ARRAY_T(31) ble_PeripheralModeCmd_scan_data_t;
@@ -247,6 +257,7 @@ typedef struct _ble_RawPduReceived {
     uint32_t crc;
     uint32_t conn_handle;
     bool processed;
+    bool decrypted;
 } ble_RawPduReceived;
 
 typedef struct _ble_ScanModeCmd { 
@@ -270,6 +281,7 @@ typedef struct _ble_SendPDUCmd {
     ble_BleDirection direction;
     uint32_t conn_handle;
     ble_SendPDUCmd_pdu_t pdu;
+    bool encrypt;
 } ble_SendPDUCmd;
 
 typedef PB_BYTES_ARRAY_T(300) ble_SendRawPDUCmd_pdu_t;
@@ -287,11 +299,19 @@ typedef struct _ble_SendRawPDUCmd {
     uint32_t access_address;
     ble_SendRawPDUCmd_pdu_t pdu;
     uint32_t crc;
+    bool encrypt;
 } ble_SendRawPDUCmd;
 
 typedef struct _ble_SetBdAddressCmd { 
     pb_byte_t bd_address[6];
+    ble_BleAddrType addr_type;
 } ble_SetBdAddressCmd;
+
+typedef struct _ble_SetEncryptionCmd { 
+    bool enabled;
+    pb_byte_t key[16];
+    pb_byte_t iv[8];
+} ble_SetEncryptionCmd;
 
 /* *
  SniffAccessAddressCmd
@@ -374,6 +394,7 @@ typedef struct _ble_Message {
         ble_RawPduReceived raw_pdu;
         ble_Injected injected;
         ble_Desynchronized desynchronized;
+        ble_SetEncryptionCmd encryption;
     } msg;
 } ble_Message;
 
@@ -391,13 +412,17 @@ typedef struct _ble_Message {
 #define _ble_BleDirection_MAX ble_BleDirection_INJECTION_TO_MASTER
 #define _ble_BleDirection_ARRAYSIZE ((ble_BleDirection)(ble_BleDirection_INJECTION_TO_MASTER+1))
 
+#define _ble_BleAddrType_MIN ble_BleAddrType_PUBLIC
+#define _ble_BleAddrType_MAX ble_BleAddrType_RANDOM
+#define _ble_BleAddrType_ARRAYSIZE ((ble_BleAddrType)(ble_BleAddrType_RANDOM+1))
+
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /* Initializer values for message structs */
-#define ble_SetBdAddressCmd_init_default         {{0}}
+#define ble_SetBdAddressCmd_init_default         {{0}, _ble_BleAddrType_MIN}
 #define ble_SniffAdvCmd_init_default             {0, 0, {0}}
 #define ble_JamAdvCmd_init_default               {0}
 #define ble_JamAdvOnChannelCmd_init_default      {0}
@@ -409,9 +434,9 @@ extern "C" {
 #define ble_AdvModeCmd_init_default              {{0, {0}}, {0, {0}}}
 #define ble_SetAdvDataCmd_init_default           {{{NULL}, NULL}, {{NULL}, NULL}}
 #define ble_CentralModeCmd_init_default          {0}
-#define ble_ConnectToCmd_init_default            {{0}}
-#define ble_SendRawPDUCmd_init_default           {_ble_BleDirection_MIN, 0, 0, {0, {0}}, 0}
-#define ble_SendPDUCmd_init_default              {_ble_BleDirection_MIN, 0, {0, {0}}}
+#define ble_ConnectToCmd_init_default            {{0}, _ble_BleAddrType_MIN}
+#define ble_SendRawPDUCmd_init_default           {_ble_BleDirection_MIN, 0, 0, {0, {0}}, 0, 0}
+#define ble_SendPDUCmd_init_default              {_ble_BleDirection_MIN, 0, {0, {0}}, 0}
 #define ble_DisconnectCmd_init_default           {0}
 #define ble_PeripheralModeCmd_init_default       {{0, {0}}, {0, {0}}}
 #define ble_StartCmd_init_default                {0}
@@ -419,18 +444,19 @@ extern "C" {
 #define ble_HijackMasterCmd_init_default         {0}
 #define ble_HijackSlaveCmd_init_default          {0}
 #define ble_HijackBothCmd_init_default           {0}
+#define ble_SetEncryptionCmd_init_default        {0, {0}, {0}}
 #define ble_AccessAddressDiscovered_init_default {0, false, 0, false, 0}
-#define ble_AdvPduReceived_init_default          {_ble_BleAdvType_MIN, 0, {0}, {0, {0}}}
-#define ble_Connected_init_default               {{0}, {0}, 0, 0}
+#define ble_AdvPduReceived_init_default          {_ble_BleAdvType_MIN, 0, {0}, {0, {0}}, _ble_BleAddrType_MIN}
+#define ble_Connected_init_default               {{0}, {0}, 0, 0, _ble_BleAddrType_MIN, _ble_BleAddrType_MIN}
 #define ble_Disconnected_init_default            {0, 0}
 #define ble_Synchronized_init_default            {0, 0, 0, 0, {0}}
 #define ble_Desynchronized_init_default          {0}
 #define ble_Hijacked_init_default                {0, 0}
 #define ble_Injected_init_default                {0, 0, 0}
-#define ble_RawPduReceived_init_default          {_ble_BleDirection_MIN, 0, false, 0, false, 0, false, 0, false, 0, 0, {0, {0}}, 0, 0, 0}
-#define ble_PduReceived_init_default             {_ble_BleDirection_MIN, {0, {0}}, 0, 0}
+#define ble_RawPduReceived_init_default          {_ble_BleDirection_MIN, 0, false, 0, false, 0, false, 0, false, 0, 0, {0, {0}}, 0, 0, 0, 0}
+#define ble_PduReceived_init_default             {_ble_BleDirection_MIN, {0, {0}}, 0, 0, 0}
 #define ble_Message_init_default                 {0, {ble_SetBdAddressCmd_init_default}}
-#define ble_SetBdAddressCmd_init_zero            {{0}}
+#define ble_SetBdAddressCmd_init_zero            {{0}, _ble_BleAddrType_MIN}
 #define ble_SniffAdvCmd_init_zero                {0, 0, {0}}
 #define ble_JamAdvCmd_init_zero                  {0}
 #define ble_JamAdvOnChannelCmd_init_zero         {0}
@@ -442,9 +468,9 @@ extern "C" {
 #define ble_AdvModeCmd_init_zero                 {{0, {0}}, {0, {0}}}
 #define ble_SetAdvDataCmd_init_zero              {{{NULL}, NULL}, {{NULL}, NULL}}
 #define ble_CentralModeCmd_init_zero             {0}
-#define ble_ConnectToCmd_init_zero               {{0}}
-#define ble_SendRawPDUCmd_init_zero              {_ble_BleDirection_MIN, 0, 0, {0, {0}}, 0}
-#define ble_SendPDUCmd_init_zero                 {_ble_BleDirection_MIN, 0, {0, {0}}}
+#define ble_ConnectToCmd_init_zero               {{0}, _ble_BleAddrType_MIN}
+#define ble_SendRawPDUCmd_init_zero              {_ble_BleDirection_MIN, 0, 0, {0, {0}}, 0, 0}
+#define ble_SendPDUCmd_init_zero                 {_ble_BleDirection_MIN, 0, {0, {0}}, 0}
 #define ble_DisconnectCmd_init_zero              {0}
 #define ble_PeripheralModeCmd_init_zero          {{0, {0}}, {0, {0}}}
 #define ble_StartCmd_init_zero                   {0}
@@ -452,16 +478,17 @@ extern "C" {
 #define ble_HijackMasterCmd_init_zero            {0}
 #define ble_HijackSlaveCmd_init_zero             {0}
 #define ble_HijackBothCmd_init_zero              {0}
+#define ble_SetEncryptionCmd_init_zero           {0, {0}, {0}}
 #define ble_AccessAddressDiscovered_init_zero    {0, false, 0, false, 0}
-#define ble_AdvPduReceived_init_zero             {_ble_BleAdvType_MIN, 0, {0}, {0, {0}}}
-#define ble_Connected_init_zero                  {{0}, {0}, 0, 0}
+#define ble_AdvPduReceived_init_zero             {_ble_BleAdvType_MIN, 0, {0}, {0, {0}}, _ble_BleAddrType_MIN}
+#define ble_Connected_init_zero                  {{0}, {0}, 0, 0, _ble_BleAddrType_MIN, _ble_BleAddrType_MIN}
 #define ble_Disconnected_init_zero               {0, 0}
 #define ble_Synchronized_init_zero               {0, 0, 0, 0, {0}}
 #define ble_Desynchronized_init_zero             {0}
 #define ble_Hijacked_init_zero                   {0, 0}
 #define ble_Injected_init_zero                   {0, 0, 0}
-#define ble_RawPduReceived_init_zero             {_ble_BleDirection_MIN, 0, false, 0, false, 0, false, 0, false, 0, 0, {0, {0}}, 0, 0, 0}
-#define ble_PduReceived_init_zero                {_ble_BleDirection_MIN, {0, {0}}, 0, 0}
+#define ble_RawPduReceived_init_zero             {_ble_BleDirection_MIN, 0, false, 0, false, 0, false, 0, false, 0, 0, {0, {0}}, 0, 0, 0, 0}
+#define ble_PduReceived_init_zero                {_ble_BleDirection_MIN, {0, {0}}, 0, 0, 0}
 #define ble_Message_init_zero                    {0, {ble_SetBdAddressCmd_init_zero}}
 
 /* Field tags (for use in manual encoding/decoding) */
@@ -476,11 +503,15 @@ extern "C" {
 #define ble_AdvPduReceived_rssi_tag              2
 #define ble_AdvPduReceived_bd_address_tag        3
 #define ble_AdvPduReceived_adv_data_tag          4
+#define ble_AdvPduReceived_addr_type_tag         5
 #define ble_ConnectToCmd_bd_address_tag          1
+#define ble_ConnectToCmd_addr_type_tag           2
 #define ble_Connected_initiator_tag              1
 #define ble_Connected_advertiser_tag             2
 #define ble_Connected_access_address_tag         3
 #define ble_Connected_conn_handle_tag            8
+#define ble_Connected_adv_addr_type_tag          9
+#define ble_Connected_init_addr_type_tag         10
 #define ble_Desynchronized_access_address_tag    1
 #define ble_DisconnectCmd_conn_handle_tag        1
 #define ble_Disconnected_reason_tag              1
@@ -499,6 +530,7 @@ extern "C" {
 #define ble_PduReceived_pdu_tag                  2
 #define ble_PduReceived_conn_handle_tag          3
 #define ble_PduReceived_processed_tag            4
+#define ble_PduReceived_decrypted_tag            5
 #define ble_PeripheralModeCmd_scan_data_tag      1
 #define ble_PeripheralModeCmd_scanrsp_data_tag   2
 #define ble_RawPduReceived_direction_tag         1
@@ -512,16 +544,23 @@ extern "C" {
 #define ble_RawPduReceived_crc_tag               9
 #define ble_RawPduReceived_conn_handle_tag       10
 #define ble_RawPduReceived_processed_tag         11
+#define ble_RawPduReceived_decrypted_tag         12
 #define ble_ScanModeCmd_active_scan_tag          1
 #define ble_SendPDUCmd_direction_tag             1
 #define ble_SendPDUCmd_conn_handle_tag           2
 #define ble_SendPDUCmd_pdu_tag                   3
+#define ble_SendPDUCmd_encrypt_tag               4
 #define ble_SendRawPDUCmd_direction_tag          1
 #define ble_SendRawPDUCmd_conn_handle_tag        2
 #define ble_SendRawPDUCmd_access_address_tag     3
 #define ble_SendRawPDUCmd_pdu_tag                4
 #define ble_SendRawPDUCmd_crc_tag                5
+#define ble_SendRawPDUCmd_encrypt_tag            6
 #define ble_SetBdAddressCmd_bd_address_tag       1
+#define ble_SetBdAddressCmd_addr_type_tag        2
+#define ble_SetEncryptionCmd_enabled_tag         1
+#define ble_SetEncryptionCmd_key_tag             2
+#define ble_SetEncryptionCmd_iv_tag              3
 #define ble_SniffAccessAddressCmd_monitored_channels_tag 6
 #define ble_SniffActiveConnCmd_access_address_tag 1
 #define ble_SniffActiveConnCmd_crc_init_tag      2
@@ -573,10 +612,12 @@ extern "C" {
 #define ble_Message_raw_pdu_tag                  30
 #define ble_Message_injected_tag                 31
 #define ble_Message_desynchronized_tag           32
+#define ble_Message_encryption_tag               33
 
 /* Struct field encoding specification for nanopb */
 #define ble_SetBdAddressCmd_FIELDLIST(X, a) \
-X(a, STATIC,   SINGULAR, FIXED_LENGTH_BYTES, bd_address,        1)
+X(a, STATIC,   SINGULAR, FIXED_LENGTH_BYTES, bd_address,        1) \
+X(a, STATIC,   SINGULAR, UENUM,    addr_type,         2)
 #define ble_SetBdAddressCmd_CALLBACK NULL
 #define ble_SetBdAddressCmd_DEFAULT NULL
 
@@ -648,7 +689,8 @@ X(a, CALLBACK, SINGULAR, BYTES,    scanrsp_data,      2)
 #define ble_CentralModeCmd_DEFAULT NULL
 
 #define ble_ConnectToCmd_FIELDLIST(X, a) \
-X(a, STATIC,   SINGULAR, FIXED_LENGTH_BYTES, bd_address,        1)
+X(a, STATIC,   SINGULAR, FIXED_LENGTH_BYTES, bd_address,        1) \
+X(a, STATIC,   SINGULAR, UENUM,    addr_type,         2)
 #define ble_ConnectToCmd_CALLBACK NULL
 #define ble_ConnectToCmd_DEFAULT NULL
 
@@ -657,14 +699,16 @@ X(a, STATIC,   SINGULAR, UENUM,    direction,         1) \
 X(a, STATIC,   SINGULAR, UINT32,   conn_handle,       2) \
 X(a, STATIC,   SINGULAR, UINT32,   access_address,    3) \
 X(a, STATIC,   SINGULAR, BYTES,    pdu,               4) \
-X(a, STATIC,   SINGULAR, UINT32,   crc,               5)
+X(a, STATIC,   SINGULAR, UINT32,   crc,               5) \
+X(a, STATIC,   SINGULAR, BOOL,     encrypt,           6)
 #define ble_SendRawPDUCmd_CALLBACK NULL
 #define ble_SendRawPDUCmd_DEFAULT NULL
 
 #define ble_SendPDUCmd_FIELDLIST(X, a) \
 X(a, STATIC,   SINGULAR, UENUM,    direction,         1) \
 X(a, STATIC,   SINGULAR, UINT32,   conn_handle,       2) \
-X(a, STATIC,   SINGULAR, BYTES,    pdu,               3)
+X(a, STATIC,   SINGULAR, BYTES,    pdu,               3) \
+X(a, STATIC,   SINGULAR, BOOL,     encrypt,           4)
 #define ble_SendPDUCmd_CALLBACK NULL
 #define ble_SendPDUCmd_DEFAULT NULL
 
@@ -704,6 +748,13 @@ X(a, STATIC,   SINGULAR, UINT32,   access_address,    1)
 #define ble_HijackBothCmd_CALLBACK NULL
 #define ble_HijackBothCmd_DEFAULT NULL
 
+#define ble_SetEncryptionCmd_FIELDLIST(X, a) \
+X(a, STATIC,   SINGULAR, BOOL,     enabled,           1) \
+X(a, STATIC,   SINGULAR, FIXED_LENGTH_BYTES, key,               2) \
+X(a, STATIC,   SINGULAR, FIXED_LENGTH_BYTES, iv,                3)
+#define ble_SetEncryptionCmd_CALLBACK NULL
+#define ble_SetEncryptionCmd_DEFAULT NULL
+
 #define ble_AccessAddressDiscovered_FIELDLIST(X, a) \
 X(a, STATIC,   SINGULAR, UINT32,   access_address,    1) \
 X(a, STATIC,   OPTIONAL, INT32,    rssi,              2) \
@@ -715,7 +766,8 @@ X(a, STATIC,   OPTIONAL, UINT32,   timestamp,         3)
 X(a, STATIC,   SINGULAR, UENUM,    adv_type,          1) \
 X(a, STATIC,   SINGULAR, INT32,    rssi,              2) \
 X(a, STATIC,   SINGULAR, FIXED_LENGTH_BYTES, bd_address,        3) \
-X(a, STATIC,   SINGULAR, BYTES,    adv_data,          4)
+X(a, STATIC,   SINGULAR, BYTES,    adv_data,          4) \
+X(a, STATIC,   SINGULAR, UENUM,    addr_type,         5)
 #define ble_AdvPduReceived_CALLBACK NULL
 #define ble_AdvPduReceived_DEFAULT NULL
 
@@ -723,7 +775,9 @@ X(a, STATIC,   SINGULAR, BYTES,    adv_data,          4)
 X(a, STATIC,   SINGULAR, FIXED_LENGTH_BYTES, initiator,         1) \
 X(a, STATIC,   SINGULAR, FIXED_LENGTH_BYTES, advertiser,        2) \
 X(a, STATIC,   SINGULAR, UINT32,   access_address,    3) \
-X(a, STATIC,   SINGULAR, UINT32,   conn_handle,       8)
+X(a, STATIC,   SINGULAR, UINT32,   conn_handle,       8) \
+X(a, STATIC,   SINGULAR, UENUM,    adv_addr_type,     9) \
+X(a, STATIC,   SINGULAR, UENUM,    init_addr_type,   10)
 #define ble_Connected_CALLBACK NULL
 #define ble_Connected_DEFAULT NULL
 
@@ -771,7 +825,8 @@ X(a, STATIC,   SINGULAR, UINT32,   access_address,    7) \
 X(a, STATIC,   SINGULAR, BYTES,    pdu,               8) \
 X(a, STATIC,   SINGULAR, UINT32,   crc,               9) \
 X(a, STATIC,   SINGULAR, UINT32,   conn_handle,      10) \
-X(a, STATIC,   SINGULAR, BOOL,     processed,        11)
+X(a, STATIC,   SINGULAR, BOOL,     processed,        11) \
+X(a, STATIC,   SINGULAR, BOOL,     decrypted,        12)
 #define ble_RawPduReceived_CALLBACK NULL
 #define ble_RawPduReceived_DEFAULT NULL
 
@@ -779,7 +834,8 @@ X(a, STATIC,   SINGULAR, BOOL,     processed,        11)
 X(a, STATIC,   SINGULAR, UENUM,    direction,         1) \
 X(a, STATIC,   SINGULAR, BYTES,    pdu,               2) \
 X(a, STATIC,   SINGULAR, UINT32,   conn_handle,       3) \
-X(a, STATIC,   SINGULAR, BOOL,     processed,         4)
+X(a, STATIC,   SINGULAR, BOOL,     processed,         4) \
+X(a, STATIC,   SINGULAR, BOOL,     decrypted,         5)
 #define ble_PduReceived_CALLBACK NULL
 #define ble_PduReceived_DEFAULT NULL
 
@@ -815,7 +871,8 @@ X(a, STATIC,   ONEOF,    MESSAGE,  (msg,hijacked,msg.hijacked),  28) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (msg,pdu,msg.pdu),  29) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (msg,raw_pdu,msg.raw_pdu),  30) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (msg,injected,msg.injected),  31) \
-X(a, STATIC,   ONEOF,    MESSAGE,  (msg,desynchronized,msg.desynchronized),  32)
+X(a, STATIC,   ONEOF,    MESSAGE,  (msg,desynchronized,msg.desynchronized),  32) \
+X(a, STATIC,   ONEOF,    MESSAGE,  (msg,encryption,msg.encryption),  33)
 #define ble_Message_CALLBACK NULL
 #define ble_Message_DEFAULT NULL
 #define ble_Message_msg_set_bd_addr_MSGTYPE ble_SetBdAddressCmd
@@ -850,6 +907,7 @@ X(a, STATIC,   ONEOF,    MESSAGE,  (msg,desynchronized,msg.desynchronized),  32)
 #define ble_Message_msg_raw_pdu_MSGTYPE ble_RawPduReceived
 #define ble_Message_msg_injected_MSGTYPE ble_Injected
 #define ble_Message_msg_desynchronized_MSGTYPE ble_Desynchronized
+#define ble_Message_msg_encryption_MSGTYPE ble_SetEncryptionCmd
 
 extern const pb_msgdesc_t ble_SetBdAddressCmd_msg;
 extern const pb_msgdesc_t ble_SniffAdvCmd_msg;
@@ -873,6 +931,7 @@ extern const pb_msgdesc_t ble_StopCmd_msg;
 extern const pb_msgdesc_t ble_HijackMasterCmd_msg;
 extern const pb_msgdesc_t ble_HijackSlaveCmd_msg;
 extern const pb_msgdesc_t ble_HijackBothCmd_msg;
+extern const pb_msgdesc_t ble_SetEncryptionCmd_msg;
 extern const pb_msgdesc_t ble_AccessAddressDiscovered_msg;
 extern const pb_msgdesc_t ble_AdvPduReceived_msg;
 extern const pb_msgdesc_t ble_Connected_msg;
@@ -908,6 +967,7 @@ extern const pb_msgdesc_t ble_Message_msg;
 #define ble_HijackMasterCmd_fields &ble_HijackMasterCmd_msg
 #define ble_HijackSlaveCmd_fields &ble_HijackSlaveCmd_msg
 #define ble_HijackBothCmd_fields &ble_HijackBothCmd_msg
+#define ble_SetEncryptionCmd_fields &ble_SetEncryptionCmd_msg
 #define ble_AccessAddressDiscovered_fields &ble_AccessAddressDiscovered_msg
 #define ble_AdvPduReceived_fields &ble_AdvPduReceived_msg
 #define ble_Connected_fields &ble_Connected_msg
@@ -925,10 +985,10 @@ extern const pb_msgdesc_t ble_Message_msg;
 /* ble_Message_size depends on runtime parameters */
 #define ble_AccessAddressDiscovered_size         23
 #define ble_AdvModeCmd_size                      66
-#define ble_AdvPduReceived_size                  54
+#define ble_AdvPduReceived_size                  56
 #define ble_CentralModeCmd_size                  0
-#define ble_ConnectToCmd_size                    8
-#define ble_Connected_size                       28
+#define ble_ConnectToCmd_size                    10
+#define ble_Connected_size                       32
 #define ble_Desynchronized_size                  6
 #define ble_DisconnectCmd_size                   11
 #define ble_Disconnected_size                    12
@@ -940,13 +1000,14 @@ extern const pb_msgdesc_t ble_Message_msg;
 #define ble_JamAdvCmd_size                       0
 #define ble_JamAdvOnChannelCmd_size              6
 #define ble_JamConnCmd_size                      6
-#define ble_PduReceived_size                     313
+#define ble_PduReceived_size                     315
 #define ble_PeripheralModeCmd_size               66
-#define ble_RawPduReceived_size                  311
+#define ble_RawPduReceived_size                  313
 #define ble_ScanModeCmd_size                     2
-#define ble_SendPDUCmd_size                      311
-#define ble_SendRawPDUCmd_size                   323
-#define ble_SetBdAddressCmd_size                 8
+#define ble_SendPDUCmd_size                      313
+#define ble_SendRawPDUCmd_size                   325
+#define ble_SetBdAddressCmd_size                 10
+#define ble_SetEncryptionCmd_size                30
 #define ble_SniffAccessAddressCmd_size           7
 #define ble_SniffActiveConnCmd_size              38
 #define ble_SniffAdvCmd_size                     16

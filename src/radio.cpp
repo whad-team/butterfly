@@ -967,9 +967,10 @@ bool Radio::enable() {
 			NRF_RADIO->INTENSET = 0x00008000;
 			NVIC_ClearPendingIRQ(RADIO_IRQn);
 			NVIC_EnableIRQ(RADIO_IRQn);
-			NRF_RADIO->SHORTS = RADIO_SHORTS_READY_EDSTART_Msk /*| RADIO_SHORTS_EDEND_DISABLE_Msk*/;
+			NRF_RADIO->SHORTS = RADIO_SHORTS_READY_EDSTART_Msk;
 			NRF_RADIO->EVENTS_READY = 0;
 			NRF_RADIO->EVENTS_END = 0;
+			NRF_RADIO->EDCNT = 10;
 			NRF_RADIO->TASKS_EDSTART = 1;
 			this->state = ENERGY_DETECTION;
 		}
@@ -1038,12 +1039,11 @@ extern "C" void RADIO_IRQHandler(void) {
 	if (NRF_RADIO->EVENTS_EDEND) {
 		uint8_t sample = NRF_RADIO->EDSAMPLE;
 		NRF_RADIO->EVENTS_EDEND = 0;
-		NRF_TIMER1->TASKS_CAPTURE[0] = 1UL;
-		uint32_t now = NRF_TIMER1->CC[0];
+		NRF_TIMER4->TASKS_CAPTURE[5] = 1UL;
+		uint32_t now = NRF_TIMER4->CC[5];
 
 		Controller *controller = Radio::instance->getController();
 		controller->onEnergyDetection(now, sample);
-
 		NRF_RADIO->TASKS_EDSTART = 1;
 
 	}

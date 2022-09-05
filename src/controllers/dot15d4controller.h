@@ -22,10 +22,19 @@ typedef struct Dot15d4AttackStatus {
 	bool successful;
 } Dot15d4AttackStatus;
 
+typedef enum Dot15d4ControllerState {
+	RECEIVING,
+	ENERGY_DETECTION_SCANNING
+} Dot15d4ControllerState;
+
+
 class Dot15d4Controller : public Controller {
   protected:
 		int channel;
     Dot15d4AttackStatus attackStatus;
+		Dot15d4ControllerState controllerState;
+		bool started;
+
 	public:
 		static int channelToFrequency(int channel);
 		Dot15d4Controller(Radio* radio);
@@ -35,10 +44,14 @@ class Dot15d4Controller : public Controller {
 		int getChannel();
 		void setChannel(int channel);
 
+		void enterReceptionMode();
+		void enterEDScanMode();
+
 		void setWazabeeConfiguration();
 		void setNativeConfiguration();
 		void setJammerConfiguration();
 		void setRawConfiguration();
+		void setEnergyDetectionConfiguration();
 
 		void startAttack(Dot15d4Attack attack);
 		void sendJammingReport(uint32_t timestamp);

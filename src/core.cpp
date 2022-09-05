@@ -76,6 +76,18 @@ void Core::processZigbeeInputMessage(zigbee_Message msg) {
     int channel = msg.msg.sniff.channel;
     if (channel >= 11 && channel <= 26) {
       this->dot15d4Controller->setChannel(channel);
+      this->dot15d4Controller->enterReceptionMode();
+      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    }
+    else {
+      response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+    }
+  }
+  else if (msg.which_msg == zigbee_Message_ed_tag) {
+    int channel = msg.msg.ed.channel;
+    if (channel >= 11 && channel <= 26) {
+      this->dot15d4Controller->setChannel(channel);
+      this->dot15d4Controller->enterEDScanMode();
       response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
     }
     else {
@@ -201,7 +213,10 @@ void Core::processBLEInputMessage(ble_Message msg) {
       this->bleController->recoverHopInterval(msg.msg.sniff_conn.access_address, msg.msg.sniff_conn.crc_init, msg.msg.sniff_conn.channel_map);
     }
     else if (msg.msg.sniff_conn.hop_increment == 0) {
-      this->bleController->recoverHopIncrement(msg.msg.sniff_conn.access_address, msg.msg.sniff_conn.crc_init, msg.msg.sniff_conn.channel_map, msg.msg.sniff_conn.hop_increment);
+      this->bleController->recoverHopIncrement(msg.msg.sniff_conn.access_address, msg.msg.sniff_conn.crc_init, msg.msg.sniff_conn.channel_map, msg.msg.sniff_conn.hop_interval);
+    }
+    else {
+      this->bleController->attachToExistingConnection(msg.msg.sniff_conn.access_address, msg.msg.sniff_conn.crc_init, msg.msg.sniff_conn.channel_map, msg.msg.sniff_conn.hop_interval, msg.msg.sniff_conn.hop_increment);
     }
 
     response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);

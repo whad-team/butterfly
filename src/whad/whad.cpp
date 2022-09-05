@@ -160,6 +160,15 @@ Message* Whad::buildDot15d4RawPduMessage(Dot15d4Packet* packet) {
 
 }
 
+Message* Whad::buildDot15d4EnergyDetectionSampleMessage(uint32_t sample, uint32_t timestamp) {
+  Message* msg = Whad::buildMessage();
+  msg->which_msg = Message_zigbee_tag;
+  msg->msg.zigbee.which_msg = zigbee_Message_ed_sample_tag;
+  msg->msg.zigbee.msg.ed_sample.timestamp = timestamp;
+  msg->msg.zigbee.msg.ed_sample.sample = sample;
+  return msg;
+
+}
 Message* Whad::buildBLERawPduMessage(BLEPacket* packet) {
   Message* msg = Whad::buildMessage();
   msg->which_msg = Message_ble_tag;

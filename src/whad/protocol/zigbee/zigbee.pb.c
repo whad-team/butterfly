@@ -12,6 +12,9 @@ PB_BIND(zigbee_SetNodeAddressCmd, zigbee_SetNodeAddressCmd, AUTO)
 PB_BIND(zigbee_SniffCmd, zigbee_SniffCmd, AUTO)
 
 
+PB_BIND(zigbee_EnergyDetectionCmd, zigbee_EnergyDetectionCmd, AUTO)
+
+
 PB_BIND(zigbee_JamCmd, zigbee_JamCmd, AUTO)
 
 
@@ -40,6 +43,9 @@ PB_BIND(zigbee_ManInTheMiddleCmd, zigbee_ManInTheMiddleCmd, AUTO)
 
 
 PB_BIND(zigbee_Jammed, zigbee_Jammed, AUTO)
+
+
+PB_BIND(zigbee_EnergyDetectionSample, zigbee_EnergyDetectionSample, AUTO)
 
 
 PB_BIND(zigbee_RawPduReceived, zigbee_RawPduReceived, 2)
