@@ -27,7 +27,22 @@ int Dot15d4Controller::channelToFrequency(int channel) {
 
 Dot15d4Controller::Dot15d4Controller(Radio *radio) : Controller(radio) {
 	this->channel = 11;
+	this->autoAcknowledgement = false;
 	this->controllerState = RECEIVING;
+	this->shortAddress = 0xFFFF;
+	this->extendedAddress = 0x1122334455667788;
+}
+
+void Dot15d4Controller::setShortAddress(uint16_t shortAddress) {
+	this->shortAddress = shortAddress;
+}
+
+void Dot15d4Controller::setExtendedAddress(uint64_t extendedAddress) {
+	this->extendedAddress = extendedAddress;
+}
+
+void Dot15d4Controller::setAutoAcknowledgement(bool enable) {
+	this->autoAcknowledgement = enable;
 }
 
 int Dot15d4Controller::getChannel() {
@@ -329,49 +344,6 @@ Dot15d4Packet* Dot15d4Controller::wazabeeDecoder(uint8_t *buffer, uint8_t size,u
 		}
 	}
 
-	/*
-	if (this->attackStatus.correctorMode && fcsValue.validity == INVALID_CRC) {
-		// Correct the SFD
-		if (output_buffer[0]!=0xa7) output_buffer[0] = 0xa7;
-		int valid = 0;
-		if (check_fcs_dot15d4(output_buffer,output_buffer[1]+2) && (output_buffer[1]+2 == index)) {
-			//Serial.printf("The frame is valid ! (index=%d)\n",index);
-			valid = 1;
-		}
-		else {*/
-			/*for (int i=0;i<=0xFF;i++) {
-				output_buffer[1] = i;
-				if (check_fcs_dot15d4(output_buffer,output_buffer[1])) {
-					valid = 1;
-					break;
-				}
-			}*//*
-			if (correct_size_dot15d4(output_buffer,index)) {
-				valid = 1;
-			}
-			else {
-				valid = 0;
-			}
-		}
-		if (valid) rssi = 0xFF;
-		else rssi = 0;
-
-	}
-	bool retransmit = false;
-	for (int i=0;i<index;i++) {
-		if (output_buffer[i] == 0x42) {
-			retransmit = true;
-			break;
-		}
-	}
-	if (retransmit) {
-		Core::instance->getLinkModule()->sendSignalToSlave(STOP_SLAVE_RADIO);
-		this->setNativeConfiguration();
-		this->send(output_buffer+1,index-1);
-		this->setWazabeeConfiguration();
-		Core::instance->getLinkModule()->sendSignalToSlave(START_SLAVE_RADIO);
-	}
-	*/
 	return new Dot15d4Packet(output_buffer+1,output_buffer[1]+1-2,timestamp,source,this->channel, rssi, fcsValue);
 }
 
@@ -390,10 +362,23 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
 
 	if (pkt != NULL) {
 		this->addPacket(pkt);
+
+		if (pkt->extractAcknowledgmentRequest() && this->autoAcknowledgement) {
+			Dot15d4AddressMode mode = pkt->extractDestinationAddressMode();
+			if (
+					(mode == ADDR_SHORT && pkt->extractShortDestinationAddress() != 0xFFFF && pkt->extractShortDestinationAddress() == this->shortAddress) ||
+					(mode == ADDR_EXTENDED && pkt->extractExtendedDestinationAddress() == this->extendedAddress)
+				) {
+					nrf_delay_us(12*(4*1000/250));
+					bsp_board_led_invert(0);
+					uint8_t ack_packet[4] = {5, 0x02, 0x00, pkt->extractSequenceNumber()};
+					this->radio->send(ack_packet,4,Dot15d4Controller::channelToFrequency(this->channel), 0x00);
+					nrf_delay_us((4+6)*8*1000/250);
+
+			}
+		}
 		delete pkt;
 	}
-
-
 }
 
 void Dot15d4Controller::onJam(uint32_t timestamp) {

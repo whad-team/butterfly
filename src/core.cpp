@@ -77,6 +77,7 @@ void Core::processZigbeeInputMessage(zigbee_Message msg) {
     if (channel >= 11 && channel <= 26) {
       this->dot15d4Controller->setChannel(channel);
       this->dot15d4Controller->enterReceptionMode();
+      this->dot15d4Controller->setAutoAcknowledgement(false);
       response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
     }
     else {
@@ -97,6 +98,60 @@ void Core::processZigbeeInputMessage(zigbee_Message msg) {
   else if (msg.which_msg == zigbee_Message_start_tag) {
     this->currentController->start();
     response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+  }
+
+  else if (msg.which_msg == zigbee_Message_end_device_tag) {
+    int channel = msg.msg.end_device.channel;
+    if (channel >= 11 && channel <= 26) {
+      this->dot15d4Controller->setChannel(channel);
+      this->dot15d4Controller->enterReceptionMode();
+      this->dot15d4Controller->setAutoAcknowledgement(true);
+      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    }
+    else {
+      response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+    }
+  }
+
+
+  else if (msg.which_msg == zigbee_Message_coordinator_tag) {
+    int channel = msg.msg.coordinator.channel;
+    if (channel >= 11 && channel <= 26) {
+      this->dot15d4Controller->setChannel(channel);
+      this->dot15d4Controller->enterReceptionMode();
+      this->dot15d4Controller->setAutoAcknowledgement(true);
+      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    }
+    else {
+      response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+    }
+  }
+
+  else if (msg.which_msg == zigbee_Message_router_tag) {
+    int channel = msg.msg.router.channel;
+    if (channel >= 11 && channel <= 26) {
+      this->dot15d4Controller->setChannel(channel);
+      this->dot15d4Controller->enterReceptionMode();
+      this->dot15d4Controller->setAutoAcknowledgement(true);
+      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    }
+    else {
+      response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+    }
+  }
+  else if (msg.which_msg == zigbee_Message_set_node_addr_tag) {
+    if (msg.msg.set_node_addr.address_type == zigbee_AddressType_SHORT) {
+      uint16_t shortAddress = msg.msg.set_node_addr.address & 0xFFFF;
+      this->dot15d4Controller->setShortAddress(shortAddress);
+      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+
+    }
+    else {
+      uint64_t extendedAddress = msg.msg.set_node_addr.address;
+      this->dot15d4Controller->setExtendedAddress(extendedAddress);
+      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+
+    }
   }
 
   else if (msg.which_msg == zigbee_Message_stop_tag) {

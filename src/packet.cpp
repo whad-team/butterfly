@@ -388,13 +388,49 @@ BLEAdvertisementType BLEPacket::extractAdvertisementType() {
 }
 
 Dot15d4Packet::Dot15d4Packet(uint8_t *packetBuffer, size_t packetSize, uint32_t timestamp, uint8_t source, uint8_t channel, int8_t rssi, CrcValue crcValue) : Packet(DOT15D4_PACKET_TYPE, packetBuffer, packetSize+2, timestamp, source, channel, rssi, crcValue) {
-
-
 	for (size_t i=0;i<packetSize;i++) {
 		this->packetPointer[i] = packetBuffer[i];
 	}
 	this->packetPointer[packetSize] = (uint8_t)bytewise_bit_swap((crcValue.value & 0xFF00) >> 8);
 	this->packetPointer[packetSize+1] = (uint8_t)bytewise_bit_swap(crcValue.value & 0xFF);
+}
+
+bool Dot15d4Packet::extractAcknowledgmentRequest() {
+	return this->packetPointer[1] & (1 << 5);
+}
+
+Dot15d4AddressMode Dot15d4Packet::extractDestinationAddressMode() {
+	uint8_t mode = ((this->packetPointer[2] & 0x0C) >> 2);
+	if (mode == 2) {
+		return ADDR_SHORT;
+	}
+	else if (mode == 3) {
+		return ADDR_EXTENDED;
+	}
+	else {
+		return ADDR_NONE;
+	}
+}
+
+uint16_t Dot15d4Packet::extractShortDestinationAddress() {
+	return (this->packetPointer[6] | (this->packetPointer[7] << 8));
+}
+
+uint64_t Dot15d4Packet::extractExtendedDestinationAddress() {
+	return (
+					(uint64_t)(this->packetPointer[6]) |
+					((uint64_t)(this->packetPointer[7]) << 8) |
+					((uint64_t)(this->packetPointer[8]) << 16) |
+					((uint64_t)(this->packetPointer[9]) << 24) |
+					((uint64_t)(this->packetPointer[10]) << 32) |
+					((uint64_t)(this->packetPointer[11]) << 40) |
+					((uint64_t)(this->packetPointer[12]) << 48) |
+					((uint64_t)(this->packetPointer[13]) << 56)
+	);
+}
+
+uint8_t Dot15d4Packet::extractSequenceNumber() {
+	return this->packetPointer[3];
 }
 
 uint32_t Dot15d4Packet::getFCS() {

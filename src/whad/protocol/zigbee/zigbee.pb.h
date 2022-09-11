@@ -41,35 +41,12 @@ typedef enum _zigbee_ZigbeeMitmRole {
     zigbee_ZigbeeMitmRole_CORRECTOR = 1 
 } zigbee_ZigbeeMitmRole;
 
+typedef enum _zigbee_AddressType { 
+    zigbee_AddressType_SHORT = 0, 
+    zigbee_AddressType_EXTENDED = 1 
+} zigbee_AddressType;
+
 /* Struct definitions */
-/* *
- CoordinatorCmd
-
- Enable Coordinator mode. */
-typedef struct _zigbee_CoordinatorCmd { /* not implemented yet */
-    char dummy_field;
-} zigbee_CoordinatorCmd;
-
-/* *
- EndDeviceCmd
-
- Enable End Device mode. */
-typedef struct _zigbee_EndDeviceCmd { /* not implemented yet */
-    char dummy_field;
-} zigbee_EndDeviceCmd;
-
-/* *
- RouterCmd
-
- Enable Router mode. */
-typedef struct _zigbee_RouterCmd { /* not implemented yet */
-    char dummy_field;
-} zigbee_RouterCmd;
-
-typedef struct _zigbee_SetNodeAddressCmd { 
-    pb_callback_t address;
-} zigbee_SetNodeAddressCmd;
-
 /* *
  StartCmd
 
@@ -85,6 +62,22 @@ typedef struct _zigbee_StartCmd {
 typedef struct _zigbee_StopCmd { 
     char dummy_field;
 } zigbee_StopCmd;
+
+/* *
+ CoordinatorCmd
+
+ Enable Coordinator mode. */
+typedef struct _zigbee_CoordinatorCmd { 
+    uint32_t channel;
+} zigbee_CoordinatorCmd;
+
+/* *
+ EndDeviceCmd
+
+ Enable End Device mode. */
+typedef struct _zigbee_EndDeviceCmd { 
+    uint32_t channel;
+} zigbee_EndDeviceCmd;
 
 /* *
  EnergyDetectionCmd
@@ -136,6 +129,14 @@ typedef struct _zigbee_RawPduReceived {
     uint32_t fcs;
 } zigbee_RawPduReceived;
 
+/* *
+ RouterCmd
+
+ Enable Router mode. */
+typedef struct _zigbee_RouterCmd { 
+    uint32_t channel;
+} zigbee_RouterCmd;
+
 typedef PB_BYTES_ARRAY_T(255) zigbee_SendCmd_pdu_t;
 /* *
  SendCmd
@@ -152,6 +153,11 @@ typedef struct _zigbee_SendRawCmd {
     zigbee_SendRawCmd_pdu_t pdu;
     uint32_t fcs;
 } zigbee_SendRawCmd;
+
+typedef struct _zigbee_SetNodeAddressCmd { 
+    uint64_t address;
+    zigbee_AddressType address_type;
+} zigbee_SetNodeAddressCmd;
 
 typedef struct _zigbee_SniffCmd { 
     /* Channel must be specified, the device will only
@@ -193,13 +199,17 @@ typedef struct _zigbee_Message {
 #define _zigbee_ZigbeeMitmRole_MAX zigbee_ZigbeeMitmRole_CORRECTOR
 #define _zigbee_ZigbeeMitmRole_ARRAYSIZE ((zigbee_ZigbeeMitmRole)(zigbee_ZigbeeMitmRole_CORRECTOR+1))
 
+#define _zigbee_AddressType_MIN zigbee_AddressType_SHORT
+#define _zigbee_AddressType_MAX zigbee_AddressType_EXTENDED
+#define _zigbee_AddressType_ARRAYSIZE ((zigbee_AddressType)(zigbee_AddressType_EXTENDED+1))
+
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /* Initializer values for message structs */
-#define zigbee_SetNodeAddressCmd_init_default    {{{NULL}, NULL}}
+#define zigbee_SetNodeAddressCmd_init_default    {0, _zigbee_AddressType_MIN}
 #define zigbee_SniffCmd_init_default             {0}
 #define zigbee_EnergyDetectionCmd_init_default   {0}
 #define zigbee_JamCmd_init_default               {0}
@@ -216,7 +226,7 @@ extern "C" {
 #define zigbee_RawPduReceived_init_default       {0, false, 0, false, 0, false, 0, {0, {0}}, 0}
 #define zigbee_PduReceived_init_default          {0, false, 0, false, 0, false, 0, {0, {0}}}
 #define zigbee_Message_init_default              {0, {zigbee_SetNodeAddressCmd_init_default}}
-#define zigbee_SetNodeAddressCmd_init_zero       {{{NULL}, NULL}}
+#define zigbee_SetNodeAddressCmd_init_zero       {0, _zigbee_AddressType_MIN}
 #define zigbee_SniffCmd_init_zero                {0}
 #define zigbee_EnergyDetectionCmd_init_zero      {0}
 #define zigbee_JamCmd_init_zero                  {0}
@@ -235,7 +245,8 @@ extern "C" {
 #define zigbee_Message_init_zero                 {0, {zigbee_SetNodeAddressCmd_init_zero}}
 
 /* Field tags (for use in manual encoding/decoding) */
-#define zigbee_SetNodeAddressCmd_address_tag     1
+#define zigbee_CoordinatorCmd_channel_tag        1
+#define zigbee_EndDeviceCmd_channel_tag          1
 #define zigbee_EnergyDetectionCmd_channel_tag    1
 #define zigbee_EnergyDetectionSample_sample_tag  1
 #define zigbee_EnergyDetectionSample_timestamp_tag 2
@@ -253,11 +264,14 @@ extern "C" {
 #define zigbee_RawPduReceived_fcs_validity_tag   4
 #define zigbee_RawPduReceived_pdu_tag            5
 #define zigbee_RawPduReceived_fcs_tag            6
+#define zigbee_RouterCmd_channel_tag             1
 #define zigbee_SendCmd_channel_tag               1
 #define zigbee_SendCmd_pdu_tag                   2
 #define zigbee_SendRawCmd_channel_tag            1
 #define zigbee_SendRawCmd_pdu_tag                2
 #define zigbee_SendRawCmd_fcs_tag                3
+#define zigbee_SetNodeAddressCmd_address_tag     1
+#define zigbee_SetNodeAddressCmd_address_type_tag 2
 #define zigbee_SniffCmd_channel_tag              1
 #define zigbee_Message_set_node_addr_tag         1
 #define zigbee_Message_sniff_tag                 2
@@ -278,8 +292,9 @@ extern "C" {
 
 /* Struct field encoding specification for nanopb */
 #define zigbee_SetNodeAddressCmd_FIELDLIST(X, a) \
-X(a, CALLBACK, SINGULAR, BYTES,    address,           1)
-#define zigbee_SetNodeAddressCmd_CALLBACK pb_default_field_callback
+X(a, STATIC,   SINGULAR, UINT64,   address,           1) \
+X(a, STATIC,   SINGULAR, UENUM,    address_type,      2)
+#define zigbee_SetNodeAddressCmd_CALLBACK NULL
 #define zigbee_SetNodeAddressCmd_DEFAULT NULL
 
 #define zigbee_SniffCmd_FIELDLIST(X, a) \
@@ -311,17 +326,17 @@ X(a, STATIC,   SINGULAR, UINT32,   fcs,               3)
 #define zigbee_SendRawCmd_DEFAULT NULL
 
 #define zigbee_EndDeviceCmd_FIELDLIST(X, a) \
-
+X(a, STATIC,   SINGULAR, UINT32,   channel,           1)
 #define zigbee_EndDeviceCmd_CALLBACK NULL
 #define zigbee_EndDeviceCmd_DEFAULT NULL
 
 #define zigbee_RouterCmd_FIELDLIST(X, a) \
-
+X(a, STATIC,   SINGULAR, UINT32,   channel,           1)
 #define zigbee_RouterCmd_CALLBACK NULL
 #define zigbee_RouterCmd_DEFAULT NULL
 
 #define zigbee_CoordinatorCmd_FIELDLIST(X, a) \
-
+X(a, STATIC,   SINGULAR, UINT32,   channel,           1)
 #define zigbee_CoordinatorCmd_CALLBACK NULL
 #define zigbee_CoordinatorCmd_DEFAULT NULL
 
@@ -444,20 +459,20 @@ extern const pb_msgdesc_t zigbee_Message_msg;
 #define zigbee_Message_fields &zigbee_Message_msg
 
 /* Maximum encoded size of messages (where known) */
-/* zigbee_SetNodeAddressCmd_size depends on runtime parameters */
-/* zigbee_Message_size depends on runtime parameters */
-#define zigbee_CoordinatorCmd_size               0
-#define zigbee_EndDeviceCmd_size                 0
+#define zigbee_CoordinatorCmd_size               6
+#define zigbee_EndDeviceCmd_size                 6
 #define zigbee_EnergyDetectionCmd_size           6
 #define zigbee_EnergyDetectionSample_size        12
 #define zigbee_JamCmd_size                       6
 #define zigbee_Jammed_size                       6
 #define zigbee_ManInTheMiddleCmd_size            2
+#define zigbee_Message_size                      292
 #define zigbee_PduReceived_size                  283
 #define zigbee_RawPduReceived_size               289
-#define zigbee_RouterCmd_size                    0
+#define zigbee_RouterCmd_size                    6
 #define zigbee_SendCmd_size                      264
 #define zigbee_SendRawCmd_size                   270
+#define zigbee_SetNodeAddressCmd_size            13
 #define zigbee_SniffCmd_size                     6
 #define zigbee_StartCmd_size                     0
 #define zigbee_StopCmd_size                      0

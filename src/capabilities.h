@@ -45,6 +45,10 @@ const DeviceCapability CAPABILITIES[] = {
       CMD(zigbee_ZigbeeCommand_Send) |
       CMD(zigbee_ZigbeeCommand_Start) |
       CMD(zigbee_ZigbeeCommand_Stop) |
+      CMD(zigbee_ZigbeeCommand_SetNodeAddress) |
+      CMD(zigbee_ZigbeeCommand_EndDeviceMode) |
+      CMD(zigbee_ZigbeeCommand_CoordinatorMode) |
+      CMD(zigbee_ZigbeeCommand_RouterMode) |
       CMD(zigbee_ZigbeeCommand_ManInTheMiddle)
       )
   },

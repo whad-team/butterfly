@@ -34,13 +34,19 @@ class Dot15d4Controller : public Controller {
     Dot15d4AttackStatus attackStatus;
 		Dot15d4ControllerState controllerState;
 		bool started;
-
+		bool autoAcknowledgement;
+		uint16_t shortAddress;
+		uint64_t extendedAddress;
 	public:
 		static int channelToFrequency(int channel);
 		Dot15d4Controller(Radio* radio);
     void start();
     void stop();
 
+		void setShortAddress(uint16_t shortAddress);
+		void setExtendedAddress(uint64_t extendedAddress);
+		void setAutoAcknowledgement(bool enable);
+		
 		int getChannel();
 		void setChannel(int channel);
 

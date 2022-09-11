@@ -53,6 +53,13 @@ typedef enum BLEAdvertisementType {
 	ADV_UNKNOWN = 0xFF
 } BLEAdvertisementType;
 
+typedef enum Dot15d4AddressMode {
+	ADDR_NONE = 0,
+	ADDR_RESERVED = 1,
+	ADDR_SHORT = 2,
+	ADDR_EXTENDED = 3
+} Dot15d4AddressMode;
+
 class BLEPacket : public Packet {
 	protected:
 		uint32_t accessAddress;
@@ -105,6 +112,11 @@ class BLEPacket : public Packet {
 class Dot15d4Packet : public Packet {
 	public:
 		Dot15d4Packet(uint8_t *packetBuffer, size_t packetSize, uint32_t timestamp, uint8_t source, uint8_t channel, int8_t rssi, CrcValue crcValue);
+		bool extractAcknowledgmentRequest();
+		uint8_t extractSequenceNumber();
+		Dot15d4AddressMode extractDestinationAddressMode();
+		uint16_t extractShortDestinationAddress();
+		uint64_t extractExtendedDestinationAddress();
 		uint32_t getFCS();
 
 };

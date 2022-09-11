@@ -58,10 +58,10 @@ extern const pb_msgdesc_t Message_msg;
 #define Message_fields &Message_msg
 
 /* Maximum encoded size of messages (where known) */
-#if defined(generic_Message_size) && defined(discovery_Message_size) && defined(ble_Message_size) && defined(zigbee_Message_size)
-union Message_msg_size_union {char f1[(6 + generic_Message_size)]; char f2[(6 + discovery_Message_size)]; char f3[(6 + ble_Message_size)]; char f4[(6 + zigbee_Message_size)];};
+#if defined(generic_Message_size) && defined(discovery_Message_size) && defined(ble_Message_size)
+union Message_msg_size_union {char f1[(6 + generic_Message_size)]; char f2[(6 + discovery_Message_size)]; char f3[(6 + ble_Message_size)]; char f0[295];};
 #endif
-#if defined(generic_Message_size) && defined(discovery_Message_size) && defined(ble_Message_size) && defined(zigbee_Message_size)
+#if defined(generic_Message_size) && defined(discovery_Message_size) && defined(ble_Message_size)
 #define Message_size                             (0 + sizeof(union Message_msg_size_union))
 #endif
 
