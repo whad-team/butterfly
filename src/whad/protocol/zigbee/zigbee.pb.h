@@ -114,6 +114,8 @@ typedef struct _zigbee_PduReceived {
     bool has_fcs_validity;
     bool fcs_validity;
     zigbee_PduReceived_pdu_t pdu;
+    bool has_lqi;
+    uint32_t lqi;
 } zigbee_PduReceived;
 
 typedef PB_BYTES_ARRAY_T(255) zigbee_RawPduReceived_pdu_t;
@@ -127,6 +129,8 @@ typedef struct _zigbee_RawPduReceived {
     bool fcs_validity;
     zigbee_RawPduReceived_pdu_t pdu;
     uint32_t fcs;
+    bool has_lqi;
+    uint32_t lqi;
 } zigbee_RawPduReceived;
 
 /* *
@@ -223,8 +227,8 @@ extern "C" {
 #define zigbee_ManInTheMiddleCmd_init_default    {_zigbee_ZigbeeMitmRole_MIN}
 #define zigbee_Jammed_init_default               {0}
 #define zigbee_EnergyDetectionSample_init_default {0, 0}
-#define zigbee_RawPduReceived_init_default       {0, false, 0, false, 0, false, 0, {0, {0}}, 0}
-#define zigbee_PduReceived_init_default          {0, false, 0, false, 0, false, 0, {0, {0}}}
+#define zigbee_RawPduReceived_init_default       {0, false, 0, false, 0, false, 0, {0, {0}}, 0, false, 0}
+#define zigbee_PduReceived_init_default          {0, false, 0, false, 0, false, 0, {0, {0}}, false, 0}
 #define zigbee_Message_init_default              {0, {zigbee_SetNodeAddressCmd_init_default}}
 #define zigbee_SetNodeAddressCmd_init_zero       {0, _zigbee_AddressType_MIN}
 #define zigbee_SniffCmd_init_zero                {0}
@@ -240,8 +244,8 @@ extern "C" {
 #define zigbee_ManInTheMiddleCmd_init_zero       {_zigbee_ZigbeeMitmRole_MIN}
 #define zigbee_Jammed_init_zero                  {0}
 #define zigbee_EnergyDetectionSample_init_zero   {0, 0}
-#define zigbee_RawPduReceived_init_zero          {0, false, 0, false, 0, false, 0, {0, {0}}, 0}
-#define zigbee_PduReceived_init_zero             {0, false, 0, false, 0, false, 0, {0, {0}}}
+#define zigbee_RawPduReceived_init_zero          {0, false, 0, false, 0, false, 0, {0, {0}}, 0, false, 0}
+#define zigbee_PduReceived_init_zero             {0, false, 0, false, 0, false, 0, {0, {0}}, false, 0}
 #define zigbee_Message_init_zero                 {0, {zigbee_SetNodeAddressCmd_init_zero}}
 
 /* Field tags (for use in manual encoding/decoding) */
@@ -258,12 +262,14 @@ extern "C" {
 #define zigbee_PduReceived_timestamp_tag         3
 #define zigbee_PduReceived_fcs_validity_tag      4
 #define zigbee_PduReceived_pdu_tag               5
+#define zigbee_PduReceived_lqi_tag               6
 #define zigbee_RawPduReceived_channel_tag        1
 #define zigbee_RawPduReceived_rssi_tag           2
 #define zigbee_RawPduReceived_timestamp_tag      3
 #define zigbee_RawPduReceived_fcs_validity_tag   4
 #define zigbee_RawPduReceived_pdu_tag            5
 #define zigbee_RawPduReceived_fcs_tag            6
+#define zigbee_RawPduReceived_lqi_tag            7
 #define zigbee_RouterCmd_channel_tag             1
 #define zigbee_SendCmd_channel_tag               1
 #define zigbee_SendCmd_pdu_tag                   2
@@ -372,7 +378,8 @@ X(a, STATIC,   OPTIONAL, INT32,    rssi,              2) \
 X(a, STATIC,   OPTIONAL, UINT32,   timestamp,         3) \
 X(a, STATIC,   OPTIONAL, BOOL,     fcs_validity,      4) \
 X(a, STATIC,   SINGULAR, BYTES,    pdu,               5) \
-X(a, STATIC,   SINGULAR, UINT32,   fcs,               6)
+X(a, STATIC,   SINGULAR, UINT32,   fcs,               6) \
+X(a, STATIC,   OPTIONAL, UINT32,   lqi,               7)
 #define zigbee_RawPduReceived_CALLBACK NULL
 #define zigbee_RawPduReceived_DEFAULT NULL
 
@@ -381,7 +388,8 @@ X(a, STATIC,   SINGULAR, UINT32,   channel,           1) \
 X(a, STATIC,   OPTIONAL, INT32,    rssi,              2) \
 X(a, STATIC,   OPTIONAL, UINT32,   timestamp,         3) \
 X(a, STATIC,   OPTIONAL, BOOL,     fcs_validity,      4) \
-X(a, STATIC,   SINGULAR, BYTES,    pdu,               5)
+X(a, STATIC,   SINGULAR, BYTES,    pdu,               5) \
+X(a, STATIC,   OPTIONAL, UINT32,   lqi,               6)
 #define zigbee_PduReceived_CALLBACK NULL
 #define zigbee_PduReceived_DEFAULT NULL
 
@@ -466,9 +474,9 @@ extern const pb_msgdesc_t zigbee_Message_msg;
 #define zigbee_JamCmd_size                       6
 #define zigbee_Jammed_size                       6
 #define zigbee_ManInTheMiddleCmd_size            2
-#define zigbee_Message_size                      292
-#define zigbee_PduReceived_size                  283
-#define zigbee_RawPduReceived_size               289
+#define zigbee_Message_size                      298
+#define zigbee_PduReceived_size                  289
+#define zigbee_RawPduReceived_size               295
 #define zigbee_RouterCmd_size                    6
 #define zigbee_SendCmd_size                      264
 #define zigbee_SendRawCmd_size                   270

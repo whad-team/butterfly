@@ -134,7 +134,7 @@ void Dot15d4Controller::setNativeConfiguration() {
   this->radio->setMode(MODE_NORMAL);
   this->radio->setFastRampUpTime(true);
   this->radio->setTxPower(POS0_DBM);
-  this->radio->disableRssi();
+  this->radio->enableRssi();
 	this->radio->setEndianness(LITTLE);
   this->radio->setPhy(DOT15D4_NATIVE);
 	this->radio->disableJammingPatterns();
@@ -344,7 +344,7 @@ Dot15d4Packet* Dot15d4Controller::wazabeeDecoder(uint8_t *buffer, uint8_t size,u
 		}
 	}
 
-	return new Dot15d4Packet(output_buffer+1,output_buffer[1]+1-2,timestamp,source,this->channel, rssi, fcsValue);
+	return new Dot15d4Packet(output_buffer+1,output_buffer[1]+1-2,timestamp,source,this->channel, rssi, fcsValue, rssi);
 }
 
 void Dot15d4Controller::sendJammingReport(uint32_t timestamp) {
@@ -357,7 +357,9 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
 		pkt = this->wazabeeDecoder(buffer,size,timestamp, crcValue, rssi);
 	}
 	else {
-		pkt = new Dot15d4Packet(buffer,1+buffer[0]-2,timestamp,RECEIVER,this->channel,buffer[buffer[0]-1],crcValue);
+		uint8_t lqi = buffer[buffer[0]-1];
+
+		pkt = new Dot15d4Packet(buffer,1+buffer[0]-2,timestamp,RECEIVER,this->channel,rssi,crcValue, (uint8_t)(lqi > 63 ? 255 : lqi*4));
 	}
 
 	if (pkt != NULL) {

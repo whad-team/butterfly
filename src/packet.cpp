@@ -387,12 +387,17 @@ BLEAdvertisementType BLEPacket::extractAdvertisementType() {
 	return type;
 }
 
-Dot15d4Packet::Dot15d4Packet(uint8_t *packetBuffer, size_t packetSize, uint32_t timestamp, uint8_t source, uint8_t channel, int8_t rssi, CrcValue crcValue) : Packet(DOT15D4_PACKET_TYPE, packetBuffer, packetSize+2, timestamp, source, channel, rssi, crcValue) {
+Dot15d4Packet::Dot15d4Packet(uint8_t *packetBuffer, size_t packetSize, uint32_t timestamp, uint8_t source, uint8_t channel, int8_t rssi, CrcValue crcValue, uint8_t lqi) : Packet(DOT15D4_PACKET_TYPE, packetBuffer, packetSize+2, timestamp, source, channel, rssi, crcValue) {
 	for (size_t i=0;i<packetSize;i++) {
 		this->packetPointer[i] = packetBuffer[i];
 	}
 	this->packetPointer[packetSize] = (uint8_t)bytewise_bit_swap((crcValue.value & 0xFF00) >> 8);
 	this->packetPointer[packetSize+1] = (uint8_t)bytewise_bit_swap(crcValue.value & 0xFF);
+	this->lqi = lqi;
+}
+
+uint8_t Dot15d4Packet::getLQI() {
+	return this->lqi;
 }
 
 bool Dot15d4Packet::extractAcknowledgmentRequest() {

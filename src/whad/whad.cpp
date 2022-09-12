@@ -152,6 +152,8 @@ Message* Whad::buildDot15d4RawPduMessage(Dot15d4Packet* packet) {
   msg->msg.zigbee.msg.raw_pdu.timestamp = packet->getTimestamp();
   msg->msg.zigbee.msg.raw_pdu.has_fcs_validity = true;
   msg->msg.zigbee.msg.raw_pdu.fcs_validity = packet->isCrcValid();
+  msg->msg.zigbee.msg.raw_pdu.has_lqi = true;
+  msg->msg.zigbee.msg.raw_pdu.lqi = packet->getLQI();
   msg->msg.zigbee.msg.raw_pdu.pdu.size = packet->getPacketSize()-3;
   memcpy(msg->msg.zigbee.msg.raw_pdu.pdu.bytes, packet->getPacketBuffer()+1, packet->getPacketSize()-3);
   msg->msg.zigbee.msg.raw_pdu.fcs = packet->getFCS();

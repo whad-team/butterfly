@@ -110,10 +110,14 @@ class BLEPacket : public Packet {
 };
 
 class Dot15d4Packet : public Packet {
+	protected:
+		uint8_t lqi;
+
 	public:
-		Dot15d4Packet(uint8_t *packetBuffer, size_t packetSize, uint32_t timestamp, uint8_t source, uint8_t channel, int8_t rssi, CrcValue crcValue);
+		Dot15d4Packet(uint8_t *packetBuffer, size_t packetSize, uint32_t timestamp, uint8_t source, uint8_t channel, int8_t rssi, CrcValue crcValue, uint8_t lqi);
 		bool extractAcknowledgmentRequest();
 		uint8_t extractSequenceNumber();
+		uint8_t getLQI();
 		Dot15d4AddressMode extractDestinationAddressMode();
 		uint16_t extractShortDestinationAddress();
 		uint64_t extractExtendedDestinationAddress();
