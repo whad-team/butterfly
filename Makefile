@@ -173,6 +173,7 @@ SRC_FILES += \
 	$(PROJ_DIR)/whad/protocol/whad.pb.c \
 	$(PROJ_DIR)/whad/protocol/ble/ble.pb.c \
 	$(PROJ_DIR)/whad/protocol/zigbee/zigbee.pb.c \
+	$(PROJ_DIR)/whad/protocol/esb/esb.pb.c \
 	$(PROJ_DIR)/whad/nanopb/pb_common.c \
 	$(PROJ_DIR)/whad/nanopb/pb_decode.c \
 	$(PROJ_DIR)/whad/nanopb/pb_encode.c \

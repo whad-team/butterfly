@@ -5,6 +5,7 @@ ESBController::ESBController(Radio *radio) : Controller(radio) {
   this->timerModule = Core::instance->getTimerModule();
   this->scanTimer = NULL;
   this->timeoutTimer = NULL;
+  this->showAcknowledgements = false;
 }
 
 
@@ -20,7 +21,9 @@ void ESBController::sendPing() {
 }
 void ESBController::setChannel(int channel) {
   this->channel = channel;
-	this->radio->fastFrequencyChange(channel,channel);
+  if (this->channel != 0xFF) {
+	   this->radio->fastFrequencyChange(channel,channel);
+  }
 
 }
 
@@ -126,6 +129,7 @@ bool ESBController::goToNextChannel() {
     this->nextPairingChannel();
   }
   else {
+    bsp_board_led_invert(0);
     this->setChannel((this->getChannel() + 1) % 100);
   }
   if (this->activeScanning && this->mode == ESB_FOLLOW) {
@@ -174,7 +178,7 @@ void ESBController::startScanning() {
   }
 	this->scanTimer->setMode(REPEATED);
 	this->scanTimer->setCallback((ControllerCallback)&ESBController::goToNextChannel, this);
-	this->scanTimer->update(690);
+	this->scanTimer->update(10000);
 	this->scanTimer->start();
 }
 
@@ -187,24 +191,55 @@ void ESBController::stopScanning() {
 }
 
 void ESBController::start() {
-  this->channel = 15;
-  this->setPromiscuousConfiguration();
+  this->stopScanning();
+
+  if (
+    this->filter.bytes[0] == 0xFF &&
+    this->filter.bytes[1] == 0xFF &&
+    this->filter.bytes[2] == 0xFF &&
+    this->filter.bytes[3] == 0xFF &&
+    this->filter.bytes[4] == 0xFF
+  ) {
+
+    if (this->channel == 0xFF) {
+      this->channel = 0;
+      this->startScanning();
+    }
+    this->setPromiscuousConfiguration();
+  }
+  else {
+    if (this->channel == 0xFF) {
+      this->channel = 0;
+      this->setFollowMode(true);
+      this->setAutofind(true);
+    }
+    this->setFollowConfiguration(this->filter.bytes);
+  }
+}
+
+
+void ESBController::enableAcknowledgements() {
+  this->showAcknowledgements = true;
+}
+void ESBController::disableAcknowledgements() {
+  this->showAcknowledgements = false;
 }
 
 void ESBController::stop() {
+  this->stopScanning();
   this->radio->disable();
 }
 
 void ESBController::setPromiscuousConfiguration() {
   this->mode = ESB_PROMISCUOUS;
-  uint8_t preamble[] = {0x00,0xAA};
+  uint8_t preamble[] = {0x00, 0xaa};
   this->radio->setPreamble(preamble,2);
-  this->radio->setPrefixes();
+  this->radio->setPrefixes(0xaa,0x1f,0x9f);
   this->radio->setMode(MODE_NORMAL);
   this->radio->setFastRampUpTime(true);
   this->radio->setEndianness(BIG);
   this->radio->setTxPower(POS8_DBM);
-  this->radio->disableRssi();
+  this->radio->enableRssi();
   this->radio->setPhy(ESB_2MBITS);
   this->radio->setHeader(0,0,0);
   this->radio->setWhitening(NO_WHITENING);
@@ -215,9 +250,9 @@ void ESBController::setPromiscuousConfiguration() {
   this->radio->setCrcSize(3);
   this->radio->setCrcInit(0x000000);
   this->radio->setCrcPoly(0x000000);
-  this->radio->setPayloadLength(38);
+  this->radio->setPayloadLength(250);
   this->radio->setInterFrameSpacing(0);
-  this->radio->setExpandPayloadLength(38);
+  this->radio->setExpandPayloadLength(250);
   this->radio->setFrequency(this->channel);
   this->radio->reload();
 }
@@ -231,7 +266,7 @@ void ESBController::setFollowConfiguration(uint8_t address[5]) {
   this->radio->setFastRampUpTime(true);
   this->radio->setEndianness(BIG);
   this->radio->setTxPower(POS8_DBM);
-  this->radio->disableRssi();
+  this->radio->enableRssi();
   this->radio->setPhy(ESB_2MBITS);
   this->radio->setHeader(0,6,3);
   this->radio->setWhitening(NO_WHITENING);
@@ -242,7 +277,7 @@ void ESBController::setFollowConfiguration(uint8_t address[5]) {
   this->radio->setCrcSize(2);
   this->radio->setCrcInit(0xFFFF);
   this->radio->setCrcPoly(0x11021);
-  this->radio->setPayloadLength(38);
+  this->radio->setPayloadLength(40);
   this->radio->setInterFrameSpacing(0);
   this->radio->setExpandPayloadLength(0);
   this->radio->setFrequency(this->channel);
@@ -323,20 +358,24 @@ ESBPacket* ESBController::buildPseudoPacketFromPayload(uint32_t timestamp, uint8
 void ESBController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
   if (this->mode == ESB_PROMISCUOUS) {
     int channel = this->channel;
-    if (size >= 7 && (buffer[5] >> 2)+5+2+2 < size && (buffer[5] >> 2) < 25) {
-      ESBPacket *pkt = new ESBPacket(buffer,size,timestamp,0x00,channel,rssi,crcValue);
-
-      if (pkt != NULL && pkt->checkCrc()) {
-        ESBPacket *croppedPkt = new ESBPacket(buffer,pkt->getSize()+5+2+2,timestamp,0x00,channel,rssi,crcValue);
-        this->addPacket(croppedPkt);
-        delete pkt;
-        //nrf_delay_us(100);
-      }
+    int i=0;
+    while (buffer[0] == 0xAA && i < 55*8) {
+      shift_buffer(buffer, 1);
+      i++;
     }
+    ESBPacket *pkt = new ESBPacket(buffer,size,timestamp,0x00,channel,rssi,crcValue);
+
+    if (pkt != NULL && pkt->checkCrc()) {
+      ESBPacket *croppedPkt = new ESBPacket(buffer,pkt->getSize()+5+2+2,timestamp,0x00,channel,rssi,crcValue);
+      this->addPacket(croppedPkt);
+      delete croppedPkt;
+      //nrf_delay_us(100);
+    }
+    delete pkt;
+
   }
   else if (this->mode == ESB_FOLLOW) {
-
-    if (/*crcValue.validity == VALID_CRC*/true) {
+    if (true) {
 
       if (this->autofind) {
         this->expandTimeout(timestamp);
@@ -368,8 +407,8 @@ void ESBController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer,
        }
       }*/
       ESBPacket *pkt = this->buildPseudoPacketFromPayload(timestamp, size,buffer,crcValue, rssi);
-
-      this->addPacket(pkt);
+      if (size > 2 || this->showAcknowledgements) this->addPacket(pkt);
+		  delete pkt;
 
       /*if (this->attackStatus.attack == ESB_ATTACK_SNIFF_LOGITECH_PAIRING && buffer[3] == 0x5F && buffer[4] == 0x01) {
         this->setFilter(buffer[5],buffer[6],buffer[7],buffer[8],buffer[9]);

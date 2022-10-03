@@ -43,12 +43,8 @@ typedef enum _discovery_Capability {
     discovery_Capability_Jam = 8, 
     discovery_Capability_Hijack = 16, 
     discovery_Capability_Hook = 32, 
-    discovery_Capability_MasterRole = 64, 
-    discovery_Capability_SlaveRole = 128, 
-    discovery_Capability_NoRawData = 256, 
-    discovery_Capability_EndDeviceRole = 257, 
-    discovery_Capability_CoordinatorRole = 258, 
-    discovery_Capability_RouterRole = 260 
+    discovery_Capability_SimulateRole = 64, 
+    discovery_Capability_NoRawData = 128 
 } discovery_Capability;
 
 /* Struct definitions */
@@ -121,8 +117,8 @@ typedef struct _discovery_Message {
 #define _discovery_DeviceType_ARRAYSIZE ((discovery_DeviceType)(discovery_DeviceType_VirtualDevice+1))
 
 #define _discovery_Capability_MIN discovery_Capability__CapNone
-#define _discovery_Capability_MAX discovery_Capability_RouterRole
-#define _discovery_Capability_ARRAYSIZE ((discovery_Capability)(discovery_Capability_RouterRole+1))
+#define _discovery_Capability_MAX discovery_Capability_NoRawData
+#define _discovery_Capability_ARRAYSIZE ((discovery_Capability)(discovery_Capability_NoRawData+1))
 
 
 #ifdef __cplusplus

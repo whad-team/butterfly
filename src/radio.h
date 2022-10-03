@@ -41,7 +41,7 @@ class Radio
 		uint32_t crcInit;
 		bool crcSkipAddress;
 
-		uint8_t interFrameSpacing;
+		int interFrameSpacing;
 		Header header;
 
 		uint8_t expandPayloadLength;
@@ -160,8 +160,8 @@ class Radio
 		bool getCrcSkipAddress();
 		bool setCrcSkipAddress(bool skip);
 
-		uint8_t getInterFrameSpacing();
-		bool setInterFrameSpacing(uint8_t ifs);
+		int getInterFrameSpacing();
+		bool setInterFrameSpacing(int ifs);
 
 		Header getHeader();
 		bool setHeader(uint8_t s0, uint8_t length, uint8_t s1);

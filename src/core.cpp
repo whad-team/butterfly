@@ -15,15 +15,23 @@ void Core::processInputMessage(Message msg) {
     case Message_generic_tag:
       this->processGenericInputMessage(msg.msg.generic);
       break;
+
     case Message_discovery_tag:
       this->processDiscoveryInputMessage(msg.msg.discovery);
       break;
+
     case Message_ble_tag:
       this->processBLEInputMessage(msg.msg.ble);
       break;
+
     case Message_zigbee_tag:
       this->processZigbeeInputMessage(msg.msg.zigbee);
       break;
+
+    case Message_esb_tag:
+      this->processESBInputMessage(msg.msg.esb);
+      break;
+
     default:
       // send error ?
       break;
@@ -342,6 +350,47 @@ void Core::processBLEInputMessage(ble_Message msg) {
         response = Whad::buildResultMessage(generic_ResultCode_WRONG_MODE);
       }
   }
+  this->pushMessageToQueue(response);
+}
+void Core::processESBInputMessage(esb_Message msg) {
+  Message *response = NULL;
+
+  if (this->currentController != this->esbController) {
+    this->selectController(ESB_PROTOCOL);
+  }
+
+  if (msg.which_msg == esb_Message_sniff_tag) {
+    if (msg.msg.sniff.channel == 0xFF || (msg.msg.sniff.channel >= 0 && msg.msg.sniff.channel <= 100)) {
+      this->esbController->setFilter(
+                msg.msg.sniff.address.bytes[0],
+                msg.msg.sniff.address.bytes[1],
+                msg.msg.sniff.address.bytes[2],
+                msg.msg.sniff.address.bytes[3],
+                msg.msg.sniff.address.bytes[4]
+      );
+      this->esbController->setChannel(msg.msg.sniff.channel);
+      if (msg.msg.sniff.show_acknowledgements) {
+        this->esbController->enableAcknowledgements();
+      }
+      else {
+        this->esbController->disableAcknowledgements();
+      }
+
+      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    }
+    else {
+      response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+    }
+  }
+  else if (msg.which_msg == esb_Message_start_tag) {
+    this->esbController->start();
+    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+  }
+  else if (msg.which_msg == esb_Message_stop_tag) {
+    this->esbController->stop();
+    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+  }
+
   this->pushMessageToQueue(response);
 }
 

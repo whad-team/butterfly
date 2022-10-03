@@ -371,11 +371,12 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
 					(mode == ADDR_SHORT && pkt->extractShortDestinationAddress() != 0xFFFF && pkt->extractShortDestinationAddress() == this->shortAddress) ||
 					(mode == ADDR_EXTENDED && pkt->extractExtendedDestinationAddress() == this->extendedAddress)
 				) {
-					nrf_delay_us(12*(4*1000/250));
-					bsp_board_led_invert(0);
+
+					nrf_delay_us(5*(4*1000/250));
 					uint8_t ack_packet[4] = {5, 0x02, 0x00, pkt->extractSequenceNumber()};
 					this->radio->send(ack_packet,4,Dot15d4Controller::channelToFrequency(this->channel), 0x00);
 					nrf_delay_us((4+6)*8*1000/250);
+					bsp_board_led_invert(0);
 
 			}
 		}

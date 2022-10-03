@@ -131,6 +131,9 @@ Message* Whad::buildMessageFromPacket(Packet* packet) {
   else if (packet->getPacketType() == DOT15D4_PACKET_TYPE) {
     msg = Whad::buildDot15d4RawPduMessage((Dot15d4Packet*)packet);
   }
+  else if (packet->getPacketType() == ESB_PACKET_TYPE) {
+    msg = Whad::buildESBRawPduMessage((ESBPacket*)packet);
+  }
   return msg;
 }
 /*
@@ -141,6 +144,24 @@ optional bool fcs_validity = 4;
 bytes pdu = 5;
 uint32 fcs = 6;
 */
+Message* Whad::buildESBRawPduMessage(ESBPacket* packet) {
+  Message* msg = Whad::buildMessage();
+  msg->which_msg = Message_esb_tag;
+  msg->msg.esb.which_msg = esb_Message_raw_pdu_tag;
+  msg->msg.esb.msg.raw_pdu.has_rssi = true;
+  msg->msg.esb.msg.raw_pdu.rssi = packet->getRssi();
+  msg->msg.esb.msg.raw_pdu.channel = packet->getChannel();
+  msg->msg.esb.msg.raw_pdu.has_timestamp = true;
+  msg->msg.esb.msg.raw_pdu.timestamp = packet->getTimestamp();
+  msg->msg.esb.msg.raw_pdu.has_crc_validity = true;
+  msg->msg.esb.msg.raw_pdu.crc_validity = packet->isCrcValid();
+  msg->msg.esb.msg.raw_pdu.pdu.size = packet->getPacketSize();
+  memcpy(msg->msg.esb.msg.raw_pdu.pdu.bytes, packet->getPacketBuffer(), packet->getPacketSize());
+  return msg;
+
+}
+
+
 Message* Whad::buildDot15d4RawPduMessage(Dot15d4Packet* packet) {
   Message* msg = Whad::buildMessage();
   msg->which_msg = Message_zigbee_tag;

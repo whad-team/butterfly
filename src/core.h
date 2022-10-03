@@ -70,7 +70,7 @@ class Core {
 		void processDiscoveryInputMessage(discovery_Message msg);
 		void processZigbeeInputMessage(zigbee_Message msg);
 		void processBLEInputMessage(ble_Message msg);
-
+		void processESBInputMessage(esb_Message msg);
 
 
 		bool selectController(Protocol controller);

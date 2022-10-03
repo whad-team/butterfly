@@ -356,10 +356,10 @@ bool Radio::disableAutoTXafterRX() {
 	this->autoTXafterRXenabled = false;
 	return true;
 }
-uint8_t Radio::getInterFrameSpacing() {
+int Radio::getInterFrameSpacing() {
 	return this->interFrameSpacing;
 }
-bool Radio::setInterFrameSpacing(uint8_t ifs) {
+bool Radio::setInterFrameSpacing(int ifs) {
 	this->interFrameSpacing = ifs;
 	return true;
 }
@@ -911,6 +911,7 @@ bool Radio::enable() {
 	if (success) success = this->generatePcnf0Register();
 	if (success) success = this->generatePcnf1Register();
 	if (success) success = this->generateDataWhiteIvRegister();
+
 
 	if (success) {
 		NRF_RADIO->TIFS = this->interFrameSpacing;

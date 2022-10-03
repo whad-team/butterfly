@@ -17,7 +17,7 @@ typedef struct {
 const DeviceCapability CAPABILITIES[] = {
   {
     discovery_Domain_BtLE,
-    (discovery_Capability)(discovery_Capability_Sniff | discovery_Capability_Inject | discovery_Capability_Hijack | discovery_Capability_MasterRole | discovery_Capability_SlaveRole),
+    (discovery_Capability)(discovery_Capability_Sniff | discovery_Capability_Inject | discovery_Capability_Hijack | discovery_Capability_SimulateRole),
     (
       CMD(ble_BleCommand_SniffAdv) |
       CMD(ble_BleCommand_SniffConnReq) |
@@ -37,7 +37,7 @@ const DeviceCapability CAPABILITIES[] = {
   },
   {
     discovery_Domain_Zigbee,
-    (discovery_Capability)(discovery_Capability_Sniff | discovery_Capability_Inject | discovery_Capability_Jam ),
+    (discovery_Capability)(discovery_Capability_Sniff | discovery_Capability_Inject | discovery_Capability_Jam | discovery_Capability_SimulateRole),
     (
       CMD(zigbee_ZigbeeCommand_Sniff) |
       CMD(zigbee_ZigbeeCommand_Jam) |
@@ -50,6 +50,17 @@ const DeviceCapability CAPABILITIES[] = {
       CMD(zigbee_ZigbeeCommand_CoordinatorMode) |
       CMD(zigbee_ZigbeeCommand_RouterMode) |
       CMD(zigbee_ZigbeeCommand_ManInTheMiddle)
+      )
+  },
+  {
+    discovery_Domain_Esb,
+    (discovery_Capability)(discovery_Capability_Sniff | discovery_Capability_Inject | discovery_Capability_Jam | discovery_Capability_SimulateRole),
+    (
+      CMD(esb_ESBCommand_Sniff) |
+      CMD(esb_ESBCommand_Send) |
+      CMD(esb_ESBCommand_Start) |
+      CMD(esb_ESBCommand_Stop) |
+      CMD(esb_ESBCommand_SetNodeAddress)
       )
   },
   {discovery_Domain__DomainNone, discovery_Capability__CapNone, 0x00000000}
