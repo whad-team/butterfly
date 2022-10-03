@@ -134,6 +134,7 @@ class ESBPacket : public Packet {
 		uint8_t getSize();
 		uint16_t getCrc();
 		bool checkCrc();
+		uint8_t getPID();
 };
 
 class ANTPacket : public Packet {

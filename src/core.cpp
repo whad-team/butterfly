@@ -370,10 +370,10 @@ void Core::processESBInputMessage(esb_Message msg) {
       );
       this->esbController->setChannel(msg.msg.sniff.channel);
       if (msg.msg.sniff.show_acknowledgements) {
-        this->esbController->enableAcknowledgements();
+        this->esbController->enableAcknowledgementsSniffing();
       }
       else {
-        this->esbController->disableAcknowledgements();
+        this->esbController->disableAcknowledgementsSniffing();
       }
 
       response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
@@ -390,7 +390,29 @@ void Core::processESBInputMessage(esb_Message msg) {
     this->esbController->stop();
     response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
   }
-
+  else if (msg.which_msg == esb_Message_send_raw_tag) {
+    int channel = msg.msg.send_raw.channel;
+    if (channel >= 0 && channel <= 100) {
+      this->esbController->setChannel(channel);
+    }
+    this->esbController->send(msg.msg.send_raw.pdu.bytes, msg.msg.send_raw.pdu.size);
+    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+  }
+  else if (msg.which_msg == esb_Message_set_node_addr_tag) {
+    this->esbController->setFilter(
+              msg.msg.set_node_addr.address.bytes[0],
+              msg.msg.set_node_addr.address.bytes[1],
+              msg.msg.set_node_addr.address.bytes[2],
+              msg.msg.set_node_addr.address.bytes[3],
+              msg.msg.set_node_addr.address.bytes[4]
+    );
+    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+  }
+  else if (msg.which_msg == esb_Message_prx_tag) {
+    this->esbController->setChannel(msg.msg.prx.channel);
+    this->esbController->enableAcknowledgementsTransmission();
+    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+  }
   this->pushMessageToQueue(response);
 }
 

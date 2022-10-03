@@ -479,6 +479,9 @@ uint8_t ESBPacket::getSize() {
 		return this->packetPointer[5] >> 2;
 }
 
+uint8_t ESBPacket::getPID() {
+		return this->packetPointer[5] & 0x03;
+}
 
 MosartPacket::MosartPacket(uint8_t *packetBuffer, size_t packetSize, uint32_t timestamp, uint8_t source, uint8_t channel, int8_t rssi, CrcValue crcValue) : Packet(MOSART_PACKET_TYPE, packetBuffer, packetSize, timestamp, source, channel, rssi, crcValue) {}
 

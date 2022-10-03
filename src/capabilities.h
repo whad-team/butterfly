@@ -60,7 +60,9 @@ const DeviceCapability CAPABILITIES[] = {
       CMD(esb_ESBCommand_Send) |
       CMD(esb_ESBCommand_Start) |
       CMD(esb_ESBCommand_Stop) |
-      CMD(esb_ESBCommand_SetNodeAddress)
+      CMD(esb_ESBCommand_SetNodeAddress) |
+      CMD(esb_ESBCommand_PrimaryReceiverMode)
+
       )
   },
   {discovery_Domain__DomainNone, discovery_Capability__CapNone, 0x00000000}
