@@ -434,11 +434,28 @@ void ESBController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer,
 
        }
       }*/
-      ESBPacket *pkt = this->buildPseudoPacketFromPayload(timestamp, size,buffer,crcValue, rssi);
       if (size > 2 || this->showAcknowledgements) {
-        this->addPacket(pkt);
+        bool retransmission = false;
+        if (size != this->lastReceivedPacket.size) {
+          retransmission = false;
+        }
+        else {
+          retransmission = true;
+          for (int i=2;i<size;i++) {
+            if (buffer[i] != this->lastReceivedPacket.buffer[i]) {
+              retransmission = false;
+              break;
+            }
+          }
+        }
+        if (!retransmission) {
+          ESBPacket *pkt = this->buildPseudoPacketFromPayload(timestamp, size,buffer,crcValue, rssi);
+          memcpy(this->lastReceivedPacket.buffer, buffer, size);
+          this->lastReceivedPacket.size = size;
+          this->addPacket(pkt);
+          delete pkt;
+        }
       }
-		  delete pkt;
 
       /*if (this->attackStatus.attack == ESB_ATTACK_SNIFF_LOGITECH_PAIRING && buffer[3] == 0x5F && buffer[4] == 0x01) {
         this->setFilter(buffer[5],buffer[6],buffer[7],buffer[8],buffer[9]);

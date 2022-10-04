@@ -29,6 +29,11 @@ typedef enum ESBMode {
 	ESB_JAM
 } ESBMode;
 
+typedef struct ESBRetransmitBuffer {
+	uint8_t buffer[255];
+	size_t size;
+} ESBRetransmitBuffer;
+
 class ESBController : public Controller {
   protected:
 
@@ -38,6 +43,7 @@ class ESBController : public Controller {
 
 		int channel;
 
+		ESBRetransmitBuffer lastReceivedPacket;
     ESBAttackStatus attackStatus;
 		ESBAddress filter;
 		ESBMode mode;

@@ -81,6 +81,7 @@ class BLEPacket : public Packet {
 
 		bool isAdvertisement();
 		bool isEncryptionRequest();
+		bool isPairingRequest();
 		bool isReadRequest();
 		bool isLinkLayerConnectionUpdateRequest();
 		bool isLinkLayerChannelMapRequest();
@@ -135,6 +136,7 @@ class ESBPacket : public Packet {
 		uint16_t getCrc();
 		bool checkCrc();
 		uint8_t getPID();
+		uint8_t* getAddress();
 };
 
 class ANTPacket : public Packet {

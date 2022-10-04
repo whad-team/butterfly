@@ -155,6 +155,10 @@ Message* Whad::buildESBRawPduMessage(ESBPacket* packet) {
   msg->msg.esb.msg.raw_pdu.timestamp = packet->getTimestamp();
   msg->msg.esb.msg.raw_pdu.has_crc_validity = true;
   msg->msg.esb.msg.raw_pdu.crc_validity = packet->isCrcValid();
+  msg->msg.esb.msg.raw_pdu.has_address = true;
+  msg->msg.esb.msg.raw_pdu.address.size = 5;
+  memcpy(msg->msg.esb.msg.raw_pdu.address.bytes, packet->getAddress(), 5);
+
   msg->msg.esb.msg.raw_pdu.pdu.size = packet->getPacketSize();
   memcpy(msg->msg.esb.msg.raw_pdu.pdu.bytes, packet->getPacketBuffer(), packet->getPacketSize());
   return msg;

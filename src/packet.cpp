@@ -218,7 +218,14 @@ bool BLEPacket::isReadRequest() {
 		return false;
 	}
 }
-
+bool BLEPacket::isPairingRequest() {
+	if (this->extractPayloadLength() >= 6) {
+		return ((this->packetPointer[4] & 3) == 2) && ((this->packetPointer[8] | (this->packetPointer[9] << 8)) == 0x0006) && (this->packetPointer[10] == 0x1);
+	}
+	else {
+		return false;
+	}
+}
 bool BLEPacket::isEncryptionRequest() {
 	if (this->extractPayloadLength() >= 6) {
 		return ((this->packetPointer[4] & 3) == 3) && (this->packetPointer[6] == 0x3);
@@ -469,6 +476,9 @@ uint16_t ESBPacket::getCrc() {
 	crcGiven = (crcGiven << 8) | (crcGiven >> 8);
 	if(this->packetPointer[totalSize+2] & 0x80) crcGiven |= 0x100;
 	return crcGiven;
+}
+uint8_t* ESBPacket::getAddress() {
+	return this->packetPointer;
 }
 
 bool ESBPacket::checkCrc() {
