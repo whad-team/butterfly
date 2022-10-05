@@ -11,6 +11,10 @@ void MosartController::start() {
 }
 
 
+void MosartController::onMatch(uint8_t *buffer, size_t size) {
+
+}
+
 void MosartController::setFilter(uint8_t a,uint8_t b,uint8_t c,uint8_t d) {
 	this->filter.bytes[0] = a;
 	this->filter.bytes[1] = b;

@@ -22,6 +22,10 @@ void ANTController::stop() {
   this->radio->disable();
 }
 
+void ANTController::onMatch(uint8_t *buffer, size_t size) {
+
+}
+
 
 void ANTController::setFilter(uint16_t preamble, uint16_t deviceNumber, uint8_t deviceType) {
 	uint16_t savedPreamble = this->preamble;

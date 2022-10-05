@@ -23,6 +23,19 @@ Radio::Radio() {
 }
 
 
+void Radio::enableMatch(int matchingSize) {
+	this->matchingEnable = true;
+	this->matchingSize = matchingSize;
+}
+
+void Radio::disableMatch() {
+	this->matchingEnable = false;
+}
+
+bool Radio::isMatchingEnabled() {
+	return this->matchingEnable;
+}
+
 uint32_t Radio::getJammingInterval() {
 	return this->jammingInterval;
 }
@@ -930,6 +943,8 @@ bool Radio::enable() {
 				NRF_RADIO->DACNF = 0;
 				NRF_RADIO->INTENSET = 0x00000008;
 			}
+
+
 			NVIC_ClearPendingIRQ(RADIO_IRQn);
 			NVIC_EnableIRQ(RADIO_IRQn);
 
@@ -938,6 +953,11 @@ bool Radio::enable() {
 				NRF_RADIO->SHORTS |= RADIO_SHORTS_ADDRESS_RSSISTART_Msk;
 			}
 
+			if (this->isMatchingEnabled()) {
+				NRF_RADIO->BCC = this->matchingSize;
+				NRF_RADIO->SHORTS |= RADIO_SHORTS_ADDRESS_BCSTART_Msk;
+				NRF_RADIO->INTENSET |= 1 << 10; // enable BCMATCH event
+			}
 			NRF_RADIO->EVENTS_END = 0;
 			NRF_RADIO->EVENTS_READY = 0;
 			NRF_RADIO->TASKS_RXEN = 1;
@@ -991,6 +1011,10 @@ bool Radio::updateTXBuffer(uint8_t *data, uint8_t size) {
 	return true;
 }
 
+int Radio::getMatchingSize() {
+	return this->matchingSize;
+}
+
 bool Radio::send(uint8_t *data,int size,int frequency, uint8_t channel) {
 	NVIC_DisableIRQ(RADIO_IRQn);
 	NRF_RADIO->SHORTS = 0;
@@ -1031,10 +1055,18 @@ extern "C" void RADIO_IRQHandler(void) {
 
 	if (NRF_RADIO->EVENTS_BCMATCH) {
 		NRF_RADIO->EVENTS_BCMATCH = 0;
-		bsp_board_led_invert(0);
-		if (Radio::instance->checkJammingPatterns(Radio::instance->rxBuffer,Radio::instance->getJammingPatternsCounter()/8)) {
-			NRF_RADIO->TASKS_STOP = 1;
-			Radio::instance->reload();
+		if (Radio::instance->getMode() == MODE_NORMAL) {
+			Controller *controller = Radio::instance->getController();
+			controller->onMatch(Radio::instance->rxBuffer, Radio::instance->getMatchingSize());
+			NRF_RADIO->TASKS_BCSTOP = 1;
+		}
+		else if (Radio::instance->getMode() == MODE_JAMMER) {
+
+			bsp_board_led_invert(0);
+			if (Radio::instance->checkJammingPatterns(Radio::instance->rxBuffer,Radio::instance->getJammingPatternsCounter()/8)) {
+				NRF_RADIO->TASKS_STOP = 1;
+				Radio::instance->reload();
+			}
 		}
 	}
 	if (NRF_RADIO->EVENTS_EDEND) {
@@ -1050,6 +1082,8 @@ extern "C" void RADIO_IRQHandler(void) {
 	}
 	if (NRF_RADIO->EVENTS_END && (Radio::instance->isFilterEnabled() ? NRF_RADIO->EVENTS_DEVMATCH : 1)) {
 		NRF_RADIO->EVENTS_END = 0;
+
+		//NRF_RADIO->TASKS_BCSTART = 1;
 		if (Radio::instance->isFilterEnabled()) NRF_RADIO->EVENTS_DEVMATCH = 0;
 		NRF_TIMER4->TASKS_CAPTURE[5] = 1UL;
 		uint32_t now = NRF_TIMER4->CC[5];
@@ -1103,6 +1137,10 @@ extern "C" void RADIO_IRQHandler(void) {
 						}
 						if (Radio::instance->isRssiEnabled()) {
 							NRF_RADIO->SHORTS |= RADIO_SHORTS_ADDRESS_RSSISTART_Msk;
+						}
+						if (Radio::instance->isMatchingEnabled()) {
+							NRF_RADIO->INTENSET |= 1 << 10; // enable BCMATCH event
+							NRF_RADIO->SHORTS |= RADIO_SHORTS_ADDRESS_BCSTART_Msk;
 						}
 
 					}

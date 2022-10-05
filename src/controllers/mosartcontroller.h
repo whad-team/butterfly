@@ -52,6 +52,8 @@ class MosartController : public Controller {
     // Reception callback
     void onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi);
 		void onJam(uint32_t timestamp);
+		void onMatch(uint8_t *buffer, size_t size);
+
 		void onEnergyDetection(uint32_t timestamp, uint8_t value);
 };
 

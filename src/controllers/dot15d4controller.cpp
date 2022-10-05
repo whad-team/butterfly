@@ -24,6 +24,9 @@ int Dot15d4Controller::channelToFrequency(int channel) {
 	return 5+5*(channel-11);
 }
 
+void Dot15d4Controller::onMatch(uint8_t *buffer, size_t size) {
+
+}
 
 Dot15d4Controller::Dot15d4Controller(Radio *radio) : Controller(radio) {
 	this->channel = 11;

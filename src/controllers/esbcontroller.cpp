@@ -9,6 +9,10 @@ ESBController::ESBController(Radio *radio) : Controller(radio) {
 }
 
 
+void ESBController::onMatch(uint8_t *buffer, size_t size) {
+
+}
+
 int ESBController::getChannel() {
   return this->channel;
 }

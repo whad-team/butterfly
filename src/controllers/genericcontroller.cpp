@@ -12,6 +12,10 @@ void GenericController::stop() {
   this->radio->disable();
 }
 
+void GenericController::onMatch(uint8_t *buffer, size_t size) {
+
+}
+
 bool GenericController::configure(uint8_t *preamble, size_t preambleSize, size_t packetSize, GenericPhy phy, GenericEndianness endianness) {
   if (preambleSize > 0 && preambleSize <= 4) {
     memcpy(this->preamble, preamble, preambleSize);

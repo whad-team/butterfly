@@ -56,6 +56,9 @@ class Radio
 		uint8_t jammingPatternsCounter;
 		JammingPatternsQueue* jammingPatternsQueue;
 
+		bool matchingEnable;
+		int matchingSize;
+
 		Controller *controller;
 
 		void initJammingPatternsQueue();
@@ -82,6 +85,11 @@ class Radio
 
 		Controller* getController();
 		bool setController(Controller *controller);
+
+		void enableMatch(int matchingSize);
+		void disableMatch();
+		int getMatchingSize();
+		bool isMatchingEnabled();
 
 		uint32_t getJammingInterval();
 		void setJammingInterval(uint32_t jammingInterval);
