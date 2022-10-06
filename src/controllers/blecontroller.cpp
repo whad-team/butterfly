@@ -732,6 +732,37 @@ void BLEController::setAccessAddressDiscoveryConfiguration(uint8_t preamble) {
   this->radio->setFrequency(BLEController::channelToFrequency(channel));
   this->radio->reload();
 }
+void BLEController::setReactiveJammerConfiguration(uint8_t *pattern, size_t size, int position) {
+	this->controllerState = REACTIVE_JAMMING;
+	uint8_t whitened_pattern[size];
+	for (size_t i=0;i<size;i++) {
+		whitened_pattern[size - 1 - i] = dewhiten_byte_ble(pattern[i], position+i, this->channel);
+	}
+	this->radio->setPreamble(whitened_pattern,(size <= 4 ? size  : 4));
+	this->radio->setPrefixes();
+	this->radio->setMode(MODE_JAMMER);
+	this->radio->setFastRampUpTime(true);
+	this->radio->setEndianness(LITTLE);
+	this->radio->setTxPower(POS8_DBM);
+	this->radio->disableRssi();
+	this->radio->setPhy(BLE_1MBITS);
+	this->radio->setHeader(0,0,0);
+	this->radio->setWhitening(NO_WHITENING);
+	this->radio->setWhiteningDataIv(0);
+	this->radio->disableJammingPatterns();
+	this->radio->setCrc(NO_CRC);
+	this->radio->setCrcSkipAddress(true);
+
+	this->radio->setCrcSize(0);
+	this->radio->setPayloadLength(4);
+	this->radio->setInterFrameSpacing(0);
+	this->radio->setExpandPayloadLength(4);
+
+	//this->radio->setJammingInterval(30000); // prevent jamming the same packet multiple times
+	this->radio->setFrequency(BLEController::channelToFrequency(this->channel));
+	this->radio->reload();
+
+}
 void BLEController::setJammerConfiguration() {
 	this->controllerState = JAMMING_CONNECT_REQ;
 	uint8_t connectReq[4] = {dewhiten_byte_ble(0x05,0,this->channel),0x8e,0x89,0xbe};
@@ -1701,7 +1732,10 @@ void BLEController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer,
 }
 
 void BLEController::onJam(uint32_t timestamp) {
-	/*if (this->controllerState == JAMMING_CONNECT_REQ) {
+	if (this->controllerState == REACTIVE_JAMMING) {
+		bsp_board_led_invert(1);
+	}
+	else if (this->controllerState == JAMMING_CONNECT_REQ) {
 		Core::instance->sendDebug("JAMMED !");
 		NRF_RADIO->TASKS_STOP = 1;
 		bsp_board_led_on(2);
@@ -1709,7 +1743,7 @@ void BLEController::onJam(uint32_t timestamp) {
 		nrf_delay_us(1000);
 		NRF_RADIO->TASKS_START = 1;
 		bsp_board_led_off(2);
-	}*/
+	}
 }
 
 void BLEController::onEnergyDetection(uint32_t timestamp, uint8_t value) {}

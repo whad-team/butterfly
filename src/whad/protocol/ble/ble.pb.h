@@ -49,7 +49,8 @@ typedef enum _ble_BleCommand { /* *
     /* Hijack mode. */
     ble_BleCommand_HijackMaster = 19, 
     ble_BleCommand_HijackSlave = 20, 
-    ble_BleCommand_HijackBoth = 21 
+    ble_BleCommand_HijackBoth = 21, 
+    ble_BleCommand_ReactiveJam = 22 
 } ble_BleCommand;
 
 typedef enum _ble_BleAdvType { 
@@ -260,6 +261,13 @@ typedef struct _ble_RawPduReceived {
     bool decrypted;
 } ble_RawPduReceived;
 
+typedef PB_BYTES_ARRAY_T(20) ble_ReactiveJamCmd_pattern_t;
+typedef struct _ble_ReactiveJamCmd { 
+    uint32_t channel;
+    ble_ReactiveJamCmd_pattern_t pattern;
+    uint32_t position;
+} ble_ReactiveJamCmd;
+
 typedef struct _ble_ScanModeCmd { 
     bool active_scan;
 } ble_ScanModeCmd;
@@ -395,14 +403,15 @@ typedef struct _ble_Message {
         ble_Injected injected;
         ble_Desynchronized desynchronized;
         ble_SetEncryptionCmd encryption;
+        ble_ReactiveJamCmd reactive_jam;
     } msg;
 } ble_Message;
 
 
 /* Helper constants for enums */
 #define _ble_BleCommand_MIN ble_BleCommand_SetBdAddress
-#define _ble_BleCommand_MAX ble_BleCommand_HijackBoth
-#define _ble_BleCommand_ARRAYSIZE ((ble_BleCommand)(ble_BleCommand_HijackBoth+1))
+#define _ble_BleCommand_MAX ble_BleCommand_ReactiveJam
+#define _ble_BleCommand_ARRAYSIZE ((ble_BleCommand)(ble_BleCommand_ReactiveJam+1))
 
 #define _ble_BleAdvType_MIN ble_BleAdvType_ADV_UNKNOWN
 #define _ble_BleAdvType_MAX ble_BleAdvType_ADV_SCAN_RSP
@@ -445,6 +454,7 @@ extern "C" {
 #define ble_HijackSlaveCmd_init_default          {0}
 #define ble_HijackBothCmd_init_default           {0}
 #define ble_SetEncryptionCmd_init_default        {0, {0}, {0}}
+#define ble_ReactiveJamCmd_init_default          {0, {0, {0}}, 0}
 #define ble_AccessAddressDiscovered_init_default {0, false, 0, false, 0}
 #define ble_AdvPduReceived_init_default          {_ble_BleAdvType_MIN, 0, {0}, {0, {0}}, _ble_BleAddrType_MIN}
 #define ble_Connected_init_default               {{0}, {0}, 0, 0, _ble_BleAddrType_MIN, _ble_BleAddrType_MIN}
@@ -479,6 +489,7 @@ extern "C" {
 #define ble_HijackSlaveCmd_init_zero             {0}
 #define ble_HijackBothCmd_init_zero              {0}
 #define ble_SetEncryptionCmd_init_zero           {0, {0}, {0}}
+#define ble_ReactiveJamCmd_init_zero             {0, {0, {0}}, 0}
 #define ble_AccessAddressDiscovered_init_zero    {0, false, 0, false, 0}
 #define ble_AdvPduReceived_init_zero             {_ble_BleAdvType_MIN, 0, {0}, {0, {0}}, _ble_BleAddrType_MIN}
 #define ble_Connected_init_zero                  {{0}, {0}, 0, 0, _ble_BleAddrType_MIN, _ble_BleAddrType_MIN}
@@ -545,6 +556,9 @@ extern "C" {
 #define ble_RawPduReceived_conn_handle_tag       10
 #define ble_RawPduReceived_processed_tag         11
 #define ble_RawPduReceived_decrypted_tag         12
+#define ble_ReactiveJamCmd_channel_tag           1
+#define ble_ReactiveJamCmd_pattern_tag           2
+#define ble_ReactiveJamCmd_position_tag          3
 #define ble_ScanModeCmd_active_scan_tag          1
 #define ble_SendPDUCmd_direction_tag             1
 #define ble_SendPDUCmd_conn_handle_tag           2
@@ -613,6 +627,7 @@ extern "C" {
 #define ble_Message_injected_tag                 31
 #define ble_Message_desynchronized_tag           32
 #define ble_Message_encryption_tag               33
+#define ble_Message_reactive_jam_tag             34
 
 /* Struct field encoding specification for nanopb */
 #define ble_SetBdAddressCmd_FIELDLIST(X, a) \
@@ -755,6 +770,13 @@ X(a, STATIC,   SINGULAR, FIXED_LENGTH_BYTES, iv,                3)
 #define ble_SetEncryptionCmd_CALLBACK NULL
 #define ble_SetEncryptionCmd_DEFAULT NULL
 
+#define ble_ReactiveJamCmd_FIELDLIST(X, a) \
+X(a, STATIC,   SINGULAR, UINT32,   channel,           1) \
+X(a, STATIC,   SINGULAR, BYTES,    pattern,           2) \
+X(a, STATIC,   SINGULAR, UINT32,   position,          3)
+#define ble_ReactiveJamCmd_CALLBACK NULL
+#define ble_ReactiveJamCmd_DEFAULT NULL
+
 #define ble_AccessAddressDiscovered_FIELDLIST(X, a) \
 X(a, STATIC,   SINGULAR, UINT32,   access_address,    1) \
 X(a, STATIC,   OPTIONAL, INT32,    rssi,              2) \
@@ -872,7 +894,8 @@ X(a, STATIC,   ONEOF,    MESSAGE,  (msg,pdu,msg.pdu),  29) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (msg,raw_pdu,msg.raw_pdu),  30) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (msg,injected,msg.injected),  31) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (msg,desynchronized,msg.desynchronized),  32) \
-X(a, STATIC,   ONEOF,    MESSAGE,  (msg,encryption,msg.encryption),  33)
+X(a, STATIC,   ONEOF,    MESSAGE,  (msg,encryption,msg.encryption),  33) \
+X(a, STATIC,   ONEOF,    MESSAGE,  (msg,reactive_jam,msg.reactive_jam),  34)
 #define ble_Message_CALLBACK NULL
 #define ble_Message_DEFAULT NULL
 #define ble_Message_msg_set_bd_addr_MSGTYPE ble_SetBdAddressCmd
@@ -908,6 +931,7 @@ X(a, STATIC,   ONEOF,    MESSAGE,  (msg,encryption,msg.encryption),  33)
 #define ble_Message_msg_injected_MSGTYPE ble_Injected
 #define ble_Message_msg_desynchronized_MSGTYPE ble_Desynchronized
 #define ble_Message_msg_encryption_MSGTYPE ble_SetEncryptionCmd
+#define ble_Message_msg_reactive_jam_MSGTYPE ble_ReactiveJamCmd
 
 extern const pb_msgdesc_t ble_SetBdAddressCmd_msg;
 extern const pb_msgdesc_t ble_SniffAdvCmd_msg;
@@ -932,6 +956,7 @@ extern const pb_msgdesc_t ble_HijackMasterCmd_msg;
 extern const pb_msgdesc_t ble_HijackSlaveCmd_msg;
 extern const pb_msgdesc_t ble_HijackBothCmd_msg;
 extern const pb_msgdesc_t ble_SetEncryptionCmd_msg;
+extern const pb_msgdesc_t ble_ReactiveJamCmd_msg;
 extern const pb_msgdesc_t ble_AccessAddressDiscovered_msg;
 extern const pb_msgdesc_t ble_AdvPduReceived_msg;
 extern const pb_msgdesc_t ble_Connected_msg;
@@ -968,6 +993,7 @@ extern const pb_msgdesc_t ble_Message_msg;
 #define ble_HijackSlaveCmd_fields &ble_HijackSlaveCmd_msg
 #define ble_HijackBothCmd_fields &ble_HijackBothCmd_msg
 #define ble_SetEncryptionCmd_fields &ble_SetEncryptionCmd_msg
+#define ble_ReactiveJamCmd_fields &ble_ReactiveJamCmd_msg
 #define ble_AccessAddressDiscovered_fields &ble_AccessAddressDiscovered_msg
 #define ble_AdvPduReceived_fields &ble_AdvPduReceived_msg
 #define ble_Connected_fields &ble_Connected_msg
@@ -1003,6 +1029,7 @@ extern const pb_msgdesc_t ble_Message_msg;
 #define ble_PduReceived_size                     315
 #define ble_PeripheralModeCmd_size               66
 #define ble_RawPduReceived_size                  313
+#define ble_ReactiveJamCmd_size                  34
 #define ble_ScanModeCmd_size                     2
 #define ble_SendPDUCmd_size                      313
 #define ble_SendRawPDUCmd_size                   325

@@ -75,6 +75,9 @@ PB_BIND(ble_HijackBothCmd, ble_HijackBothCmd, AUTO)
 PB_BIND(ble_SetEncryptionCmd, ble_SetEncryptionCmd, AUTO)
 
 
+PB_BIND(ble_ReactiveJamCmd, ble_ReactiveJamCmd, AUTO)
+
+
 PB_BIND(ble_AccessAddressDiscovered, ble_AccessAddressDiscovered, AUTO)
 
 

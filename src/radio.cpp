@@ -1060,14 +1060,14 @@ extern "C" void RADIO_IRQHandler(void) {
 			controller->onMatch(Radio::instance->rxBuffer, Radio::instance->getMatchingSize());
 			NRF_RADIO->TASKS_BCSTOP = 1;
 		}
+		/*
 		else if (Radio::instance->getMode() == MODE_JAMMER) {
-
 			bsp_board_led_invert(0);
 			if (Radio::instance->checkJammingPatterns(Radio::instance->rxBuffer,Radio::instance->getJammingPatternsCounter()/8)) {
 				NRF_RADIO->TASKS_STOP = 1;
 				Radio::instance->reload();
 			}
-		}
+		}*/
 	}
 	if (NRF_RADIO->EVENTS_EDEND) {
 		uint8_t sample = NRF_RADIO->EDSAMPLE;

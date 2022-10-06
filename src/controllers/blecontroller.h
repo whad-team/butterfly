@@ -46,7 +46,8 @@ typedef enum BLEControllerState {
 	SIMULATING_MASTER,
 	SYNCHRONIZING_MITM,
 	PERFORMING_MITM,
-	JAMMING_CONNECT_REQ
+	JAMMING_CONNECT_REQ,
+	REACTIVE_JAMMING
 } BLEControllerState;
 
 // Connection update definitions
@@ -242,6 +243,8 @@ class BLEController : public Controller {
 		void setJammerConfiguration();
 		void setAccessAddressDiscoveryConfiguration(uint8_t preamble);
 		void setCrcRecoveryConfiguration(uint32_t accessAddress);
+		void setReactiveJammerConfiguration(uint8_t *pattern, size_t size, int position);
+
 		// Follow mode setter
 		void setFollowMode(bool follow);
 

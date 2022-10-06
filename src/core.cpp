@@ -236,6 +236,16 @@ void Core::processBLEInputMessage(ble_Message msg) {
     this->bleController->sniff();
     response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
   }
+  else if (msg.which_msg == ble_Message_reactive_jam_tag) {
+    int channel = msg.msg.reactive_jam.channel;
+    uint8_t *pattern = msg.msg.reactive_jam.pattern.bytes;
+    size_t pattern_size = msg.msg.reactive_jam.pattern.size;
+    int position = msg.msg.reactive_jam.position;
+
+    this->bleController->setChannel(channel);
+    this->bleController->setReactiveJammerConfiguration(pattern, pattern_size, position );
+    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+  }
   else if (msg.which_msg == ble_Message_sniff_connreq_tag) {
     int channel = msg.msg.sniff_connreq.channel;
     bool show_advertisements = msg.msg.sniff_connreq.show_advertisements;
@@ -350,6 +360,18 @@ void Core::processBLEInputMessage(ble_Message msg) {
         response = Whad::buildResultMessage(generic_ResultCode_WRONG_MODE);
       }
   }
+  /*
+  else if (msg.which_msg == ble_Message_jam_adv_chan_tag) {
+    int channel = msg.msg.jam_adv_chan.channel;
+    if (channel == 37 || channel == 38 || channel == 39) {
+      this->bleController->setChannel(channel);
+      this->bleController->setJammerConfiguration();
+      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    }
+    else {
+      response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+    }
+  }*/
   this->pushMessageToQueue(response);
 }
 void Core::processESBInputMessage(esb_Message msg) {
