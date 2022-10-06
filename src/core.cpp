@@ -413,6 +413,11 @@ void Core::processESBInputMessage(esb_Message msg) {
     this->esbController->enableAcknowledgementsTransmission();
     response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
   }
+  else if (msg.which_msg == esb_Message_ptx_tag) {
+    this->esbController->setChannel(msg.msg.ptx.channel);
+    this->esbController->disableAcknowledgementsTransmission();
+    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+  }
   this->pushMessageToQueue(response);
 }
 

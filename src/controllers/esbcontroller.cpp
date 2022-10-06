@@ -19,6 +19,8 @@ int ESBController::getChannel() {
 
 void ESBController::sendPing() {
   uint8_t payload[6] = {0x04, 0x00, 0x0f,0x0f, 0x0f, 0x0f};
+
+  this->lastTransmissionTimestamp = TimerModule::instance->getTimestamp();
   this->radio->send(payload,6,this->channel, 0x00);
   bsp_board_led_invert(0);
 }
@@ -210,6 +212,9 @@ void ESBController::start() {
       this->channel = 0;
       this->startScanning();
     }
+    else {
+      this->stopScanning();
+    }
     this->setPromiscuousConfiguration();
   }
   else {
@@ -217,6 +222,10 @@ void ESBController::start() {
       this->channel = 0;
       this->setFollowMode(true);
       this->setAutofind(true);
+    }
+    else {
+      this->setFollowMode(false);
+      this->setAutofind(false);
     }
     this->setFollowConfiguration(this->filter.bytes);
   }
@@ -243,7 +252,10 @@ void ESBController::disableAcknowledgementsTransmission() {
 
 void ESBController::stop() {
   this->stopScanning();
+  this->setFollowMode(false);
+  this->setAutofind(false);
   this->radio->disable();
+
 }
 
 void ESBController::setPromiscuousConfiguration() {
@@ -344,10 +356,9 @@ void ESBController::send(uint8_t *data, size_t size) {
         buffer[2+i] = (data[7+i] << 1) | (data[7+i+1] >> 7);
       }
       //Core::instance->sendDebug(buffer,payload_size+2);
-
+      this->lastTransmissionTimestamp = TimerModule::instance->getTimestamp();
       this->radio->send(buffer,payload_size+2,this->channel, 0x00);
       nrf_delay_us(100);
-
     }
 }
 
@@ -377,14 +388,12 @@ void ESBController::sendAck(uint8_t pid) {
 
   uint8_t payload[2] = {0x00, (uint8_t)((pid & 0x3)<<1 | 1)};
   //this->radio->updateTXBuffer(payload, 2);
-  nrf_delay_us(110);
+  nrf_delay_us(160);
   this->radio->send(payload,2,this->channel, 0x00);
-  nrf_delay_us(10);
+  nrf_delay_us(50);
   //bsp_board_led_invert(0);
 }
-
-void ESBController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
-  if (this->mode == ESB_PROMISCUOUS) {
+void ESBController::onPromiscuousPacketProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
     int channel = this->channel;
     int i=0;
     while (buffer[0] == 0xAA && i < 55*8) {
@@ -397,24 +406,24 @@ void ESBController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer,
       ESBPacket *croppedPkt = new ESBPacket(buffer,pkt->getSize()+5+2+2,timestamp,0x00,channel,rssi,crcValue);
       this->addPacket(croppedPkt);
       delete croppedPkt;
-      //nrf_delay_us(100);
     }
     delete pkt;
+}
 
-  }
-  else if (this->mode == ESB_FOLLOW) {
+void ESBController::onFollowPacketProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
     if (crcValue.validity == VALID_CRC) {
-
       if (this->autofind) {
         this->expandTimeout(timestamp);
       }
-      if (this->syncing) {
-        this->syncing = false;
-        this->stopScanning();
+
+      if (size > 2) {
+        this->onPTXPacketProcessing(timestamp, size, buffer, crcValue, rssi);
       }
-      if (this->sendAcknowledgements) {
-        this->sendAck(buffer[1] >> 1);
+      else {
+        this->onPRXPacketProcessing(timestamp, size, buffer, crcValue, rssi);
       }
+
+
     }
       /*
       if (this->attackStatus.attack == ESB_ATTACK_SNIFF_LOGITECH_PAIRING) {
@@ -437,35 +446,81 @@ void ESBController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer,
          this->attackStatus.successful = true;
 
        }
-      }*/
-      if (size > 2 || this->showAcknowledgements) {
-        bool retransmission = false;
-        if (size != this->lastReceivedPacket.size) {
-          retransmission = false;
-        }
-        else {
-          retransmission = true;
-          for (int i=2;i<size;i++) {
-            if (buffer[i] != this->lastReceivedPacket.buffer[i]) {
-              retransmission = false;
-              break;
-            }
-          }
-        }
-        if (!retransmission) {
-          ESBPacket *pkt = this->buildPseudoPacketFromPayload(timestamp, size,buffer,crcValue, rssi);
-          memcpy(this->lastReceivedPacket.buffer, buffer, size);
-          this->lastReceivedPacket.size = size;
-          this->addPacket(pkt);
-          delete pkt;
-        }
       }
-
-      /*if (this->attackStatus.attack == ESB_ATTACK_SNIFF_LOGITECH_PAIRING && buffer[3] == 0x5F && buffer[4] == 0x01) {
+      if (this->attackStatus.attack == ESB_ATTACK_SNIFF_LOGITECH_PAIRING && buffer[3] == 0x5F && buffer[4] == 0x01) {
         this->setFilter(buffer[5],buffer[6],buffer[7],buffer[8],buffer[9]);
         this->setFollowConfiguration(this->filter.bytes);
       }*/
       //free(pkt);
+}
+
+void ESBController::onPRXPacketProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
+  bool ownAck = false;
+  if ((timestamp - this->lastReceivedPacket.timestamp) < 350) {
+    this->lastReceivedPacket.acked = true;
+  }
+  if ((timestamp - this->lastTransmissionTimestamp) < 350) {
+    bsp_board_led_invert(1);
+    if (this->syncing) {
+      this->syncing = false;
+      this->stopScanning();
+    }
+    ownAck = true;
+  }
+  if (this->showAcknowledgements || ownAck) {
+    ESBPacket *pkt = this->buildPseudoPacketFromPayload(0, size,buffer,crcValue, rssi);
+    this->addPacket(pkt);
+    delete pkt;
+  }
+
+}
+
+void ESBController::onPTXPacketProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
+  // If we act as a PRX, reply with an acknowledgement
+  if (this->sendAcknowledgements) {
+    this->sendAck(buffer[1] >> 1);
+  }
+
+  bool retransmission = false;
+  // Check if the packet has been acknowledged to know if it is a retransmission
+  if (!this->lastReceivedPacket.acked) {
+    if (size != this->lastReceivedPacket.size) {
+      retransmission = false;
+    }
+    else {
+      // Check if similar payload has been received before
+      retransmission = true;
+      for (int i=2;i<size;i++) {
+        if (buffer[i] != this->lastReceivedPacket.buffer[i]) {
+          retransmission = false;
+          break;
+        }
+      }
+    }
+  }
+
+  // If the packet is not a retransmission, we update lastReceivedPacket and transmit pkt to the host
+  if (!retransmission) {
+    ESBPacket *pkt = this->buildPseudoPacketFromPayload(timestamp, size,buffer,crcValue, rssi);
+    memcpy(this->lastReceivedPacket.buffer, buffer, size);
+    this->lastReceivedPacket.timestamp = timestamp;
+    this->lastReceivedPacket.size = size;
+    this->addPacket(pkt);
+    this->lastReceivedPacket.acked = false;
+    delete pkt;
+  }
+  else {
+    // It is a retransmission, but we have to update the timestamp of the last received packet structure to make sure we detect a lately ack
+    this->lastReceivedPacket.timestamp = timestamp;
+  }
+}
+
+void ESBController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
+  if (this->mode == ESB_PROMISCUOUS) {
+    this->onPromiscuousPacketProcessing(timestamp, size, buffer, crcValue, rssi);
+  }
+  else if (this->mode == ESB_FOLLOW) {
+    this->onFollowPacketProcessing(timestamp, size, buffer, crcValue, rssi);
 
   }
 }

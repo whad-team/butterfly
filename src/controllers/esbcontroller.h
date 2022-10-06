@@ -32,6 +32,8 @@ typedef enum ESBMode {
 typedef struct ESBRetransmitBuffer {
 	uint8_t buffer[255];
 	size_t size;
+	uint32_t timestamp;
+	bool acked;
 } ESBRetransmitBuffer;
 
 class ESBController : public Controller {
@@ -42,6 +44,8 @@ class ESBController : public Controller {
 		Timer *timeoutTimer;
 
 		int channel;
+
+		uint32_t lastTransmissionTimestamp;
 
 		ESBRetransmitBuffer lastReceivedPacket;
     ESBAttackStatus attackStatus;
@@ -103,6 +107,12 @@ class ESBController : public Controller {
     // Reception callback
     void onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi);
 		void onMatch(uint8_t *buffer, size_t size);
+
+		void onPromiscuousPacketProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi);
+		void onFollowPacketProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi);
+		void onPRXPacketProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi);
+		void onPTXPacketProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi);
+
 
 		// Jamming callback
 		void onJam(uint32_t timestamp);
