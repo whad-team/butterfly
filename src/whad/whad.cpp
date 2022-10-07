@@ -146,21 +146,41 @@ uint32 fcs = 6;
 */
 Message* Whad::buildESBRawPduMessage(ESBPacket* packet) {
   Message* msg = Whad::buildMessage();
-  msg->which_msg = Message_esb_tag;
-  msg->msg.esb.which_msg = esb_Message_raw_pdu_tag;
-  msg->msg.esb.msg.raw_pdu.has_rssi = true;
-  msg->msg.esb.msg.raw_pdu.rssi = packet->getRssi();
-  msg->msg.esb.msg.raw_pdu.channel = packet->getChannel();
-  msg->msg.esb.msg.raw_pdu.has_timestamp = true;
-  msg->msg.esb.msg.raw_pdu.timestamp = packet->getTimestamp();
-  msg->msg.esb.msg.raw_pdu.has_crc_validity = true;
-  msg->msg.esb.msg.raw_pdu.crc_validity = packet->isCrcValid();
-  msg->msg.esb.msg.raw_pdu.has_address = true;
-  msg->msg.esb.msg.raw_pdu.address.size = 5;
-  memcpy(msg->msg.esb.msg.raw_pdu.address.bytes, packet->getAddress(), 5);
+  if (packet->isUnifying()) {
+    msg->which_msg = Message_unifying_tag;
+    msg->msg.unifying.which_msg = unifying_Message_raw_pdu_tag;
+    msg->msg.unifying.msg.raw_pdu.has_rssi = true;
+    msg->msg.unifying.msg.raw_pdu.rssi = packet->getRssi();
+    msg->msg.unifying.msg.raw_pdu.channel = packet->getChannel();
+    msg->msg.unifying.msg.raw_pdu.has_timestamp = true;
+    msg->msg.unifying.msg.raw_pdu.timestamp = packet->getTimestamp();
+    msg->msg.unifying.msg.raw_pdu.has_crc_validity = true;
+    msg->msg.unifying.msg.raw_pdu.crc_validity = packet->isCrcValid();
+    msg->msg.unifying.msg.raw_pdu.has_address = true;
+    msg->msg.unifying.msg.raw_pdu.address.size = 5;
+    memcpy(msg->msg.unifying.msg.raw_pdu.address.bytes, packet->getAddress(), 5);
 
-  msg->msg.esb.msg.raw_pdu.pdu.size = packet->getPacketSize();
-  memcpy(msg->msg.esb.msg.raw_pdu.pdu.bytes, packet->getPacketBuffer(), packet->getPacketSize());
+    msg->msg.unifying.msg.raw_pdu.pdu.size = packet->getPacketSize();
+    memcpy(msg->msg.unifying.msg.raw_pdu.pdu.bytes, packet->getPacketBuffer(), packet->getPacketSize());
+
+  }
+  else {
+    msg->which_msg = Message_esb_tag;
+    msg->msg.esb.which_msg = esb_Message_raw_pdu_tag;
+    msg->msg.esb.msg.raw_pdu.has_rssi = true;
+    msg->msg.esb.msg.raw_pdu.rssi = packet->getRssi();
+    msg->msg.esb.msg.raw_pdu.channel = packet->getChannel();
+    msg->msg.esb.msg.raw_pdu.has_timestamp = true;
+    msg->msg.esb.msg.raw_pdu.timestamp = packet->getTimestamp();
+    msg->msg.esb.msg.raw_pdu.has_crc_validity = true;
+    msg->msg.esb.msg.raw_pdu.crc_validity = packet->isCrcValid();
+    msg->msg.esb.msg.raw_pdu.has_address = true;
+    msg->msg.esb.msg.raw_pdu.address.size = 5;
+    memcpy(msg->msg.esb.msg.raw_pdu.address.bytes, packet->getAddress(), 5);
+
+    msg->msg.esb.msg.raw_pdu.pdu.size = packet->getPacketSize();
+    memcpy(msg->msg.esb.msg.raw_pdu.pdu.bytes, packet->getPacketBuffer(), packet->getPacketSize());
+  }
   return msg;
 
 }

@@ -36,6 +36,12 @@ typedef struct ESBRetransmitBuffer {
 	bool acked;
 } ESBRetransmitBuffer;
 
+typedef struct ESBAcknowledgementBuffer {
+	uint8_t buffer[255];
+	size_t size;
+	bool available;
+} ESBAcknowledgementBuffer;
+
 class ESBController : public Controller {
   protected:
 
@@ -47,6 +53,7 @@ class ESBController : public Controller {
 
 		uint32_t lastTransmissionTimestamp;
 
+		ESBAcknowledgementBuffer preparedAck;
 		ESBRetransmitBuffer lastReceivedPacket;
     ESBAttackStatus attackStatus;
 		ESBAddress filter;
@@ -60,11 +67,17 @@ class ESBController : public Controller {
 		bool sendAcknowledgements;
 		bool showAcknowledgements;
 
+		bool unifying;
+
 	public:
 		ESBController(Radio* radio);
     void start();
     void stop();
 
+		void enableUnifying();
+		void disableUnifying();
+		bool isUnifyingEnabled();
+		
 		void sendAck(uint8_t pid);
 		void enableAcknowledgementsSniffing();
 		void disableAcknowledgementsSniffing();

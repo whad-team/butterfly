@@ -475,7 +475,16 @@ Core::Core() {
 	#ifdef PA_ENABLED
 	this->configurePowerAmplifier(true);
 	#endif
+  this->linkModule->configureLink(LINK_SLAVE);
 
+/*
+  this->linkModule->configureLink(LINK_MASTER);
+
+  while (true) {
+    this->linkModule->sendSignalToSlave(42);
+    nrf_delay_ms(1000);
+  }
+  */
 }
 
 LedModule* Core::getLedModule() {

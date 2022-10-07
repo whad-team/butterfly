@@ -59,12 +59,12 @@ void Dot15d4Controller::setChannel(int channel) {
 
 void Dot15d4Controller::send(uint8_t *data, size_t size, bool raw) {
 			if (this->attackStatus.attack == DOT15D4_ATTACK_CORRECTION) {
-				Core::instance->getLinkModule()->sendSignalToSlave(STOP_SLAVE_RADIO);
+				//Core::instance->getLinkModule()->sendSignalToSlave(STOP_SLAVE_RADIO);
 				this->setNativeConfiguration();
 				this->radio->send(data,size,Dot15d4Controller::channelToFrequency(this->channel), 0x00);
 				nrf_delay_us((size+6)*8*1000/250);
 				this->setWazabeeConfiguration();
-				Core::instance->getLinkModule()->sendSignalToSlave(START_SLAVE_RADIO);
+				//Core::instance->getLinkModule()->sendSignalToSlave(START_SLAVE_RADIO);
 			}
 			else if (raw) {
 				this->setRawConfiguration();

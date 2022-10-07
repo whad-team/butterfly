@@ -3,10 +3,17 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include "nrf_drv_spis.h"
+#include "nrf_drv_spi.h"
 #include "nrf.h"
 
-#define START_SLAVE_RADIO 0
-#define STOP_SLAVE_RADIO 1
+#define LINK_CS 47
+#define LINK_MOSI 29
+#define LINK_MISO 2
+#define LINK_SCK 31
+
+#define MASTER_SPI_INSTANCE 0
+#define SLAVE_SPI_INSTANCE 1
 
 typedef enum LinkMode {
 	LINK_SLAVE = 0,
@@ -14,14 +21,23 @@ typedef enum LinkMode {
 	RESET_LINK = 0xFF
 } LinkMode;
 
+
+static const nrf_drv_spi_t master_instance = NRF_DRV_SPI_INSTANCE(MASTER_SPI_INSTANCE);
+static const nrf_drv_spis_t slave_instance = NRF_DRV_SPIS_INSTANCE(SLAVE_SPI_INSTANCE);
+
+static volatile bool spiTransferDone;
+
+static uint8_t spiTxBuffer[4];
+static uint8_t spiRxBuffer[4];
+
 class LinkModule {
 	protected:
-		uint8_t controlPin;
 		LinkMode mode;
 
 	public:
+
     LinkModule();
-		void configureLink(LinkMode mode, uint8_t pin);
+		void configureLink(LinkMode mode);
 
 		void resetLink();
 
@@ -30,9 +46,7 @@ class LinkModule {
 
 		void sendSignalToSlave(int signal);
 
-    void initInput(int pin);
-    void initOutput(int pin);
-    void initPPI(int pin);
-
+    static void spiMasterEventHandler(nrf_drv_spi_evt_t const* event, void * context);
+    static void spiSlaveEventHandler(nrf_drv_spis_event_t event);
 };
 #endif

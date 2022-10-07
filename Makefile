@@ -146,6 +146,8 @@ SRC_FILES += \
 	$(SDK_ROOT)/integration/nrfx/legacy/nrf_drv_clock.c \
 	$(SDK_ROOT)/integration/nrfx/legacy/nrf_drv_power.c \
 	$(SDK_ROOT)/integration/nrfx/legacy/nrf_drv_uart.c \
+  $(SDK_ROOT)/integration/nrfx/legacy/nrf_drv_spi.c \
+  $(SDK_ROOT)/integration/nrfx/legacy/nrf_drv_spis.c \
 	$(SDK_ROOT)/components/drivers_nrf/nrf_soc_nosd/nrf_nvic.c \
 	$(SDK_ROOT)/components/drivers_nrf/nrf_soc_nosd/nrf_soc.c \
 	$(SDK_ROOT)/modules/nrfx/soc/nrfx_atomic.c \
@@ -157,6 +159,9 @@ SRC_FILES += \
 	$(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_uart.c \
 	$(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_uarte.c \
 	$(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_usbd.c \
+  $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_spi.c \
+  $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_spim.c \
+  $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_spis.c \
 	$(SDK_ROOT)/components/libraries/bsp/bsp.c \
 	$(SDK_ROOT)/modules/nrfx/mdk/system_nrf52840.c \
 	$(PROJ_DIR)/led.cpp \
@@ -174,6 +179,7 @@ SRC_FILES += \
 	$(PROJ_DIR)/whad/protocol/ble/ble.pb.c \
 	$(PROJ_DIR)/whad/protocol/zigbee/zigbee.pb.c \
 	$(PROJ_DIR)/whad/protocol/esb/esb.pb.c \
+	$(PROJ_DIR)/whad/protocol/unifying/unifying.pb.c \
 	$(PROJ_DIR)/whad/nanopb/pb_common.c \
 	$(PROJ_DIR)/whad/nanopb/pb_decode.c \
 	$(PROJ_DIR)/whad/nanopb/pb_encode.c \

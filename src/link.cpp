@@ -1,95 +1,69 @@
 #include "link.h"
+#include "bsp.h"
 
+void LinkModule::spiMasterEventHandler(nrf_drv_spi_evt_t const* event, void * context) {
+    spiTransferDone = true;
+}
+
+void LinkModule::spiSlaveEventHandler(nrf_drv_spis_event_t event) {
+  spiTransferDone = true;
+
+  if (event.evt_type == NRF_DRV_SPIS_XFER_DONE)
+  {
+    bsp_board_led_invert(1);
+  }
+}
 
 LinkModule::LinkModule() {
-  this->controlPin = 0;
   this->mode = RESET_LINK;
 }
 
-void LinkModule::configureLink(LinkMode mode, uint8_t pin) {
+void LinkModule::configureLink(LinkMode mode) {
   this->mode = mode;
-  this->controlPin = pin;
   if (mode == RESET_LINK) {
     this->resetLink();
   }
   else if (mode == LINK_SLAVE) {
-    //this->resetLink();
     this->setupSlave();
   }
   else if (mode == LINK_MASTER) {
-    //this->resetLink();
     this->setupMaster();
   }
 }
 
 
 void LinkModule::resetLink() {
-  NRF_P0->PIN_CNF[this->controlPin] = 0;
-  NRF_GPIOTE->CONFIG[0] = 0;
-  NRF_GPIOTE->CONFIG[1] = 0;
-
-  NRF_GPIOTE->EVENTS_IN[0] = 0;
-  NRF_GPIOTE->EVENTS_IN[1] = 0;
-
-  NRF_PPI->CH[0].EEP = 0;
-  NRF_PPI->CH[0].TEP = 0;
-
-  NRF_PPI->CH[1].EEP = 0;
-  NRF_PPI->CH[1].TEP = 0;
 }
 
 void LinkModule::setupSlave() {
-  this->initInput(this->controlPin);
-  this->initPPI(this->controlPin);
+  NRF_POWER->TASKS_CONSTLAT = 1;
+  nrf_drv_spis_config_t spis_config = NRF_DRV_SPIS_DEFAULT_CONFIG;
+  spis_config.csn_pin               = LINK_CS;
+  spis_config.miso_pin              = LINK_MISO;
+  spis_config.mosi_pin              = LINK_MOSI;
+  spis_config.sck_pin               = LINK_SCK;
+  APP_ERROR_CHECK(nrf_drv_spis_init(&slave_instance, &spis_config, LinkModule::spiSlaveEventHandler));
+  APP_ERROR_CHECK(nrf_drv_spis_buffers_set(&slave_instance, spiTxBuffer, 4, spiRxBuffer, 4));
+
+  while (true) {
+    while (!spiTransferDone) __WFE();
+    spiTransferDone = false;
+    APP_ERROR_CHECK(nrf_drv_spis_buffers_set(&slave_instance, spiTxBuffer, 4, spiRxBuffer, 4));
+  }
 }
 
 void LinkModule::setupMaster() {
-  this->initOutput(this->controlPin);
+  nrf_drv_spi_config_t spi_config = NRF_DRV_SPI_DEFAULT_CONFIG;
+  spi_config.ss_pin   = LINK_CS;
+  spi_config.miso_pin = LINK_MISO;
+  spi_config.mosi_pin = LINK_MOSI;
+  spi_config.sck_pin  = LINK_SCK;
+  APP_ERROR_CHECK(nrf_drv_spi_init(&master_instance, &spi_config, LinkModule::spiMasterEventHandler, NULL));
 }
 
 void LinkModule::sendSignalToSlave(int signal) {
-  if (signal == START_SLAVE_RADIO) {
-	   NRF_P0->OUTCLR =   (1ul << this->controlPin);
-  }
-  else {
-    	NRF_P0->OUTSET =   (1ul << this->controlPin);
-  }
-}
-void LinkModule::initInput(int pin) {
-  NRF_P0->PIN_CNF[pin] = (GPIO_PIN_CNF_SENSE_Disabled << GPIO_PIN_CNF_SENSE_Pos)
-                                      | (GPIO_PIN_CNF_DRIVE_S0S1 << GPIO_PIN_CNF_DRIVE_Pos)
-                                      | (GPIO_PIN_CNF_PULL_Disabled << GPIO_PIN_CNF_PULL_Pos)
-                                      | (GPIO_PIN_CNF_INPUT_Connect << GPIO_PIN_CNF_INPUT_Pos)
-                                      | (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos);
-}
-
-
-void LinkModule::initOutput(int pin) {
-  NRF_P0->PIN_CNF[pin] = (GPIO_PIN_CNF_SENSE_Disabled << GPIO_PIN_CNF_SENSE_Pos)
-                                      | (GPIO_PIN_CNF_DRIVE_S0S1 << GPIO_PIN_CNF_DRIVE_Pos)
-                                      | (GPIO_PIN_CNF_PULL_Disabled << GPIO_PIN_CNF_PULL_Pos)
-                                      | (GPIO_PIN_CNF_INPUT_Connect << GPIO_PIN_CNF_INPUT_Pos)
-                                      | (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos);
-  NRF_P0->OUT = 0;
-}
-
-void LinkModule::initPPI(int pin) {
-  NRF_GPIOTE->CONFIG[0] =  (GPIOTE_CONFIG_POLARITY_HiToLo << GPIOTE_CONFIG_POLARITY_Pos)
-                     | (pin << GPIOTE_CONFIG_PSEL_Pos)
-                     | (GPIOTE_CONFIG_MODE_Event << GPIOTE_CONFIG_MODE_Pos);
-  NRF_GPIOTE->CONFIG[1] =  (GPIOTE_CONFIG_POLARITY_LoToHi << GPIOTE_CONFIG_POLARITY_Pos)
-                     | (pin << GPIOTE_CONFIG_PSEL_Pos)
-                     | (GPIOTE_CONFIG_MODE_Event << GPIOTE_CONFIG_MODE_Pos);
-
-  NRF_GPIOTE->EVENTS_IN[0] = 0;
-  NRF_GPIOTE->EVENTS_IN[1] = 0;
-
-  NRF_PPI->CH[0].EEP = (uint32_t)&(NRF_GPIOTE->EVENTS_IN[0]);
-  NRF_PPI->CH[0].TEP = (uint32_t)&(NRF_RADIO->TASKS_START);
-
-
-  NRF_PPI->CH[1].EEP = (uint32_t)&(NRF_GPIOTE->EVENTS_IN[1]);
-  NRF_PPI->CH[1].TEP = (uint32_t)&(NRF_RADIO->TASKS_STOP);
-
-  NRF_PPI->CHEN= 0x00000003;
+  spiTransferDone = false;
+  memset(spiRxBuffer, 4, 0);
+  APP_ERROR_CHECK(nrf_drv_spi_transfer(&master_instance, spiTxBuffer, 4, spiRxBuffer, 4));
+  while (!spiTransferDone) __WFE();
 }

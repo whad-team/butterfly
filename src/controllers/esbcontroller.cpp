@@ -132,7 +132,7 @@ void ESBController::setFollowMode(bool follow) {
 
 
 bool ESBController::goToNextChannel() {
-  if (this->attackStatus.attack == ESB_ATTACK_SNIFF_LOGITECH_PAIRING && !this->attackStatus.successful) {
+  if ((this->attackStatus.attack == ESB_ATTACK_SNIFF_LOGITECH_PAIRING && !this->attackStatus.successful) || this->unifying) {
     this->nextPairingChannel();
   }
   else {
@@ -234,6 +234,7 @@ void ESBController::start() {
 
 void ESBController::enableAcknowledgementsSniffing() {
   this->showAcknowledgements = true;
+  this->preparedAck.available = false;
 }
 void ESBController::disableAcknowledgementsSniffing() {
   this->showAcknowledgements = false;
@@ -241,6 +242,7 @@ void ESBController::disableAcknowledgementsSniffing() {
 
 void ESBController::enableAcknowledgementsTransmission() {
   this->sendAcknowledgements = true;
+
   /*this->radio->enableAutoTXafterRX();
   this->radio->reload();*/
 }
@@ -252,6 +254,8 @@ void ESBController::disableAcknowledgementsTransmission() {
 
 void ESBController::stop() {
   this->stopScanning();
+  this->disableAcknowledgementsTransmission();
+  this->disableAcknowledgementsSniffing();
   this->setFollowMode(false);
   this->setAutofind(false);
   this->radio->disable();
@@ -283,6 +287,18 @@ void ESBController::setPromiscuousConfiguration() {
   this->radio->setExpandPayloadLength(250);
   this->radio->setFrequency(this->channel);
   this->radio->reload();
+}
+
+void ESBController::enableUnifying() {
+  this->unifying = true;
+}
+
+void ESBController::disableUnifying() {
+  this->unifying = false;
+}
+
+bool ESBController::isUnifyingEnabled() {
+  return this->unifying;
 }
 
 void ESBController::setFollowConfiguration(uint8_t address[5]) {
@@ -342,23 +358,35 @@ void ESBController::setJammerConfiguration() {
 
 void ESBController::send(uint8_t *data, size_t size) {
     bsp_board_led_invert(0);
-
-    if (this->mode == ESB_PROMISCUOUS) {
-			this->radio->send(data,size,this->channel, 0x00);
-      nrf_delay_us(100);
-    }
-    else if (this->mode == ESB_FOLLOW) {
+    if (this->sendAcknowledgements) {
       size_t payload_size = (data[6] >> 2);
-      uint8_t buffer[2+payload_size];
-      buffer[0] = data[6] >> 2;
-      buffer[1] = ((data[6] & 0x03) << 1) | (data[7] >> 7);
+      this->preparedAck.size = payload_size + 2;
+      this->preparedAck.buffer[0] = data[6] >> 2;
+      this->preparedAck.buffer[1] = ((data[6] & 0x03) << 1) | (data[7] >> 7);
       for (size_t i=0;i<payload_size;i++) {
-        buffer[2+i] = (data[7+i] << 1) | (data[7+i+1] >> 7);
+        this->preparedAck.buffer[2+i] = (data[7+i] << 1) | (data[7+i+1] >> 7);
       }
-      //Core::instance->sendDebug(buffer,payload_size+2);
-      this->lastTransmissionTimestamp = TimerModule::instance->getTimestamp();
-      this->radio->send(buffer,payload_size+2,this->channel, 0x00);
-      nrf_delay_us(100);
+      this->preparedAck.available = true;
+
+    }
+    else {
+      if (this->mode == ESB_PROMISCUOUS) {
+  			this->radio->send(data,size,this->channel, 0x00);
+        nrf_delay_us(100);
+      }
+      else if (this->mode == ESB_FOLLOW) {
+          size_t payload_size = (data[6] >> 2);
+          uint8_t buffer[2+payload_size];
+          buffer[0] = data[6] >> 2;
+          buffer[1] = ((data[6] & 0x03) << 1) | (data[7] >> 7);
+          for (size_t i=0;i<payload_size;i++) {
+            buffer[2+i] = (data[7+i] << 1) | (data[7+i+1] >> 7);
+          }
+          //Core::instance->sendDebug(buffer,payload_size+2);
+          this->lastTransmissionTimestamp = TimerModule::instance->getTimestamp();
+          this->radio->send(buffer,payload_size+2,this->channel, 0x00);
+          nrf_delay_us(100);
+      }
     }
 }
 
@@ -380,18 +408,23 @@ ESBPacket* ESBController::buildPseudoPacketFromPayload(uint32_t timestamp, uint8
     packet[6+size-2] |= (crc[0] >> 1);
     packet[6+size-2+1] = (crc[0] << 7) | (crc[1] >> 1);
     packet[6+size-2+2] = (crc[1] << 7);
-    return new ESBPacket(packet,totalSize, timestamp, 0x00, this->channel, rssi, crcValue);
+    return new ESBPacket(packet,totalSize, timestamp, 0x00, this->channel, rssi, crcValue, this->unifying);
 }
 
 
 void ESBController::sendAck(uint8_t pid) {
-
-  uint8_t payload[2] = {0x00, (uint8_t)((pid & 0x3)<<1 | 1)};
-  //this->radio->updateTXBuffer(payload, 2);
-  nrf_delay_us(160);
-  this->radio->send(payload,2,this->channel, 0x00);
-  nrf_delay_us(50);
-  //bsp_board_led_invert(0);
+  if (this->preparedAck.available) {
+    this->radio->send(this->preparedAck.buffer, this->preparedAck.size, this->channel, 0x00);
+    nrf_delay_us(200);
+    this->preparedAck.available = false;
+  }
+  else {
+    uint8_t payload[2] = {0x00, (uint8_t)((pid & 0x3)<<1 | 1)};
+    //this->radio->updateTXBuffer(payload, 2);
+    nrf_delay_us(160);
+    this->radio->send(payload,2,this->channel, 0x00);
+    nrf_delay_us(50);
+  }
 }
 void ESBController::onPromiscuousPacketProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
     int channel = this->channel;
@@ -400,10 +433,10 @@ void ESBController::onPromiscuousPacketProcessing(uint32_t timestamp, uint8_t si
       shift_buffer(buffer, 1);
       i++;
     }
-    ESBPacket *pkt = new ESBPacket(buffer,size,timestamp,0x00,channel,rssi,crcValue);
+    ESBPacket *pkt = new ESBPacket(buffer,size,timestamp,0x00,channel,rssi,crcValue, this->unifying);
 
     if (pkt != NULL && pkt->checkCrc()) {
-      ESBPacket *croppedPkt = new ESBPacket(buffer,pkt->getSize()+5+2+2,timestamp,0x00,channel,rssi,crcValue);
+      ESBPacket *croppedPkt = new ESBPacket(buffer,pkt->getSize()+5+2+2,timestamp,0x00,channel,rssi,crcValue, this->unifying);
       this->addPacket(croppedPkt);
       delete croppedPkt;
     }

@@ -69,6 +69,21 @@ const DeviceCapability CAPABILITIES[] = {
 
       )
   },
+  {
+    discovery_Domain_LogitechUnifying,
+    (discovery_Capability)(discovery_Capability_Sniff | discovery_Capability_Inject | discovery_Capability_Jam | discovery_Capability_SimulateRole),
+    (
+      CMD(unifying_UnifyingCommand_Sniff) |
+      CMD(unifying_UnifyingCommand_Send) |
+      CMD(unifying_UnifyingCommand_Start) |
+      CMD(unifying_UnifyingCommand_Stop) |
+      CMD(unifying_UnifyingCommand_SetNodeAddress) |
+      CMD(unifying_UnifyingCommand_LogitechDongleMode) |
+      CMD(unifying_UnifyingCommand_LogitechKeyboardMode) |
+      CMD(unifying_UnifyingCommand_LogitechMouseMode)
+
+      )
+  },
   {discovery_Domain__DomainNone, discovery_Capability__CapNone, 0x00000000}
 };
 

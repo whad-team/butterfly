@@ -128,15 +128,19 @@ class Dot15d4Packet : public Packet {
 
 
 class ESBPacket : public Packet {
+	protected:
+		bool unifying;
+
 	public:
 		static uint16_t updateCrc(uint16_t crc, uint8_t byte, uint8_t bits);
 		static uint16_t calculateCrc(uint8_t *data, uint8_t total_size);
-		ESBPacket(uint8_t *packetBuffer, size_t packetSize, uint32_t timestamp, uint8_t source, uint8_t channel, int8_t rssi, CrcValue crcValue);
+		ESBPacket(uint8_t *packetBuffer, size_t packetSize, uint32_t timestamp, uint8_t source, uint8_t channel, int8_t rssi, CrcValue crcValue, bool unifying);
 		uint8_t getSize();
 		uint16_t getCrc();
 		bool checkCrc();
 		uint8_t getPID();
 		uint8_t* getAddress();
+		bool isUnifying();
 };
 
 class ANTPacket : public Packet {

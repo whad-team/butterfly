@@ -9,6 +9,7 @@
 #include "protocol/ble/ble.pb.h"
 #include "protocol/zigbee/zigbee.pb.h"
 #include "protocol/esb/esb.pb.h"
+#include "protocol/unifying/unifying.pb.h"
 
 #if PB_PROTO_HEADER_VERSION != 40
 #error Regenerate this file with the current version of nanopb generator.
@@ -23,6 +24,7 @@ typedef struct _Message {
         ble_Message ble;
         zigbee_Message zigbee;
         esb_Message esb;
+        unifying_Message unifying;
     } msg;
 } Message;
 
@@ -41,6 +43,7 @@ extern "C" {
 #define Message_ble_tag                          3
 #define Message_zigbee_tag                       4
 #define Message_esb_tag                          5
+#define Message_unifying_tag                     6
 
 /* Struct field encoding specification for nanopb */
 #define Message_FIELDLIST(X, a) \
@@ -48,7 +51,8 @@ X(a, STATIC,   ONEOF,    MESSAGE,  (msg,generic,msg.generic),   1) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (msg,discovery,msg.discovery),   2) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (msg,ble,msg.ble),   3) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (msg,zigbee,msg.zigbee),   4) \
-X(a, STATIC,   ONEOF,    MESSAGE,  (msg,esb,msg.esb),   5)
+X(a, STATIC,   ONEOF,    MESSAGE,  (msg,esb,msg.esb),   5) \
+X(a, STATIC,   ONEOF,    MESSAGE,  (msg,unifying,msg.unifying),   6)
 #define Message_CALLBACK NULL
 #define Message_DEFAULT NULL
 #define Message_msg_generic_MSGTYPE generic_Message
@@ -56,6 +60,7 @@ X(a, STATIC,   ONEOF,    MESSAGE,  (msg,esb,msg.esb),   5)
 #define Message_msg_ble_MSGTYPE ble_Message
 #define Message_msg_zigbee_MSGTYPE zigbee_Message
 #define Message_msg_esb_MSGTYPE esb_Message
+#define Message_msg_unifying_MSGTYPE unifying_Message
 
 extern const pb_msgdesc_t Message_msg;
 

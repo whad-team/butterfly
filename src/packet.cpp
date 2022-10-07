@@ -449,7 +449,8 @@ uint32_t Dot15d4Packet::getFCS() {
 	return bytewise_bit_swap(this->crcValue.value);
 }
 
-ESBPacket::ESBPacket(uint8_t *packetBuffer, size_t packetSize, uint32_t timestamp, uint8_t source, uint8_t channel, int8_t rssi, CrcValue crcValue) : Packet(ESB_PACKET_TYPE, packetBuffer, packetSize, timestamp, source, channel, rssi, crcValue){
+ESBPacket::ESBPacket(uint8_t *packetBuffer, size_t packetSize, uint32_t timestamp, uint8_t source, uint8_t channel, int8_t rssi, CrcValue crcValue, bool unifying) : Packet(ESB_PACKET_TYPE, packetBuffer, packetSize, timestamp, source, channel, rssi, crcValue){
+	this->unifying = unifying;
 }
 uint16_t ESBPacket::updateCrc(uint16_t crc, uint8_t byte, uint8_t bits) {
     crc = crc ^ (byte << 8);
@@ -493,6 +494,9 @@ uint8_t ESBPacket::getPID() {
 		return this->packetPointer[5] & 0x03;
 }
 
+bool ESBPacket::isUnifying() {
+	return this->unifying;
+}
 MosartPacket::MosartPacket(uint8_t *packetBuffer, size_t packetSize, uint32_t timestamp, uint8_t source, uint8_t channel, int8_t rssi, CrcValue crcValue) : Packet(MOSART_PACKET_TYPE, packetBuffer, packetSize, timestamp, source, channel, rssi, crcValue) {}
 
 uint8_t* MosartPacket::getAddress() {
