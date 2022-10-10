@@ -11,6 +11,7 @@ ifeq ($(SERIAL_PORT),)
 	SERIAL_PORT := /dev/ttyACM0
 endif
 
+
 SUPPORTED_PLATFORMS = BOARD_PCA10059 BOARD_MDK_DONGLE
 
 ifeq ($(filter $(PLATFORM), $(SUPPORTED_PLATFORMS)),)
@@ -37,7 +38,7 @@ ifeq ($(PLATFORM),BOARD_PCA10059)
 	CFLAGS += -ffunction-sections -fdata-sections -fno-strict-aliasing
 	CFLAGS += -fno-builtin -fshort-enums
 	CFLAGS += -DPA_ENABLED
-
+	
 	# C++ flags common to all targets
 	CXXFLAGS += $(OPT)
 	# Assembler flags common to all targets
@@ -54,6 +55,12 @@ ifeq ($(PLATFORM),BOARD_PCA10059)
 
 	SRC_FILES += $(SDK_ROOT)/components/libraries/timer/app_timer2.c
 	SRC_FILES += $(SDK_ROOT)/components/libraries/timer/drv_rtc.c
+endif
+
+ifeq ($(DUALMODE), "MASTER")
+	CFLAGS += -DMASTER
+	CXXFLAGS += -DMASTER
+	ASMFLAGS += -DMASTER
 endif
 
 ifeq ($(PLATFORM),BOARD_MDK_DONGLE)
@@ -98,8 +105,6 @@ ifeq ($(PLATFORM),BOARD_MDK_DONGLE)
 
 	SRC_FILES += $(SDK_ROOT)/components/libraries/timer/app_timer.c
 endif
-
-
 
 
 PROJ_DIR := src
@@ -276,7 +281,6 @@ LIB_FILES += -lc -lnosys -lm
 
 
 .PHONY: default help
-
 
 # Default target - first one defined
 default: nrf52840_xxaa

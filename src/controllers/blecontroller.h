@@ -138,6 +138,12 @@ typedef struct ActiveConnectionRecovery {
 	uint8_t secondChannel;
 } ActiveConnectionRecovery;
 
+typedef struct ReactiveJammingPattern {
+	uint8_t pattern[20];
+	size_t size;
+	int position;
+} ReactiveJammingPattern;
+
 class BLEController : public Controller {
 	protected:
 		TimerModule *timerModule;
@@ -184,6 +190,7 @@ class BLEController : public Controller {
 		uint32_t lastMasterTimestamp;
 		uint32_t lastSlaveTimestamp;
 
+		ReactiveJammingPattern reactiveJammingPattern;
 		// Sequence numbers
 		BLESequenceNumbers masterSequenceNumbers;
 		BLESequenceNumbers slaveSequenceNumbers;

@@ -32,6 +32,10 @@ void Core::processInputMessage(Message msg) {
       this->processESBInputMessage(msg.msg.esb);
       break;
 
+    case Message_unifying_tag:
+      this->processUnifyingInputMessage(msg.msg.unifying);
+      break;
+
     default:
       // send error ?
       break;
@@ -237,6 +241,7 @@ void Core::processBLEInputMessage(ble_Message msg) {
     response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
   }
   else if (msg.which_msg == ble_Message_reactive_jam_tag) {
+
     int channel = msg.msg.reactive_jam.channel;
     uint8_t *pattern = msg.msg.reactive_jam.pattern.bytes;
     size_t pattern_size = msg.msg.reactive_jam.pattern.size;
@@ -379,6 +384,7 @@ void Core::processESBInputMessage(esb_Message msg) {
 
   if (this->currentController != this->esbController) {
     this->selectController(ESB_PROTOCOL);
+    this->esbController->disableUnifying();
   }
 
   if (msg.which_msg == esb_Message_sniff_tag) {
@@ -443,6 +449,82 @@ void Core::processESBInputMessage(esb_Message msg) {
   this->pushMessageToQueue(response);
 }
 
+void Core::processUnifyingInputMessage(unifying_Message msg) {
+  Message *response = NULL;
+
+  if (this->currentController != this->esbController) {
+    this->selectController(ESB_PROTOCOL);
+    this->esbController->enableUnifying();
+  }
+
+  if (msg.which_msg == unifying_Message_sniff_tag) {
+    if (msg.msg.sniff.channel == 0xFF || (msg.msg.sniff.channel >= 0 && msg.msg.sniff.channel <= 100)) {
+      this->esbController->setFilter(
+                msg.msg.sniff.address.bytes[0],
+                msg.msg.sniff.address.bytes[1],
+                msg.msg.sniff.address.bytes[2],
+                msg.msg.sniff.address.bytes[3],
+                msg.msg.sniff.address.bytes[4]
+      );
+      this->esbController->setChannel(msg.msg.sniff.channel);
+      if (msg.msg.sniff.show_acknowledgements) {
+        this->esbController->enableAcknowledgementsSniffing();
+      }
+      else {
+        this->esbController->disableAcknowledgementsSniffing();
+      }
+
+      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    }
+    else {
+      response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+    }
+  }
+  else if (msg.which_msg == unifying_Message_start_tag) {
+    this->esbController->start();
+    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+  }
+  else if (msg.which_msg == unifying_Message_stop_tag) {
+    this->esbController->stop();
+    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+  }
+  else if (msg.which_msg == unifying_Message_send_raw_tag) {
+    int channel = msg.msg.send_raw.channel;
+    if (channel >= 0 && channel <= 100) {
+      this->esbController->setChannel(channel);
+    }
+    this->esbController->send(msg.msg.send_raw.pdu.bytes, msg.msg.send_raw.pdu.size);
+    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+  }
+  else if (msg.which_msg == unifying_Message_set_node_addr_tag) {
+    this->esbController->setFilter(
+              msg.msg.set_node_addr.address.bytes[0],
+              msg.msg.set_node_addr.address.bytes[1],
+              msg.msg.set_node_addr.address.bytes[2],
+              msg.msg.set_node_addr.address.bytes[3],
+              msg.msg.set_node_addr.address.bytes[4]
+    );
+    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+  }
+  else if (msg.which_msg == unifying_Message_dongle_tag) {
+    this->esbController->setChannel(msg.msg.dongle.channel);
+    this->esbController->enableAcknowledgementsTransmission();
+    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+  }
+  else if (msg.which_msg == unifying_Message_mouse_tag) {
+    this->esbController->setChannel(msg.msg.mouse.channel);
+    this->esbController->disableAcknowledgementsTransmission();
+    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+  }
+  else if (msg.which_msg == unifying_Message_keyboard_tag) {
+    this->esbController->setChannel(msg.msg.keyboard.channel);
+    this->esbController->disableAcknowledgementsTransmission();
+    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+  }
+  this->pushMessageToQueue(response);
+}
+
+
 #ifdef PA_ENABLED
 void Core::configurePowerAmplifier(bool enabled) {
 	NRF_P1->PIN_CNF[11] = (GPIO_PIN_CNF_SENSE_Disabled << GPIO_PIN_CNF_SENSE_Pos)
@@ -468,21 +550,26 @@ Core::Core() {
 	instance = this;
 	this->ledModule = new LedModule();
 	this->timerModule = new TimerModule();
-	this->linkModule = new LinkModule();
+	//this->linkModule = new LinkModule();
 	this->serialModule = new SerialComm((CoreCallback)&Core::handleInputData,this);
 	this->radio = new Radio();
 
 	#ifdef PA_ENABLED
 	this->configurePowerAmplifier(true);
 	#endif
-  this->linkModule->configureLink(LINK_SLAVE);
 
-/*
+  /*
+  //this->linkModule->configureLink(LINK_SLAVE);
+
+
   this->linkModule->configureLink(LINK_MASTER);
 
   while (true) {
-    this->linkModule->sendSignalToSlave(42);
+    this->linkModule->sendSignalToSlave(1);
     nrf_delay_ms(1000);
+    this->linkModule->sendSignalToSlave(2);
+    nrf_delay_ms(1000);
+
   }
   */
 }
@@ -494,10 +581,10 @@ LedModule* Core::getLedModule() {
 SerialComm *Core::getSerialModule() {
 	return (this->serialModule);
 }
-
+/*
 LinkModule* Core::getLinkModule() {
 	return (this->linkModule);
-}
+}*/
 
 TimerModule* Core::getTimerModule() {
 	return (this->timerModule);
@@ -507,6 +594,11 @@ Radio* Core::getRadioModule() {
 	return (this->radio);
 }
 
+void Core::setControllerChannel(int channel) {
+	if (this->currentController == this->bleController) {
+    this->bleController->setChannel(channel);
+  }
+}
 void Core::init() {
 
 	this->messageQueue.size = 0;
@@ -623,10 +715,7 @@ void Core::sendVerbose(const char* data) {
   this->pushMessageToQueue(msg);
 }
 
-
 void Core::loop() {
-
-
 	while (true) {
 		this->serialModule->process();
     Message *msg = this->popMessageFromQueue();

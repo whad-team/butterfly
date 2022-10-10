@@ -47,6 +47,16 @@ int BLEController::getChannel() {
 void BLEController::setChannel(int channel) {
 	if (channel == 37 || channel == 38 || channel == 39) this->lastAdvertisingChannel = channel;
 	this->channel = channel;
+	/*
+	if (this->controllerState == REACTIVE_JAMMING) {
+		uint8_t whitened_pattern[this->reactiveJammingPattern.size];
+		for (size_t i=0;i<this->reactiveJammingPattern.size;i++) {
+			whitened_pattern[this->reactiveJammingPattern.size - 1 - i] = dewhiten_byte_ble(this->reactiveJammingPattern.pattern[i], this->reactiveJammingPattern.position+i, this->channel);
+		}
+	}
+	else {
+		Core::instance->getLinkModule()->sendSignalToSlave(this->channel);
+	}*/
 	this->radio->fastFrequencyChange(BLEController::channelToFrequency(channel),channel);
 }
 
@@ -734,9 +744,12 @@ void BLEController::setAccessAddressDiscoveryConfiguration(uint8_t preamble) {
 }
 void BLEController::setReactiveJammerConfiguration(uint8_t *pattern, size_t size, int position) {
 	this->controllerState = REACTIVE_JAMMING;
-	uint8_t whitened_pattern[size];
-	for (size_t i=0;i<size;i++) {
-		whitened_pattern[size - 1 - i] = dewhiten_byte_ble(pattern[i], position+i, this->channel);
+	memcpy(this->reactiveJammingPattern.pattern, pattern, size);
+	this->reactiveJammingPattern.size = size;
+	this->reactiveJammingPattern.position = position;
+	uint8_t whitened_pattern[this->reactiveJammingPattern.size];
+	for (size_t i=0;i<this->reactiveJammingPattern.size;i++) {
+		whitened_pattern[this->reactiveJammingPattern.size - 1 - i] = dewhiten_byte_ble(this->reactiveJammingPattern.pattern[i], this->reactiveJammingPattern.position+i, this->channel);
 	}
 	this->radio->setPreamble(whitened_pattern,(size <= 4 ? size  : 4));
 	this->radio->setPrefixes();

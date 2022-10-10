@@ -1,5 +1,7 @@
+/*
 #include "link.h"
 #include "bsp.h"
+#include "core.h"
 
 void LinkModule::spiMasterEventHandler(nrf_drv_spi_evt_t const* event, void * context) {
     spiTransferDone = true;
@@ -10,7 +12,9 @@ void LinkModule::spiSlaveEventHandler(nrf_drv_spis_event_t event) {
 
   if (event.evt_type == NRF_DRV_SPIS_XFER_DONE)
   {
-    bsp_board_led_invert(1);
+    int signal = spiRxBuffer[0] | (spiRxBuffer[1] << 8)| (spiRxBuffer[2] << 8)| (spiRxBuffer[3] << 24);
+    Core::instance->setControllerChannel(signal);
+    APP_ERROR_CHECK(nrf_drv_spis_buffers_set(&slave_instance, spiTxBuffer, 4, spiRxBuffer, 4));
   }
 }
 
@@ -45,11 +49,7 @@ void LinkModule::setupSlave() {
   APP_ERROR_CHECK(nrf_drv_spis_init(&slave_instance, &spis_config, LinkModule::spiSlaveEventHandler));
   APP_ERROR_CHECK(nrf_drv_spis_buffers_set(&slave_instance, spiTxBuffer, 4, spiRxBuffer, 4));
 
-  while (true) {
-    while (!spiTransferDone) __WFE();
-    spiTransferDone = false;
-    APP_ERROR_CHECK(nrf_drv_spis_buffers_set(&slave_instance, spiTxBuffer, 4, spiRxBuffer, 4));
-  }
+
 }
 
 void LinkModule::setupMaster() {
@@ -64,6 +64,17 @@ void LinkModule::setupMaster() {
 void LinkModule::sendSignalToSlave(int signal) {
   spiTransferDone = false;
   memset(spiRxBuffer, 4, 0);
+  spiTxBuffer[0] = signal & 0xFF;
+  spiTxBuffer[1] = (signal & 0xFF00) >> 8;
+  spiTxBuffer[2] = (signal & 0xFF0000) >> 16;
+  spiTxBuffer[3] = (signal & 0xFF000000) >> 24;
   APP_ERROR_CHECK(nrf_drv_spi_transfer(&master_instance, spiTxBuffer, 4, spiRxBuffer, 4));
-  while (!spiTransferDone) __WFE();
+  //while (!spiTransferDone) __WFE();
 }
+/*
+void LinkModule::process() {
+  if (spiTransferDone) {
+
+  }
+}
+*/

@@ -31,7 +31,7 @@ class Core {
 		LedModule *ledModule;
 		SerialComm *serialModule;
 		TimerModule *timerModule;
-		LinkModule *linkModule;
+		//LinkModule *linkModule;
 		Radio *radio;
 
 		MessageQueue messageQueue;
@@ -51,9 +51,11 @@ class Core {
 		Core();
 		LedModule *getLedModule();
 		SerialComm *getSerialModule();
-		LinkModule *getLinkModule();
+		//LinkModule *getLinkModule();
 		TimerModule *getTimerModule();
 		Radio *getRadioModule();
+
+		void setControllerChannel(int channel);
 
 		#ifdef PA_ENABLED
 			void configurePowerAmplifier(bool enabled);
@@ -71,7 +73,7 @@ class Core {
 		void processZigbeeInputMessage(zigbee_Message msg);
 		void processBLEInputMessage(ble_Message msg);
 		void processESBInputMessage(esb_Message msg);
-
+		void processUnifyingInputMessage(unifying_Message msg);
 
 		bool selectController(Protocol controller);
 

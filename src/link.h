@@ -1,3 +1,4 @@
+/*
 #ifndef LINK_H
 #define LINK_H
 #include <stdlib.h>
@@ -50,3 +51,4 @@ class LinkModule {
     static void spiSlaveEventHandler(nrf_drv_spis_event_t event);
 };
 #endif
+*/
