@@ -521,6 +521,11 @@ void Core::processUnifyingInputMessage(unifying_Message msg) {
     this->esbController->disableAcknowledgementsTransmission();
     response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
   }
+  else if (msg.which_msg == unifying_Message_sniff_pairing_tag) {
+
+    
+    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+  }
   this->pushMessageToQueue(response);
 }
 

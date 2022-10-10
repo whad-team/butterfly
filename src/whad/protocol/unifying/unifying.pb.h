@@ -29,10 +29,15 @@ typedef enum _unifying_UnifyingCommand { /* *
     unifying_UnifyingCommand_LogitechMouseMode = 7, 
     /* Start and Stop commands shared with node-related mode. */
     unifying_UnifyingCommand_Start = 8, 
-    unifying_UnifyingCommand_Stop = 9 
+    unifying_UnifyingCommand_Stop = 9, 
+    unifying_UnifyingCommand_SniffPairing = 10 
 } unifying_UnifyingCommand;
 
 /* Struct definitions */
+typedef struct _unifying_SniffPairingCmd { 
+    char dummy_field;
+} unifying_SniffPairingCmd;
+
 /* *
  StartCmd
 
@@ -159,14 +164,15 @@ typedef struct _unifying_Message {
         unifying_Jammed jammed;
         unifying_RawPduReceived raw_pdu;
         unifying_PduReceived pdu;
+        unifying_SniffPairingCmd sniff_pairing;
     } msg;
 } unifying_Message;
 
 
 /* Helper constants for enums */
 #define _unifying_UnifyingCommand_MIN unifying_UnifyingCommand_SetNodeAddress
-#define _unifying_UnifyingCommand_MAX unifying_UnifyingCommand_Stop
-#define _unifying_UnifyingCommand_ARRAYSIZE ((unifying_UnifyingCommand)(unifying_UnifyingCommand_Stop+1))
+#define _unifying_UnifyingCommand_MAX unifying_UnifyingCommand_SniffPairing
+#define _unifying_UnifyingCommand_ARRAYSIZE ((unifying_UnifyingCommand)(unifying_UnifyingCommand_SniffPairing+1))
 
 
 #ifdef __cplusplus
@@ -184,6 +190,7 @@ extern "C" {
 #define unifying_LogitechMouseModeCmd_init_default {0}
 #define unifying_StartCmd_init_default           {0}
 #define unifying_StopCmd_init_default            {0}
+#define unifying_SniffPairingCmd_init_default    {0}
 #define unifying_Jammed_init_default             {0}
 #define unifying_RawPduReceived_init_default     {0, false, 0, false, 0, false, 0, false, {0, {0}}, {0, {0}}}
 #define unifying_PduReceived_init_default        {0, false, 0, false, 0, false, 0, false, {0, {0}}, {0, {0}}}
@@ -198,6 +205,7 @@ extern "C" {
 #define unifying_LogitechMouseModeCmd_init_zero  {0}
 #define unifying_StartCmd_init_zero              {0}
 #define unifying_StopCmd_init_zero               {0}
+#define unifying_SniffPairingCmd_init_zero       {0}
 #define unifying_Jammed_init_zero                {0}
 #define unifying_RawPduReceived_init_zero        {0, false, 0, false, 0, false, 0, false, {0, {0}}, {0, {0}}}
 #define unifying_PduReceived_init_zero           {0, false, 0, false, 0, false, 0, false, {0, {0}}, {0, {0}}}
@@ -242,6 +250,7 @@ extern "C" {
 #define unifying_Message_jammed_tag              11
 #define unifying_Message_raw_pdu_tag             12
 #define unifying_Message_pdu_tag                 13
+#define unifying_Message_sniff_pairing_tag       14
 
 /* Struct field encoding specification for nanopb */
 #define unifying_SetNodeAddressCmd_FIELDLIST(X, a) \
@@ -298,6 +307,11 @@ X(a, STATIC,   SINGULAR, UINT32,   channel,           1)
 #define unifying_StopCmd_CALLBACK NULL
 #define unifying_StopCmd_DEFAULT NULL
 
+#define unifying_SniffPairingCmd_FIELDLIST(X, a) \
+
+#define unifying_SniffPairingCmd_CALLBACK NULL
+#define unifying_SniffPairingCmd_DEFAULT NULL
+
 #define unifying_Jammed_FIELDLIST(X, a) \
 X(a, STATIC,   SINGULAR, UINT32,   timestamp,         1)
 #define unifying_Jammed_CALLBACK NULL
@@ -336,7 +350,8 @@ X(a, STATIC,   ONEOF,    MESSAGE,  (msg,start,msg.start),   9) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (msg,stop,msg.stop),  10) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (msg,jammed,msg.jammed),  11) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (msg,raw_pdu,msg.raw_pdu),  12) \
-X(a, STATIC,   ONEOF,    MESSAGE,  (msg,pdu,msg.pdu),  13)
+X(a, STATIC,   ONEOF,    MESSAGE,  (msg,pdu,msg.pdu),  13) \
+X(a, STATIC,   ONEOF,    MESSAGE,  (msg,sniff_pairing,msg.sniff_pairing),  14)
 #define unifying_Message_CALLBACK NULL
 #define unifying_Message_DEFAULT NULL
 #define unifying_Message_msg_set_node_addr_MSGTYPE unifying_SetNodeAddressCmd
@@ -352,6 +367,7 @@ X(a, STATIC,   ONEOF,    MESSAGE,  (msg,pdu,msg.pdu),  13)
 #define unifying_Message_msg_jammed_MSGTYPE unifying_Jammed
 #define unifying_Message_msg_raw_pdu_MSGTYPE unifying_RawPduReceived
 #define unifying_Message_msg_pdu_MSGTYPE unifying_PduReceived
+#define unifying_Message_msg_sniff_pairing_MSGTYPE unifying_SniffPairingCmd
 
 extern const pb_msgdesc_t unifying_SetNodeAddressCmd_msg;
 extern const pb_msgdesc_t unifying_SniffCmd_msg;
@@ -363,6 +379,7 @@ extern const pb_msgdesc_t unifying_LogitechKeyboardModeCmd_msg;
 extern const pb_msgdesc_t unifying_LogitechMouseModeCmd_msg;
 extern const pb_msgdesc_t unifying_StartCmd_msg;
 extern const pb_msgdesc_t unifying_StopCmd_msg;
+extern const pb_msgdesc_t unifying_SniffPairingCmd_msg;
 extern const pb_msgdesc_t unifying_Jammed_msg;
 extern const pb_msgdesc_t unifying_RawPduReceived_msg;
 extern const pb_msgdesc_t unifying_PduReceived_msg;
@@ -379,6 +396,7 @@ extern const pb_msgdesc_t unifying_Message_msg;
 #define unifying_LogitechMouseModeCmd_fields &unifying_LogitechMouseModeCmd_msg
 #define unifying_StartCmd_fields &unifying_StartCmd_msg
 #define unifying_StopCmd_fields &unifying_StopCmd_msg
+#define unifying_SniffPairingCmd_fields &unifying_SniffPairingCmd_msg
 #define unifying_Jammed_fields &unifying_Jammed_msg
 #define unifying_RawPduReceived_fields &unifying_RawPduReceived_msg
 #define unifying_PduReceived_fields &unifying_PduReceived_msg
@@ -397,6 +415,7 @@ extern const pb_msgdesc_t unifying_Message_msg;
 #define unifying_SendRawCmd_size                 264
 #define unifying_SetNodeAddressCmd_size          7
 #define unifying_SniffCmd_size                   15
+#define unifying_SniffPairingCmd_size            0
 #define unifying_StartCmd_size                   0
 #define unifying_StopCmd_size                    0
 

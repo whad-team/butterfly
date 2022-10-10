@@ -36,6 +36,9 @@ PB_BIND(unifying_StartCmd, unifying_StartCmd, AUTO)
 PB_BIND(unifying_StopCmd, unifying_StopCmd, AUTO)
 
 
+PB_BIND(unifying_SniffPairingCmd, unifying_SniffPairingCmd, AUTO)
+
+
 PB_BIND(unifying_Jammed, unifying_Jammed, AUTO)
 
 

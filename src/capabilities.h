@@ -80,7 +80,9 @@ const DeviceCapability CAPABILITIES[] = {
       CMD(unifying_UnifyingCommand_SetNodeAddress) |
       CMD(unifying_UnifyingCommand_LogitechDongleMode) |
       CMD(unifying_UnifyingCommand_LogitechKeyboardMode) |
-      CMD(unifying_UnifyingCommand_LogitechMouseMode)
+      CMD(unifying_UnifyingCommand_LogitechMouseMode) |
+      CMD(unifying_UnifyingCommand_SniffPairing)
+
 
       )
   },
