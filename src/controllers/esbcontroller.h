@@ -48,9 +48,11 @@ class ESBController : public Controller {
 		TimerModule *timerModule;
 		Timer *scanTimer;
 		Timer *timeoutTimer;
+		Timer *pairingTimer;
 
 		int channel;
 
+		bool lastTransmissionAcknowledged;
 		uint32_t lastTransmissionTimestamp;
 
 		ESBAcknowledgementBuffer preparedAck;
@@ -69,6 +71,7 @@ class ESBController : public Controller {
 
 		bool unifying;
 
+		bool stopTransmitting;
 	public:
 		ESBController(Radio* radio);
     void start();
@@ -77,7 +80,7 @@ class ESBController : public Controller {
 		void enableUnifying();
 		void disableUnifying();
 		bool isUnifyingEnabled();
-		
+
 		void sendAck(uint8_t pid);
 		void enableAcknowledgementsSniffing();
 		void disableAcknowledgementsSniffing();
@@ -85,10 +88,15 @@ class ESBController : public Controller {
 		void enableAcknowledgementsTransmission();
 		void disableAcknowledgementsTransmission();
 
+		void pairing();
+		void startPairingSniffing();
+		void stopPairingSniffing();
+
 		void sendPing();
 		void setFilter(uint8_t a,uint8_t b,uint8_t c,uint8_t d,uint8_t e);
 	  void setFollowMode(bool follow);
 
+		void checkPresence();
 		void nextPairingChannel();
 		bool timeout();
     bool goToNextChannel();

@@ -5,6 +5,7 @@ ESBController::ESBController(Radio *radio) : Controller(radio) {
   this->timerModule = Core::instance->getTimerModule();
   this->scanTimer = NULL;
   this->timeoutTimer = NULL;
+  this->pairingTimer = NULL;
   this->showAcknowledgements = false;
 }
 
@@ -18,12 +19,13 @@ int ESBController::getChannel() {
 }
 
 void ESBController::sendPing() {
-  uint8_t payload[6] = {0x04, 0x00, 0x0f,0x0f, 0x0f, 0x0f};
-
+  uint8_t payload[3] = {0x01, 0x00, 0x0f};
+  this->lastTransmissionAcknowledged = false;
   this->lastTransmissionTimestamp = TimerModule::instance->getTimestamp();
-  this->radio->send(payload,6,this->channel, 0x00);
+  this->radio->send(payload,3,this->channel, 0x00);
   bsp_board_led_invert(0);
 }
+
 
 
 void ESBController::setChannel(int channel) {
@@ -90,6 +92,37 @@ void ESBController::setAutofind(bool autofind) {
   else {
     this->autofind = false;
     this->stopTimeout();
+  }
+}
+
+void ESBController::pairing() {
+  if (!this->stopTransmitting) {
+    if (!this->lastTransmissionAcknowledged) {
+        this->nextPairingChannel();
+    }
+    //this->sendPing();
+    this->sendPing();
+    nrf_delay_us(80);
+  }
+}
+
+void ESBController::startPairingSniffing() {
+  this->stopTransmitting = false;
+  if (this->pairingTimer == NULL) {
+    this->pairingTimer = this->timerModule->getTimer();
+  }
+	this->pairingTimer->setMode(REPEATED);
+	this->pairingTimer->setCallback((ControllerCallback)&ESBController::pairing, this);
+	this->pairingTimer->update(10000);
+	this->pairingTimer->start();
+
+}
+
+void ESBController::stopPairingSniffing() {
+  if (this->pairingTimer != NULL) {
+    this->pairingTimer->stop();
+    this->pairingTimer->release();
+    this->pairingTimer = NULL;
   }
 }
 
@@ -227,6 +260,18 @@ void ESBController::start() {
       this->setFollowMode(false);
       this->setAutofind(false);
     }
+
+    if (
+      this->filter.bytes[0] == 0xBB &&
+      this->filter.bytes[1] == 0x0A &&
+      this->filter.bytes[2] == 0xDC &&
+      this->filter.bytes[3] == 0xA5 &&
+      this->filter.bytes[4] == 0x75
+    ) {
+      this->channel = 5;
+      this->startPairingSniffing();
+    }
+
     this->setFollowConfiguration(this->filter.bytes);
   }
 }
@@ -383,6 +428,7 @@ void ESBController::send(uint8_t *data, size_t size) {
             buffer[2+i] = (data[7+i] << 1) | (data[7+i+1] >> 7);
           }
           //Core::instance->sendDebug(buffer,payload_size+2);
+          this->lastTransmissionAcknowledged = false;
           this->lastTransmissionTimestamp = TimerModule::instance->getTimestamp();
           this->radio->send(buffer,payload_size+2,this->channel, 0x00);
           nrf_delay_us(100);
@@ -489,10 +535,13 @@ void ESBController::onFollowPacketProcessing(uint32_t timestamp, uint8_t size, u
 
 void ESBController::onPRXPacketProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
   bool ownAck = false;
+  this->pairingTimer->update(1000);
+
   if ((timestamp - this->lastReceivedPacket.timestamp) < 350) {
     this->lastReceivedPacket.acked = true;
   }
   if ((timestamp - this->lastTransmissionTimestamp) < 350) {
+    this->lastTransmissionAcknowledged = true;
     bsp_board_led_invert(1);
     if (this->syncing) {
       this->syncing = false;
@@ -513,6 +562,7 @@ void ESBController::onPTXPacketProcessing(uint32_t timestamp, uint8_t size, uint
   if (this->sendAcknowledgements) {
     this->sendAck(buffer[1] >> 1);
   }
+  this->stopTransmitting = true;
 
   bool retransmission = false;
   // Check if the packet has been acknowledged to know if it is a retransmission
@@ -546,6 +596,12 @@ void ESBController::onPTXPacketProcessing(uint32_t timestamp, uint8_t size, uint
     // It is a retransmission, but we have to update the timestamp of the last received packet structure to make sure we detect a lately ack
     this->lastReceivedPacket.timestamp = timestamp;
   }
+
+
+  if (buffer[3] == 0x1f) {
+    this->setFilter(buffer[5], buffer[6], buffer[7], buffer[8], buffer[9]);
+    this->setFollowConfiguration(this->filter.bytes);
+  }
 }
 
 void ESBController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
@@ -554,7 +610,6 @@ void ESBController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer,
   }
   else if (this->mode == ESB_FOLLOW) {
     this->onFollowPacketProcessing(timestamp, size, buffer, crcValue, rssi);
-
   }
 }
 

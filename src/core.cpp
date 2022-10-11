@@ -523,7 +523,9 @@ void Core::processUnifyingInputMessage(unifying_Message msg) {
   }
   else if (msg.which_msg == unifying_Message_sniff_pairing_tag) {
 
-    
+    this->esbController->setFilter(0xBB, 0x0A, 0xDC, 0xA5, 0x75);
+    this->esbController->setChannel(5);
+
     response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
   }
   this->pushMessageToQueue(response);
