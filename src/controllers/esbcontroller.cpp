@@ -549,7 +549,7 @@ void ESBController::onPRXPacketProcessing(uint32_t timestamp, uint8_t size, uint
     }
     ownAck = true;
   }
-  if (this->showAcknowledgements || ownAck) {
+  if (this->showAcknowledgements || (ownAck && this->filter.bytes[0] != 0xBB && this->filter.bytes[1] != 0x0A && this->filter.bytes[2] != 0xDC && this->filter.bytes[3] !=  0xA5 && this->filter.bytes[4] != 0x75)) {
     ESBPacket *pkt = this->buildPseudoPacketFromPayload(0, size,buffer,crcValue, rssi);
     this->addPacket(pkt);
     delete pkt;
@@ -598,10 +598,13 @@ void ESBController::onPTXPacketProcessing(uint32_t timestamp, uint8_t size, uint
   }
 
 
-  if (buffer[3] == 0x1f) {
+  if (buffer[3] == 0x1f && buffer[4] == 0x01) {
     this->setFilter(buffer[5], buffer[6], buffer[7], buffer[8], buffer[9]);
     this->setFollowConfiguration(this->filter.bytes);
   }
+  /*else if (buffer[3] == 0x1f && buffer[4] == 0x02) {
+    this->nextPairingChannel();
+  }*/
 }
 
 void ESBController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
