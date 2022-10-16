@@ -629,43 +629,51 @@ void Core::init() {
 }
 
 bool Core::selectController(Protocol controller) {
+  this->getLedModule()->on(LED2);
 	if (controller == BLE_PROTOCOL) {
+    this->getLedModule()->setColor(BLUE);
 		this->radio->disable();
 		this->currentController = this->bleController;
 		this->radio->setController(this->currentController);
 		return true;
 	}
 	else if (controller == DOT15D4_PROTOCOL) {
+    this->getLedModule()->setColor(GREEN);
 		this->radio->disable();
 		this->currentController = this->dot15d4Controller;
 		this->radio->setController(this->currentController);
 		return true;
 	}
 	else if (controller == ESB_PROTOCOL) {
+    this->getLedModule()->setColor(PURPLE);
 		this->radio->disable();
 		this->currentController = this->esbController;
 		this->radio->setController(this->currentController);
 		return true;
 	}
 	else if (controller == ANT_PROTOCOL) {
+    this->getLedModule()->setColor(RED);
 		this->radio->disable();
 		this->currentController = this->antController;
 		this->radio->setController(this->currentController);
 		return true;
 	}
 	else if (controller == MOSART_PROTOCOL) {
+    this->getLedModule()->setColor(YELLOW);
 		this->radio->disable();
 		this->currentController = this->mosartController;
 		this->radio->setController(this->currentController);
 		return true;
 	}
 	else if (controller == GENERIC_PROTOCOL) {
+    this->getLedModule()->setColor(CYAN);
 		this->radio->disable();
 		this->currentController = this->genericController;
 		this->radio->setController(this->currentController);
 		return true;
 	}
 	else {
+    this->getLedModule()->off(LED2);
 		this->radio->disable();
 		this->currentController = NULL;
 		this->radio->setController(NULL);

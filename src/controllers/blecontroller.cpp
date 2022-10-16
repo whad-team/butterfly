@@ -468,7 +468,6 @@ void BLEController::start() {
 		}
 	}
 	else if (this->controllerState == RECOVERING_HOP_INCREMENT) {
-		bsp_board_led_on(1);
 
 		//if (this->activeConnectionRecovery.firstChannel == -1 || this->activeConnectionRecovery.secondChannel == -1) {
 			this->generateAllHoppingSequences();
@@ -524,7 +523,6 @@ void BLEController::addCandidateAccessAddress(uint32_t accessAddress) {
 
 
 void BLEController::hopToNextDataChannel() {
-	bsp_board_led_invert(1);
 	if (this->controllerState == SNIFFING_ACCESS_ADDRESS) {
 		if (this->activeConnectionRecovery.accessAddressPreamble == 0xAA) {
 			this->activeConnectionRecovery.accessAddressPreamble = 0x55;
@@ -1049,7 +1047,6 @@ void BLEController::executeInjectionToMaster() {
 	this->radio->updateTXBuffer(tx_buffer,2);
 	*/
 	 // Dirty version : working
-	 bsp_board_led_invert(1);
 	 this->attackStatus.payload[0] = (this->attackStatus.payload[0] & 0xF3) | (this->simulatedSlaveSequenceNumbers.nesn  << 2) | (this->simulatedSlaveSequenceNumbers.sn << 3); // MD = 1
 	 this->radio->updateTXBuffer(this->attackStatus.payload,this->attackStatus.size);
 	 this->simulatedSlaveSequenceNumbers.sn = (this->simulatedSlaveSequenceNumbers.sn + 1) % 2; // necessary ?
@@ -1433,7 +1430,6 @@ void BLEController::connectionSynchronizationProcessing(BLEPacket *pkt) {
 		// Process the packet as a master's packet
 		this->masterPacketProcessing(pkt);
 
-		bsp_board_led_invert(1);
 
 		// Update the anchor point
 		this->setAnchorPoint(pkt->getTimestamp());
@@ -1564,7 +1560,6 @@ void BLEController::roleSimulationProcessing(BLEPacket* pkt) {
 }
 
 void BLEController::connectionPacketProcessing(BLEPacket *pkt) {
-	bsp_board_led_invert(0);
 	// Increment the packet counter
 	this->packetCount++;
 
@@ -1746,16 +1741,13 @@ void BLEController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer,
 
 void BLEController::onJam(uint32_t timestamp) {
 	if (this->controllerState == REACTIVE_JAMMING) {
-		bsp_board_led_invert(1);
 	}
 	else if (this->controllerState == JAMMING_CONNECT_REQ) {
 		Core::instance->sendDebug("JAMMED !");
 		NRF_RADIO->TASKS_STOP = 1;
-		bsp_board_led_on(2);
 
 		nrf_delay_us(1000);
 		NRF_RADIO->TASKS_START = 1;
-		bsp_board_led_off(2);
 	}
 }
 

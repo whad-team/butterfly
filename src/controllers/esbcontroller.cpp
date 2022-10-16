@@ -23,7 +23,6 @@ void ESBController::sendPing() {
   this->lastTransmissionAcknowledged = false;
   this->lastTransmissionTimestamp = TimerModule::instance->getTimestamp();
   this->radio->send(payload,3,this->channel, 0x00);
-  bsp_board_led_invert(0);
 }
 
 
@@ -146,7 +145,7 @@ void ESBController::stopTimeout() {
 
 void ESBController::expandTimeout(int timestamp) {
   if (this->timeoutTimer != NULL) {
-	 this->timeoutTimer->update(500000, timestamp);
+	 this->timeoutTimer->update(2000000, timestamp);
   }
 }
 void ESBController::setFilter(uint8_t a,uint8_t b,uint8_t c,uint8_t d,uint8_t e) {
@@ -169,7 +168,6 @@ bool ESBController::goToNextChannel() {
     this->nextPairingChannel();
   }
   else {
-    bsp_board_led_invert(0);
     this->setChannel((this->getChannel() + 1) % 100);
   }
   if (this->activeScanning && this->mode == ESB_FOLLOW) {
@@ -402,7 +400,6 @@ void ESBController::setJammerConfiguration() {
 }
 
 void ESBController::send(uint8_t *data, size_t size) {
-    bsp_board_led_invert(0);
     if (this->sendAcknowledgements) {
       size_t payload_size = (data[6] >> 2);
       this->preparedAck.size = payload_size + 2;
@@ -504,33 +501,6 @@ void ESBController::onFollowPacketProcessing(uint32_t timestamp, uint8_t size, u
 
 
     }
-      /*
-      if (this->attackStatus.attack == ESB_ATTACK_SNIFF_LOGITECH_PAIRING) {
-        if (size-2 == 0 && !this->attackStatus.successful) {
-          this->setAutofind(false);
-          this->startScanning();
-          if (this->attackStatus.index < 24) {
-            this->attackStatus.timestamps[this->attackStatus.index] = timestamp;
-            this->attackStatus.channels[this->attackStatus.index] = channel;
-            this->attackStatus.index++;
-          }
-          else {
-            this->stopScanning();
-            Core::instance->sendDebug((uint8_t*)this->attackStatus.timestamps, 24*4);
-          }
-        }
-        else {
-         this->stopScanning();
-         this->activeScanning = false;
-         this->attackStatus.successful = true;
-
-       }
-      }
-      if (this->attackStatus.attack == ESB_ATTACK_SNIFF_LOGITECH_PAIRING && buffer[3] == 0x5F && buffer[4] == 0x01) {
-        this->setFilter(buffer[5],buffer[6],buffer[7],buffer[8],buffer[9]);
-        this->setFollowConfiguration(this->filter.bytes);
-      }*/
-      //free(pkt);
 }
 
 void ESBController::onPRXPacketProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
@@ -542,7 +512,6 @@ void ESBController::onPRXPacketProcessing(uint32_t timestamp, uint8_t size, uint
   }
   if ((timestamp - this->lastTransmissionTimestamp) < 350) {
     this->lastTransmissionAcknowledged = true;
-    bsp_board_led_invert(1);
     if (this->syncing) {
       this->syncing = false;
       this->stopScanning();
@@ -602,9 +571,7 @@ void ESBController::onPTXPacketProcessing(uint32_t timestamp, uint8_t size, uint
     this->setFilter(buffer[5], buffer[6], buffer[7], buffer[8], buffer[9]);
     this->setFollowConfiguration(this->filter.bytes);
   }
-  /*else if (buffer[3] == 0x1f && buffer[4] == 0x02) {
-    this->nextPairingChannel();
-  }*/
+
 }
 
 void ESBController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {

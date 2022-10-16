@@ -1017,7 +1017,6 @@ int Radio::getMatchingSize() {
 bool Radio::send(uint8_t *data,int size,int frequency, uint8_t channel) {
 	NVIC_DisableIRQ(RADIO_IRQn);
 	NRF_RADIO->SHORTS = 0;
-	bsp_board_led_invert(0);
 	NRF_RADIO->EVENTS_DISABLED = 0;
 	NRF_RADIO->TASKS_DISABLE = 1;
 	while(NRF_RADIO->EVENTS_DISABLED == 0);
