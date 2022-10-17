@@ -29,6 +29,12 @@ typedef enum GenericEndianness {
 	GENERIC_ENDIANNESS_LITTLE = 1
 } GenericEndianness;
 
+typedef enum GenericTxPower {
+	LOW = 0,
+	MEDIUM = 1,
+	HIGH = 2
+} GenericTxPower;
+
 class GenericController : public Controller {
   protected:
 
@@ -39,6 +45,7 @@ class GenericController : public Controller {
     uint8_t packetSize;
     GenericPhy phy;
 		GenericEndianness endianness;
+		GenericTxPower txPower;
 
     GenericAttackStatus attackStatus;
 
@@ -46,6 +53,13 @@ class GenericController : public Controller {
 		GenericController(Radio* radio);
     void start();
     void stop();
+
+		bool setTxPower(GenericTxPower txPower);
+		bool setPreamble(uint8_t *preamble, size_t preambleSize);
+		bool setPacketSize(size_t packetSize);
+		bool setEndianness(GenericEndianness endianness);
+		bool setPhy(GenericPhy phy);
+		GenericPhy getPhy();
 
     bool configure(uint8_t *preamble, size_t preambleSize, size_t packetSize, GenericPhy phy, GenericEndianness endianness);
 

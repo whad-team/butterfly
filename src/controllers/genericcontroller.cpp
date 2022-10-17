@@ -1,19 +1,54 @@
 #include "genericcontroller.h"
 #include "../core.h"
 
-GenericController::GenericController(Radio* radio)  : Controller(radio) {}
-
-void GenericController::start() {
+GenericController::GenericController(Radio* radio)  : Controller(radio) {
   uint8_t preamble[] = {0x1A, 0x2B, 0x3C, 0x4D};
   this->configure(preamble, 4, 32, GENERIC_PHY_1MBPS_ESB, GENERIC_ENDIANNESS_LITTLE);
+}
+
+void GenericController::start() {
+  this->setHardwareConfiguration();
 }
 
 void GenericController::stop() {
   this->radio->disable();
 }
 
+GenericPhy GenericController::getPhy() {
+  return this->phy;
+}
+
 void GenericController::onMatch(uint8_t *buffer, size_t size) {
 
+}
+
+bool GenericController::setTxPower(GenericTxPower txPower) {
+  this->txPower = txPower;
+  return true;
+}
+
+bool GenericController::setPreamble(uint8_t *preamble, size_t preambleSize) {
+  if (preambleSize > 0 && preambleSize <= 4) {
+    memcpy(this->preamble, preamble, preambleSize);
+    this->preambleSize = preambleSize;
+    return true;
+  }
+  return false;
+}
+
+bool GenericController::setPacketSize(size_t packetSize) {
+  this->packetSize = packetSize;
+  return true;
+}
+
+bool GenericController::setEndianness(GenericEndianness endianness) {
+  this->endianness = endianness;
+  return true;
+}
+
+bool GenericController::setPhy(GenericPhy phy) {
+  this->phy = phy;
+  return true;
 }
 
 bool GenericController::configure(uint8_t *preamble, size_t preambleSize, size_t packetSize, GenericPhy phy, GenericEndianness endianness) {
@@ -23,7 +58,7 @@ bool GenericController::configure(uint8_t *preamble, size_t preambleSize, size_t
     this->packetSize = packetSize;
     this->phy = phy;
     this->endianness = endianness;
-    this->setHardwareConfiguration();
+    //this->setHardwareConfiguration();
     return true;
   }
   return false;
@@ -69,8 +104,20 @@ void GenericController::setJammerConfiguration() {
   else {
     this->radio->setEndianness(LITTLE);
   }
-  this->radio->setTxPower(POS8_DBM);
-  this->radio->disableRssi();
+
+  if (this->txPower == HIGH) {
+    this->radio->setTxPower(POS8_DBM);
+  }
+  else if (this->txPower == MEDIUM) {
+    this->radio->setTxPower(POS0_DBM);
+  }
+  else if (this->txPower == LOW) {
+    this->radio->setTxPower(NEG8_DBM);
+  }
+  else {
+    this->radio->setTxPower(POS0_DBM);
+  }
+  this->radio->enableRssi();
 
   if (this->phy == GENERIC_PHY_1MBPS_ESB) {
     this->radio->setPhy(ESB_1MBITS);
@@ -112,8 +159,20 @@ void GenericController::setHardwareConfiguration() {
   else {
     this->radio->setEndianness(LITTLE);
   }
-  this->radio->setTxPower(POS8_DBM);
-  this->radio->disableRssi();
+
+  if (this->txPower == HIGH) {
+    this->radio->setTxPower(POS8_DBM);
+  }
+  else if (this->txPower == MEDIUM) {
+    this->radio->setTxPower(POS0_DBM);
+  }
+  else if (this->txPower == LOW) {
+    this->radio->setTxPower(NEG8_DBM);
+  }
+  else {
+    this->radio->setTxPower(POS0_DBM);
+  }
+  this->radio->enableRssi();
 
   if (this->phy == GENERIC_PHY_1MBPS_ESB) {
     this->radio->setPhy(ESB_1MBITS);
@@ -157,8 +216,20 @@ void GenericController::setEnergyDetectionConfiguration() {
   else {
     this->radio->setEndianness(LITTLE);
   }
-  this->radio->setTxPower(POS8_DBM);
-  this->radio->disableRssi();
+
+  if (this->txPower == HIGH) {
+    this->radio->setTxPower(POS8_DBM);
+  }
+  else if (this->txPower == MEDIUM) {
+    this->radio->setTxPower(POS0_DBM);
+  }
+  else if (this->txPower == LOW) {
+    this->radio->setTxPower(NEG8_DBM);
+  }
+  else {
+    this->radio->setTxPower(POS0_DBM);
+  }
+  this->radio->enableRssi();
 
   if (this->phy == GENERIC_PHY_1MBPS_ESB) {
     this->radio->setPhy(ESB_1MBITS);
@@ -206,6 +277,7 @@ void GenericController::send(uint8_t* data, size_t size) {
 void GenericController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
   GenericPacket *pkt = new GenericPacket(buffer,size,timestamp,0x00,channel,rssi,crcValue, this->preamble, this->preambleSize);
   this->addPacket(pkt);
+  delete pkt;
 }
 
 void GenericController::onJam(uint32_t timestamp) {

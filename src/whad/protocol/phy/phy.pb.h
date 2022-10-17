@@ -186,7 +186,7 @@ typedef struct _phy_SetDataRateCmd {
 
  Configure the endianness to use (little or big endian). */
 typedef struct _phy_SetEndiannessCmd { 
-    phy_Endianness endianess;
+    phy_Endianness endianness;
 } phy_SetEndiannessCmd;
 
 /* *
@@ -394,7 +394,7 @@ extern "C" {
 #define phy_SendCmd_packet_tag                   1
 #define phy_SetASKModulationCmd_ook_tag          1
 #define phy_SetDataRateCmd_rate_tag              1
-#define phy_SetEndiannessCmd_endianess_tag       1
+#define phy_SetEndiannessCmd_endianness_tag      1
 #define phy_SetFSKModulationCmd_deviation_tag    1
 #define phy_SetFiveGhzFrequencyCmd_frequency_offset_tag 1
 #define phy_SetGFSKModulationCmd_deviation_tag   1
@@ -476,7 +476,7 @@ X(a, STATIC,   SINGULAR, UINT32,   rate,              1)
 #define phy_SetDataRateCmd_DEFAULT NULL
 
 #define phy_SetEndiannessCmd_FIELDLIST(X, a) \
-X(a, STATIC,   SINGULAR, UENUM,    endianess,         1)
+X(a, STATIC,   SINGULAR, UENUM,    endianness,        1)
 #define phy_SetEndiannessCmd_CALLBACK NULL
 #define phy_SetEndiannessCmd_DEFAULT NULL
 

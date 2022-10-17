@@ -134,16 +134,26 @@ Message* Whad::buildMessageFromPacket(Packet* packet) {
   else if (packet->getPacketType() == ESB_PACKET_TYPE) {
     msg = Whad::buildESBRawPduMessage((ESBPacket*)packet);
   }
+  else if (packet->getPacketType() == GENERIC_PACKET_TYPE) {
+    msg = Whad::buildPhyPacketMessage((GenericPacket*)packet);
+  }
   return msg;
 }
-/*
-uint32 channel = 1;
-optional int32 rssi = 2;
-optional uint32 timestamp = 3;
-optional bool fcs_validity = 4;
-bytes pdu = 5;
-uint32 fcs = 6;
-*/
+
+Message* Whad::buildPhyPacketMessage(GenericPacket* packet) {
+  Message *msg = Whad::buildMessage();
+  msg->which_msg = Message_phy_tag;
+  msg->msg.phy.which_msg = phy_Message_packet_tag;
+  msg->msg.phy.msg.packet.has_rssi = true;
+  msg->msg.phy.msg.packet.rssi = packet->getRssi();
+  msg->msg.phy.msg.packet.frequency = 2400 + packet->getChannel();
+  msg->msg.phy.msg.packet.has_timestamp = true;
+  msg->msg.phy.msg.packet.timestamp = packet->getTimestamp();
+  msg->msg.phy.msg.packet.packet.size = packet->getPacketSize();
+  memcpy(msg->msg.phy.msg.packet.packet.bytes, packet->getPacketBuffer(), packet->getPacketSize());
+  return msg;
+}
+
 Message* Whad::buildESBRawPduMessage(ESBPacket* packet) {
   Message* msg = Whad::buildMessage();
   if (packet->isUnifying()) {

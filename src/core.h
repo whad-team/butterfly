@@ -74,6 +74,7 @@ class Core {
 		void processBLEInputMessage(ble_Message msg);
 		void processESBInputMessage(esb_Message msg);
 		void processUnifyingInputMessage(unifying_Message msg);
+		void processPhyInputMessage(phy_Message msg);
 
 		bool selectController(Protocol controller);
 
