@@ -86,6 +86,25 @@ const DeviceCapability CAPABILITIES[] = {
 
       )
   },
+  {discovery_Domain_Phy,
+  (discovery_Capability)(discovery_Capability_Sniff | discovery_Capability_Inject | discovery_Capability_Jam | discovery_Capability_NoRawData),
+  (
+    CMD(phy_PhyCommand_SetGFSKModulation) |
+    CMD(phy_PhyCommand_SetTwoDotFourGhzFrequency) |
+    CMD(phy_PhyCommand_SetDataRate) |
+    CMD(phy_PhyCommand_SetEndianness) |
+    CMD(phy_PhyCommand_SetTXPower) |
+    CMD(phy_PhyCommand_SetPacketSize) |
+    CMD(phy_PhyCommand_SetSyncWord) |
+    CMD(phy_PhyCommand_Sniff) |
+    CMD(phy_PhyCommand_Send) |
+    CMD(phy_PhyCommand_Start) |
+    CMD(phy_PhyCommand_Stop) |
+    CMD(phy_PhyCommand_Jam) |
+    CMD(phy_PhyCommand_Monitor)
+
+    )
+},
   {discovery_Domain__DomainNone, discovery_Capability__CapNone, 0x00000000}
 };
 

@@ -38,7 +38,7 @@ ifeq ($(PLATFORM),BOARD_PCA10059)
 	CFLAGS += -ffunction-sections -fdata-sections -fno-strict-aliasing
 	CFLAGS += -fno-builtin -fshort-enums
 	CFLAGS += -DPA_ENABLED
-	
+
 	# C++ flags common to all targets
 	CXXFLAGS += $(OPT)
 	# Assembler flags common to all targets
@@ -185,6 +185,7 @@ SRC_FILES += \
 	$(PROJ_DIR)/whad/protocol/zigbee/zigbee.pb.c \
 	$(PROJ_DIR)/whad/protocol/esb/esb.pb.c \
 	$(PROJ_DIR)/whad/protocol/unifying/unifying.pb.c \
+	$(PROJ_DIR)/whad/protocol/phy/phy.pb.c \
 	$(PROJ_DIR)/whad/nanopb/pb_common.c \
 	$(PROJ_DIR)/whad/nanopb/pb_decode.c \
 	$(PROJ_DIR)/whad/nanopb/pb_encode.c \

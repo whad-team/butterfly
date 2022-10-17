@@ -1040,7 +1040,7 @@ void BLEController::executeInjectionToMaster() {
 	this->enterSlaveInjectionMode(145);
 
 	// Forge an empty data packet with MD bit set to 1
-	uint8_t tx_buffer[2];
+	//uint8_t tx_buffer[2];
 
 	/*tx_buffer[0] = (0x01 & 0xF3) | (this->simulatedSlaveSequenceNumbers.nesn  << 2) | (this->simulatedSlaveSequenceNumbers.sn << 3) | (1 << 4); // MD = 1
 	tx_buffer[1] = 0x00;

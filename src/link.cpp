@@ -71,7 +71,7 @@ void LinkModule::sendSignalToSlave(int signal) {
   APP_ERROR_CHECK(nrf_drv_spi_transfer(&master_instance, spiTxBuffer, 4, spiRxBuffer, 4));
   //while (!spiTransferDone) __WFE();
 }
-/*
+
 void LinkModule::process() {
   if (spiTransferDone) {
 

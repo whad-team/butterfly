@@ -13,7 +13,7 @@
 /* Domains definition. */
 typedef enum _discovery_Domain { 
     discovery_Domain__DomainNone = 0, 
-    discovery_Domain_Generic = 16777216, 
+    discovery_Domain_Phy = 16777216, 
     discovery_Domain_BtClassic = 33554432, 
     discovery_Domain_BtLE = 50331648, 
     discovery_Domain_Zigbee = 67108864, 
