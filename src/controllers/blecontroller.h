@@ -39,6 +39,7 @@ typedef enum BLEControllerState {
 	SNIFFING_CONNECTION,
 	INJECTING_TO_SLAVE,
 	INJECTING_TO_MASTER,
+	CONNECT,
 	//INJECTING,
 	//INJECTING_FROM_SLAVE,
 	SIMULATING_SLAVE,
@@ -224,6 +225,7 @@ class BLEController : public Controller {
 
 		void sniff();
 
+		void connect(uint8_t *address, bool random);
 		void setAnchorPoint(uint32_t timestamp);
 
 		bool whitelistAdvAddress(bool enable, uint8_t a, uint8_t b, uint8_t c,uint8_t d, uint8_t e, uint8_t f);

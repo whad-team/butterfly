@@ -368,6 +368,23 @@ void Core::processBLEInputMessage(ble_Message msg) {
         response = Whad::buildResultMessage(generic_ResultCode_WRONG_MODE);
       }
   }
+  else if (msg.which_msg == ble_Message_connect_tag) {
+    this->bleController->setChannel(37);
+    uint8_t address[6];
+    address[0] = msg.msg.connect.bd_address[5];
+    address[1] = msg.msg.connect.bd_address[4];
+    address[2] = msg.msg.connect.bd_address[3];
+    address[3] = msg.msg.connect.bd_address[2];
+    address[4] = msg.msg.connect.bd_address[1];
+    address[5] = msg.msg.connect.bd_address[0];
+
+    this->bleController->connect(
+        address,
+        msg.msg.connect.addr_type == ble_BleAddrType_RANDOM
+    );
+
+    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+  }
   /*
   else if (msg.which_msg == ble_Message_jam_adv_chan_tag) {
     int channel = msg.msg.jam_adv_chan.channel;

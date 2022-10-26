@@ -713,6 +713,12 @@ void BLEController::sniffAccessAddresses() {
 	this->controllerState	= SNIFFING_ACCESS_ADDRESS;
 }
 
+void BLEController::connect(uint8_t *address, bool random) {
+	this->controllerState = CONNECT;
+	this->setFilter(address[0], address[1], address[2], address[3], address[4], address[5]);
+	this->setHardwareConfiguration(0x8e89bed6,0x555555);
+}
+
 void BLEController::setAccessAddressDiscoveryConfiguration(uint8_t preamble) {
 	uint8_t two_bytes_preamble[] = {preamble, 0x00};
   this->radio->setPreamble(two_bytes_preamble, 2);
@@ -1592,7 +1598,7 @@ void BLEController::advertisementPacketProcessing(BLEPacket *pkt) {
 	// If the packet doesn't match the filter, drop it
 	if (!pkt->checkAdvertiserAddress(this->filter)) return;
 
-	if (this->controllerState == SNIFFING_ADVERTISEMENTS) {
+	if (this->controllerState == SNIFFING_ADVERTISEMENTS || this->controllerState == CONNECT) {
 		this->advertisementSniffingProcessing(pkt);
 	}
 
