@@ -730,6 +730,41 @@ void BLEController::connect(uint8_t *address, bool random) {
 	this->setFilter(address[0], address[1], address[2], address[3], address[4], address[5]);
 	this->responderRandom = random;
 	this->setHardwareConfiguration(0x8e89bed6,0x555555);
+	//this->radio->enableFilter(this->filter);
+	uint8_t *packet;
+	size_t size;
+	uint8_t chM[5] = {
+		(uint8_t)0xff,
+		(uint8_t)0xff,
+		(uint8_t)0xff,
+		(uint8_t)0xff,
+		(uint8_t)0x1f
+	};
+
+	BLEPacket::forgeConnectionRequest(
+			&packet,
+			&size,
+			this->own.bytes,
+			this->ownRandom,
+			this->filter.bytes,
+			this->responderRandom,
+			0xaf9a9394,
+			0xac1369,
+			3, // window size
+			9, // window offset
+			54, // hop interval
+			0,
+			42,
+			chM,
+			5,
+			8
+	);
+	this->radio->setFastRampUpTime(false);
+	this->radio->setInterFrameSpacing(145);
+	this->radio->enableAutoTXafterRX();
+	this->radio->updateTXBuffer(packet,size);
+
+	this->radio->reload();
 }
 
 void BLEController::setAccessAddressDiscoveryConfiguration(uint8_t preamble) {
@@ -966,6 +1001,75 @@ void BLEController::followConnection(uint16_t hopInterval, uint8_t hopIncrement,
 	this->slaveSCA = 20;
 	this->sendConnectionReport(CONNECTION_STARTED);
 }
+
+void BLEController::startConnection(uint16_t hopInterval, uint8_t hopIncrement, uint8_t *channelMap,uint32_t accessAddress,uint32_t crcInit,  int masterSCA,uint16_t latency, uint16_t windowOffset) {
+	// We update the parameters needed to start the connection
+	this->updateHopInterval(hopInterval);
+	this->updateHopIncrement(hopIncrement);
+	this->updateChannelsInUse(channelMap);
+
+	this->controllerState = SIMULATING_MASTER;
+
+	this->latency = latency;
+
+	this->packetCount = 0;
+	this->connectionEventCount = 0;
+
+	// Reset attack status
+	this->attackStatus.attack = BLE_ATTACK_NONE;
+	this->attackStatus.running = false;
+	this->attackStatus.injecting = false;
+	this->attackStatus.successful = false;
+
+	// Initially, we are not synchronized
+	this->sync = false;
+
+	// This counter indicates if we have lost the connection
+	this->desyncCounter = 0;
+
+
+	// We calculate the first channel
+	this->lastUnmappedChannel = 0;
+	this->channel = 0; //this->nextChannel();
+
+	// No connection update is expected
+	this->clearConnectionUpdate();
+	// Radio configuration
+	this->radio->setFastRampUpTime(true);
+	this->radio->setInterFrameSpacing(0);
+	this->radio->disableAutoTXafterRX();
+
+	this->setHardwareConfiguration(accessAddress, crcInit);
+
+	/*
+	// Timers configuration
+	if (this->connectionTimer == NULL) {
+		this->connectionTimer = this->timerModule->getTimer();
+		this->connectionTimer->setMode(REPEATED);
+		this->connectionTimer->setCallback((ControllerCallback)&BLEController::goToNextChannel, this);
+		this->connectionTimer->update(this->hopInterval * 1250UL - 250);
+	}
+	if (this->masterTimer == NULL) {
+		this->masterTimer = TimerModule::instance->getTimer();
+		this->masterTimer->setMode(REPEATED);
+		this->masterTimer->setCallback((ControllerCallback)&BLEController::masterRoleCallback, this);
+	}
+	*/
+	this->setEmptyTransmitIndicator(true);
+	this->masterSCA = masterSCA;
+	this->slaveSCA = 20;
+	nrf_delay_us(windowOffset*1250);
+
+	uint8_t data1[2];
+	data1[0] = (0x01 & 0xF3) | (this->simulatedMasterSequenceNumbers.nesn  << 2) | (this->simulatedMasterSequenceNumbers.sn << 3);
+	data1[1] = 0x00;
+	this->radio->send(data1,2,BLEController::channelToFrequency(this->channel),this->channel);
+	nrf_delay_us(8*10);
+
+	//this->setAnchorPoint(this->timerModule->getTimestamp());
+	//this->sendConnectionReport(CONNECTION_STARTED);
+}
+
 
 void BLEController::prepareInjectionToMaster() {
 	this->controllerState = INJECTING_TO_MASTER;
@@ -1346,31 +1450,8 @@ void BLEController::advertisementSniffingProcessing(BLEPacket *pkt) {
 	// Release all timers
 	this->releaseTimers();
 
-	// Check the indicators and the packet type to decide if the packet must be transmitted to host
-	if (!this->follow || this->advertisementsTransmitIndicator || pkt->extractAdvertisementType() == CONNECT_REQ) {
-		// Update the packet direction
-		pkt->updateSource(DIRECTION_UNKNOWN);
-		// Transmit the packet to host
-		this->addPacket(pkt);
-	}
 
-	// We receive a CONNECT_REQ and the follow mode is enabled...
-	if (pkt->extractAdvertisementType() == CONNECT_REQ && this->follow) {
-		// Start following the connection
-		this->followConnection(
-			pkt->extractHopInterval(),
-			pkt->extractHopIncrement(),
-			pkt->extractChannelMap(),
-			pkt->extractAccessAddress(),
-			pkt->extractCrcInit(),
-			pkt->extractSCA(),
-			pkt->extractLatency()
-		);
-	}
-
-	if (this->controllerState == CONNECT && pkt->extractAdvertisementType() == ADV_IND) {
-		uint8_t *packet;
-		size_t size;
+	if (this->controllerState == CONNECT) {
 		uint8_t chM[5] = {
 			(uint8_t)0xff,
 			(uint8_t)0xff,
@@ -1378,25 +1459,37 @@ void BLEController::advertisementSniffingProcessing(BLEPacket *pkt) {
 			(uint8_t)0xff,
 			(uint8_t)0x1f
 		};
-		BLEPacket::forgeConnectionRequest(
-				&packet,
-				&size,
-				this->own.bytes,
-				this->ownRandom,
-				this->filter.bytes,
-				this->responderRandom,
-				0xaf9a9394,
-				0xac1369,
-				3,
-				9,
-				54,
-				0,
-				42,
-				chM,
-				5,
-				8
-	  );
-		this->radio->send(packet,size,BLEController::channelToFrequency(this->channel),this->channel);
+		// Update the packet direction
+		pkt->updateSource(DIRECTION_UNKNOWN);
+		// Transmit the packet to host
+		this->addPacket(pkt);
+
+		//this->radio->send(packet,size,BLEController::channelToFrequency(this->channel),this->channel);
+		//this->startConnection(54, 8, chM, 0xaf9a9394, 0xac1369,5,0, 9);
+	}
+	else {
+
+		// Check the indicators and the packet type to decide if the packet must be transmitted to host
+		if (!this->follow || this->advertisementsTransmitIndicator || pkt->extractAdvertisementType() == CONNECT_REQ) {
+			// Update the packet direction
+			pkt->updateSource(DIRECTION_UNKNOWN);
+			// Transmit the packet to host
+			this->addPacket(pkt);
+		}
+
+		// We receive a CONNECT_REQ and the follow mode is enabled...
+		if (pkt->extractAdvertisementType() == CONNECT_REQ && this->follow) {
+			// Start following the connection
+			this->followConnection(
+				pkt->extractHopInterval(),
+				pkt->extractHopIncrement(),
+				pkt->extractChannelMap(),
+				pkt->extractAccessAddress(),
+				pkt->extractCrcInit(),
+				pkt->extractSCA(),
+				pkt->extractLatency()
+			);
+		}
 	}
 }
 

@@ -214,7 +214,7 @@ class BLEController : public Controller {
 
 		BLEAddress filter;
 		bool responderRandom;
-		
+
 		// Discovery related data
 		ActiveConnectionRecovery activeConnectionRecovery;
 
@@ -307,6 +307,9 @@ class BLEController : public Controller {
 		void setAdvertisementsTransmitIndicator(bool advertisementsTransmitIndicator);
 		void setEmptyTransmitIndicator(bool emptyTransmitIndicator);
 		void setFilter(uint8_t a,uint8_t b,uint8_t c,uint8_t d,uint8_t e,uint8_t f);
+
+		void startConnection(uint16_t hopInterval, uint8_t hopIncrement, uint8_t *channelMap,uint32_t accessAddress,uint32_t crcInit,  int masterSCA,uint16_t latency, uint16_t windowOffset);
+
 
 		// Attack related methods
 		void setAttackPayload(uint8_t *payload, size_t size);

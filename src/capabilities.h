@@ -22,6 +22,7 @@ const DeviceCapability CAPABILITIES[] = {
       CMD(ble_BleCommand_SniffAdv) |
       CMD(ble_BleCommand_SniffConnReq) |
       CMD(ble_BleCommand_SniffActiveConn) |
+      CMD(ble_BleCommand_SetBdAddress) |
       CMD(ble_BleCommand_Start) |
       CMD(ble_BleCommand_Stop) |
       CMD(ble_BleCommand_SendRawPDU) |
