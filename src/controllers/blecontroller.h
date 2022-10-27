@@ -213,9 +213,14 @@ class BLEController : public Controller {
 		int collectedIntervals;
 
 		BLEAddress filter;
-
+		bool responderRandom;
+		
 		// Discovery related data
 		ActiveConnectionRecovery activeConnectionRecovery;
+
+		BLEAddress own;
+		bool ownRandom;
+
 	public:
 		static int channelToFrequency(int channel);
 
@@ -223,6 +228,7 @@ class BLEController : public Controller {
 		void start();
 		void stop();
 
+		void setOwnAddress(uint8_t *address, bool random);
 		void sniff();
 
 		void connect(uint8_t *address, bool random);

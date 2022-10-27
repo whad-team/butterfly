@@ -18,6 +18,18 @@ BLEController::BLEController(Radio *radio) : Controller(radio) {
 	this->masterTimer = NULL;
 	this->discoveryTimer = NULL;
 	this->advertisementsTransmitIndicator = true;
+	this->own.bytes[0] = 0x11;
+	this->own.bytes[1] = 0x22;
+	this->own.bytes[2] = 0x33;
+	this->own.bytes[3] = 0x44;
+	this->own.bytes[4] = 0x55;
+	this->own.bytes[5] = 0x66;
+	this->ownRandom = true;
+}
+
+void BLEController::setOwnAddress(uint8_t *address, bool random) {
+	memcpy(this->own.bytes, address, 6);
+	this->ownRandom = random;
 }
 
 /*void BLEController::matchPattern(uint8_t pattern, size_t size) {
@@ -716,6 +728,7 @@ void BLEController::sniffAccessAddresses() {
 void BLEController::connect(uint8_t *address, bool random) {
 	this->controllerState = CONNECT;
 	this->setFilter(address[0], address[1], address[2], address[3], address[4], address[5]);
+	this->responderRandom = random;
 	this->setHardwareConfiguration(0x8e89bed6,0x555555);
 }
 
@@ -1353,6 +1366,37 @@ void BLEController::advertisementSniffingProcessing(BLEPacket *pkt) {
 			pkt->extractSCA(),
 			pkt->extractLatency()
 		);
+	}
+
+	if (this->controllerState == CONNECT && pkt->extractAdvertisementType() == ADV_IND) {
+		uint8_t *packet;
+		size_t size;
+		uint8_t chM[5] = {
+			(uint8_t)0xff,
+			(uint8_t)0xff,
+			(uint8_t)0xff,
+			(uint8_t)0xff,
+			(uint8_t)0x1f
+		};
+		BLEPacket::forgeConnectionRequest(
+				&packet,
+				&size,
+				this->own.bytes,
+				this->ownRandom,
+				this->filter.bytes,
+				this->responderRandom,
+				0xaf9a9394,
+				0xac1369,
+				3,
+				9,
+				54,
+				0,
+				42,
+				chM,
+				5,
+				8
+	  );
+		this->radio->send(packet,size,BLEController::channelToFrequency(this->channel),this->channel);
 	}
 }
 

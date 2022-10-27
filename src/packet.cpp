@@ -100,6 +100,44 @@ bool BLEPacket::needResponse(uint8_t *payload, size_t size) {
 	return false;
 }
 
+void BLEPacket::forgeConnectionRequest(uint8_t **payload,size_t *size, uint8_t *initiator, bool initiatorRandom,  uint8_t *responder, bool responderRandom, uint32_t accessAddress,  uint32_t crcInit, uint8_t windowSize, uint16_t windowOffset, uint16_t hopInterval, uint16_t slaveLatency, uint16_t timeout, uint8_t *channelMap, uint8_t sca, uint8_t hopIncrement) {
+	bool selectAlgorithm2 = false;
+
+	*size=36;
+	*payload = (uint8_t *)malloc(sizeof(uint8_t)*(*size));
+	// Header
+
+	// RxAdd | TxAdd | ChSel | PDU_type = 5
+	(*payload)[0] = 0x05 | (int(selectAlgorithm2) << 5) | (int(initiatorRandom) << 6) | (int(responderRandom) << 7);
+	// Length
+	(*payload)[1] = 34;
+
+	memcpy(&((*payload)[2]), initiator, 6);
+	memcpy(&((*payload)[8]), responder, 6);
+	(*payload)[14] = (accessAddress & 0xFF000000) >> 24;
+	(*payload)[15] = (accessAddress & 0x00FF0000) >> 16;
+	(*payload)[16] = (accessAddress & 0x0000FF00) >> 8;
+	(*payload)[17] = (accessAddress & 0x000000FF);
+	(*payload)[18] = (crcInit & 0x00FF0000) >> 16;
+	(*payload)[19] = (crcInit & 0x0000FF00) >> 8;
+	(*payload)[20] = (crcInit & 0x000000FF);
+	(*payload)[21] = windowSize;
+	(*payload)[22] = (windowOffset & 0xFF00) >> 8;
+	(*payload)[23] = (windowOffset & 0x00FF);
+	(*payload)[24] = (hopInterval & 0xFF00) >> 8;
+	(*payload)[25] = (hopInterval & 0x00FF);
+	(*payload)[26] = (slaveLatency & 0xFF00) >> 8;
+	(*payload)[27] = (slaveLatency & 0x00FF);
+	(*payload)[28] = (timeout & 0xFF00) >> 8;
+	(*payload)[29] = (timeout & 0x00FF);
+	(*payload)[30] = channelMap[0];
+	(*payload)[31] = channelMap[1];
+	(*payload)[32] = channelMap[2];
+	(*payload)[33] = channelMap[3];
+	(*payload)[34] = channelMap[4];
+	(*payload)[35] = ((sca & 0x7) << 5) | (hopInterval & 0x1f);
+}
+
 void BLEPacket::forgeTerminateInd(uint8_t **payload,size_t *size, uint8_t code) {
 	*size=4;
 	*payload = (uint8_t *)malloc(sizeof(uint8_t)*(*size));

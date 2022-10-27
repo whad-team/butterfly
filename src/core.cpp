@@ -224,7 +224,14 @@ void Core::processBLEInputMessage(ble_Message msg) {
     this->selectController(BLE_PROTOCOL);
   }
 
-  if (msg.which_msg == ble_Message_sniff_adv_tag) {
+  if (msg.which_msg == ble_Message_set_bd_addr_tag) {
+    this->bleController->setOwnAddress(
+      msg.msg.set_bd_addr.bd_address,
+      msg.msg.set_bd_addr.addr_type == ble_BleAddrType_RANDOM
+    );
+    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+  }
+  else if (msg.which_msg == ble_Message_sniff_adv_tag) {
 
     // bool enableExtended = msg.msg.sniff_adv.use_extended_adv;
 
