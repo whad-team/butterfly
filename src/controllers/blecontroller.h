@@ -153,6 +153,7 @@ class BLEController : public Controller {
 		Timer* injectionTimer;
 		Timer* masterTimer;
 		Timer* discoveryTimer;
+		Timer* initTimer;
 
 		uint32_t lastAnchorPoint;
 		bool emptyTransmitIndicator;
@@ -308,7 +309,7 @@ class BLEController : public Controller {
 		void setEmptyTransmitIndicator(bool emptyTransmitIndicator);
 		void setFilter(uint8_t a,uint8_t b,uint8_t c,uint8_t d,uint8_t e,uint8_t f);
 
-		void startConnection(uint16_t hopInterval, uint8_t hopIncrement, uint8_t *channelMap,uint32_t accessAddress,uint32_t crcInit,  int masterSCA,uint16_t latency, uint16_t windowOffset);
+		void startConnection(uint32_t timestamp, uint16_t hopInterval, uint8_t hopIncrement, uint8_t *channelMap,uint32_t accessAddress,uint32_t crcInit,  int masterSCA,uint16_t latency, uint16_t windowOffset);
 
 
 		// Attack related methods
@@ -351,6 +352,8 @@ class BLEController : public Controller {
 		bool goToNextChannel();
 		bool inject();
 		bool connectionLost();
+
+		bool sendFirstPacket();
 
 		void releaseTimers();
 

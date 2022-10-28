@@ -114,12 +114,12 @@ void BLEPacket::forgeConnectionRequest(uint8_t **payload,size_t *size, uint8_t *
 
 	memcpy(&((*payload)[2]), initiator, 6);
 	//memcpy(&((*payload)[8]), responder, 6);
-	(*payload)[8] = responder[0];
-	(*payload)[9] = responder[1];
-	(*payload)[10] = responder[2];
-	(*payload)[11] = responder[3];
-	(*payload)[12] = responder[4];
-	(*payload)[13] = responder[5];
+	(*payload)[8] = responder[5];
+	(*payload)[9] = responder[4];
+	(*payload)[10] = responder[3];
+	(*payload)[11] = responder[2];
+	(*payload)[12] = responder[1];
+	(*payload)[13] = responder[0];
 	(*payload)[17] = (accessAddress & 0xFF000000) >> 24;
 	(*payload)[16] = (accessAddress & 0x00FF0000) >> 16;
 	(*payload)[15] = (accessAddress & 0x0000FF00) >> 8;

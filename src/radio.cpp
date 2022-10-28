@@ -937,7 +937,7 @@ bool Radio::enable() {
 				(uint32_t)(this->filter.bytes[5]));
 				NRF_RADIO->DAP[0] = (uint32_t)(this->filter.bytes[0] << 8) | (uint32_t)(this->filter.bytes[1]);
 				NRF_RADIO->DACNF = 1;
-				NRF_RADIO->INTENSET = 0x00000008 | 1 << 5;
+				NRF_RADIO->INTENSET = 0x00000008 | 1 << 6;
 			}
 			else {
 				NRF_RADIO->DACNF = 0;
@@ -1046,6 +1046,14 @@ bool Radio::send(uint8_t *data,int size,int frequency, uint8_t channel) {
 static uint8_t jamBuffer[] = {0x00,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
 extern "C" void RADIO_IRQHandler(void) {
 
+	if (Radio::instance->isFilterEnabled()) {
+		NRF_RADIO->INTENSET = 0x00000008 | 1 << 6;
+		if (NRF_RADIO->EVENTS_DEVMISS == 1) {
+			NRF_RADIO->EVENTS_DEVMISS = 0;
+			Radio::instance->reload();
+			return;
+		}
+	}
 	if (NRF_RADIO->EVENTS_READY) {
 		NRF_RADIO->EVENTS_READY = 0;
 		NRF_RADIO->TASKS_START = 1;
@@ -1078,11 +1086,10 @@ extern "C" void RADIO_IRQHandler(void) {
 		NRF_RADIO->TASKS_EDSTART = 1;
 
 	}
-	if (NRF_RADIO->EVENTS_END && (Radio::instance->isFilterEnabled() ? NRF_RADIO->EVENTS_DEVMATCH : 1)) {
+	if (NRF_RADIO->EVENTS_END/* && (Radio::instance->isFilterEnabled() ? NRF_RADIO->EVENTS_DEVMATCH : 1)*/) {
 		NRF_RADIO->EVENTS_END = 0;
 
 		//NRF_RADIO->TASKS_BCSTART = 1;
-		if (Radio::instance->isFilterEnabled()) NRF_RADIO->EVENTS_DEVMATCH = 0;
 		NRF_TIMER4->TASKS_CAPTURE[5] = 1UL;
 		uint32_t now = NRF_TIMER4->CC[5];
 
