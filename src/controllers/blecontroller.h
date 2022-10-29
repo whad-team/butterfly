@@ -145,6 +145,11 @@ typedef struct ReactiveJammingPattern {
 	int position;
 } ReactiveJammingPattern;
 
+typedef struct InterFrameValues {
+	uint32_t values[5];
+	uint8_t index;
+} InterFrameValues;
+
 class BLEController : public Controller {
 	protected:
 		TimerModule *timerModule;
@@ -155,6 +160,9 @@ class BLEController : public Controller {
 		Timer* discoveryTimer;
 		Timer* initTimer;
 
+		uint32_t connectionStep;
+
+		
 		uint32_t lastAnchorPoint;
 		bool emptyTransmitIndicator;
 		bool advertisementsTransmitIndicator;
@@ -222,6 +230,7 @@ class BLEController : public Controller {
 		BLEAddress own;
 		bool ownRandom;
 
+		InterFrameValues interFrameValues;
 	public:
 		static int channelToFrequency(int channel);
 

@@ -208,7 +208,6 @@ BLEPacket::BLEPacket(uint32_t accessAddress,uint8_t *packetBuffer, size_t packet
 	this->packetPointer[4+packetSize+2] = bytewise_bit_swap(crcValue.value & 0x0000FF);
 }
 
-
 int BLEPacket::getConnectionHandle() {
 	return this->connectionHandle;
 }
