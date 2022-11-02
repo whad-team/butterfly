@@ -99,10 +99,28 @@ bool BLEPacket::needResponse(uint8_t *payload, size_t size) {
 	}
 	return false;
 }
+void BLEPacket::forgeScanRequest(uint8_t **payload,size_t *size, uint8_t *initiator, bool initiatorRandom,  uint8_t *responder, bool responderRandom) {
+	*size=14;
+	*payload = (uint8_t *)malloc(sizeof(uint8_t)*(*size));
+	// Header
+
+	// RxAdd | TxAdd | ChSel | PDU_type = 3
+	(*payload)[0] = 0x03 | ((0) << 5) | ((initiatorRandom) << 6) | ((responderRandom) << 7);
+	// Length
+	(*payload)[1] = 12;
+
+	memcpy(&((*payload)[2]), initiator, 6);
+	//memcpy(&((*payload)[8]), responder, 6);
+	(*payload)[8] = responder[5];
+	(*payload)[9] = responder[4];
+	(*payload)[10] = responder[3];
+	(*payload)[11] = responder[2];
+	(*payload)[12] = responder[1];
+	(*payload)[13] = responder[0];
+}
 
 void BLEPacket::forgeConnectionRequest(uint8_t **payload,size_t *size, uint8_t *initiator, bool initiatorRandom,  uint8_t *responder, bool responderRandom, uint32_t accessAddress,  uint32_t crcInit, uint8_t windowSize, uint16_t windowOffset, uint16_t hopInterval, uint16_t slaveLatency, uint16_t timeout, uint8_t sca, uint8_t hopIncrement, uint8_t *channelMap) {
 	bool selectAlgorithm2 = false;
-	// TODO: faire une implem de scan actif et s'en servir pour comprendre à quel niveau ca merde
 	*size=36;
 	*payload = (uint8_t *)malloc(sizeof(uint8_t)*(*size));
 	// Header

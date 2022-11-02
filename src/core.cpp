@@ -359,7 +359,7 @@ void Core::processBLEInputMessage(ble_Message msg) {
         response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
   }
   else if (msg.which_msg == ble_Message_central_mode_tag) {
-      if (this->bleController->getState() == CONNECT || this->bleController->getState() == SIMULATING_MASTER || this->bleController->getState() == PERFORMING_MITM) {
+      if (this->bleController->getState() == CONNECTION_INITIATION || this->bleController->getState() == SIMULATING_MASTER || this->bleController->getState() == PERFORMING_MITM) {
         response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
       }
       else {
