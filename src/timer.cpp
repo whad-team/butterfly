@@ -1,4 +1,5 @@
 #include "timer.h"
+#include "bsp.h"
 
 TimerModule *TimerModule::instance = NULL;
 
@@ -36,8 +37,12 @@ TimerModule::TimerModule() {
 	NVIC_SetPriority(TIMER4_IRQn, 1);
 
 	NRF_TIMER3->TASKS_CLEAR = 1;
-
 	NRF_TIMER4->TASKS_CLEAR = 1;
+
+	//NRF_TIMER3->CC[0] = 1000000;
+	NRF_TIMER3->INTENSET = (1 << 16);
+
+	//NRF_TIMER3->TASKS_START = 1;
 	NRF_TIMER4->TASKS_START = 1;
 
   for (int i=0;i<NUMBER_OF_TIMERS;i++) {
@@ -188,18 +193,19 @@ HardwareControlledTimer::HardwareControlledTimer() {
 void HardwareControlledTimer::enable(volatile void* event) {
 		NVIC_DisableIRQ(TIMER3_IRQn);
 		NRF_TIMER3->CC[0] = this->duration;
-		NRF_TIMER3->INTENSET |= (1 << 16);
+		NRF_TIMER3->INTENSET = (1 << 16);
 
-	  NRF_PPI->CH[0].EEP = (uint32_t)&(event);
+	  NRF_PPI->CH[0].EEP = (uint32_t)event;
 	  NRF_PPI->CH[0].TEP = (uint32_t)&(NRF_TIMER3->TASKS_START);
 
-		NRF_PPI->CH[1].EEP = (uint32_t)&(event);
+		NRF_PPI->CH[1].EEP = (uint32_t)event;
 		NRF_PPI->CH[1].TEP = (uint32_t)&(NRF_TIMER3->TASKS_CLEAR);
 
 	  NRF_PPI->CHEN = 3;
 		NVIC_ClearPendingIRQ(TIMER3_IRQn);
 		NVIC_EnableIRQ(TIMER3_IRQn);
 }
+
 void HardwareControlledTimer::disable() {
 	NRF_TIMER3->TASKS_STOP = 1;
 	NRF_TIMER3->TASKS_CLEAR = 1;

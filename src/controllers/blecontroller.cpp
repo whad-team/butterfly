@@ -1371,7 +1371,7 @@ void BLEController::connect(uint8_t *address, bool random) {
 			this->responderRandom, // bool responderRandom
 			0xaf9a9394, //uint32_t accessAddress
 			0xac1369, // uint32_t crcInit
-			10, // uint8_t windowSize
+			30, // uint8_t windowSize
 			5, // uint16_t windowOffset
 			54, // uint16_t hopInterval
 			0, // uint16_t slaveLatency
@@ -1383,8 +1383,8 @@ void BLEController::connect(uint8_t *address, bool random) {
 
 	HardwareControlledTimer* timer = TimerModule::instance->getHardwareControlledTimer();
 	timer->setCallback((ControllerCallback)&BLEController::sendFirstConnectionPacket, this);
-	timer->setDuration(43*8 + 1250 +1250*6);
-	timer->enable(&(NRF_RADIO->TASKS_TXEN));
+	timer->setDuration(150 + 43*8 + 1250 + 15*1250);
+	timer->enable(&(NRF_RADIO->EVENTS_END));
 
 	this->radio->updateTXBuffer(payload, payload_size);
 
@@ -1410,6 +1410,11 @@ void BLEController::initializeConnection(uint16_t hopInterval, uint8_t hopIncrem
 	this->updateChannelsInUse(channelMap);
 
 	this->controllerState = SNIFFING_CONNECTION;
+
+	this->emptyTransmitIndicator = true;
+	this->radio->disableFilter();
+	this->radio->disableAutoTXafterRX();
+	this->radio->setFastRampUpTime(true);
 
 	this->latency = latency;
 
@@ -1462,7 +1467,7 @@ bool BLEController::sendFirstConnectionPacket() {
 	data1[0] = (0x01 & 0xF3) | (0  << 2) | (0 << 3);
 	data1[1] = 0x00;
 	this->radio->send(data1,2,BLEController::channelToFrequency(this->channel),this->channel);
-	nrf_delay_us(10*8);
+	//nrf_delay_us(10*8);
 	return true;
 }
 
@@ -1472,10 +1477,12 @@ void BLEController::connectionInitiationProcessing(BLEPacket *pkt) {
 	if (pkt->extractAdvertisementType() == ADV_IND) {
 		this->addPacket(pkt);
 
+		/*
 		uint8_t *payload;
 		size_t payload_size;
 
 		uint8_t chM[] = {0xFF, 0xFF, 0xFF, 0xFF, 0x1F};
+
 		BLEPacket::forgeConnectionRequest(
 				&payload,//uint8_t **payload
 				&payload_size, //size_t *size
@@ -1500,6 +1507,7 @@ void BLEController::connectionInitiationProcessing(BLEPacket *pkt) {
 		this->radio->setFastRampUpTime(false);
 		this->radio->setInterFrameSpacing(145);
 		this->radio->enableAutoTXafterRX();
+		*/
 	}
 }
 
@@ -1919,6 +1927,9 @@ void BLEController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer,
 			}
 		}
 		else {
+			if (this->controllerState == CONNECTION_INITIATION) {
+				this->addPacket(pkt);
+			}
 			// If the packet is a connection packet, call onConnectionPacket
 			this->connectionPacketProcessing(pkt);
 		}
