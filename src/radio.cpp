@@ -1097,6 +1097,7 @@ extern "C" void RADIO_IRQHandler(void) {
 		if (controller != NULL) {
 			if (Radio::instance->getMode() == MODE_NORMAL) {
 				if (Radio::instance->getState() == TX) {
+
 					//LedManager::instance->toggle(LED1);
 					NRF_RADIO->PACKETPTR = (uint32_t)Radio::instance->rxBuffer;
 					Radio::instance->setState(RX);
