@@ -386,6 +386,8 @@ bool BLEController::connectionLost() {
 bool BLEController::goToNextChannel() {
 
 	if (this->controllerState != SNIFFING_ADVERTISEMENTS) {
+		bsp_board_led_invert(0);
+
 		// If we have not observed at least one packet, increase desyncCounter by one, otherwise resets this counter
 		this->desyncCounter = (this->packetCount == 0 ? this->desyncCounter + 1 : 0);
 		// If the desyncCounter is greater than three, the connection is considered lost
@@ -418,7 +420,6 @@ bool BLEController::goToNextChannel() {
 
 }
 void BLEController::start() {
-	if (this->controllerState == CONNECTION_INITIATION) return;
 	this->remappingTable = NULL;
 	this->lastAdvertisingChannel = 37;
 	this->follow = true;
@@ -1112,6 +1113,7 @@ bool BLEController::masterRoleCallback(BLEPacket *pkt) {
 		data1[0] = (0x01 & 0xF3) | (this->simulatedMasterSequenceNumbers.nesn  << 2) | (this->simulatedMasterSequenceNumbers.sn << 3);
 		data1[1] = 0x00;
 		this->radio->send(data1,2,BLEController::channelToFrequency(this->channel),this->channel);
+		nrf_delay_us(80);
 	}
 
 	return true;
@@ -1361,7 +1363,7 @@ void BLEController::connect(uint8_t *address, bool random) {
 
 	HardwareControlledTimer* timer = TimerModule::instance->getHardwareControlledTimer();
 	timer->setCallback((ControllerCallback)&BLEController::sendFirstConnectionPacket, this);
-	timer->setDuration(150 + 43*8 + 1250 + 6*1250);
+	timer->setDuration(150 + 43*8 + 1250 + 10*1250);
 	timer->enable(&(NRF_RADIO->EVENTS_CRCOK));
 
 	this->radio->setFastRampUpTime(false);
@@ -1415,13 +1417,31 @@ void BLEController::initializeConnection(uint16_t hopInterval, uint8_t hopIncrem
 	this->lastUnmappedChannel = 0;
 	this->channel = this->nextChannel();
 
+	this->masterPayload.transmitted = true;
+
+
+	this->clearConnectionUpdate();
 
 	// Timers configuration
 	if (this->connectionTimer == NULL) {
 		this->connectionTimer = this->timerModule->getTimer();
 		this->connectionTimer->setMode(REPEATED);
 		this->connectionTimer->setCallback((ControllerCallback)&BLEController::goToNextChannel, this);
+		this->connectionTimer->update(this->hopInterval * 1250UL - 250);
+		//this->connectionTimer->start();
 	}
+	if (this->masterTimer == NULL) {
+
+		this->masterTimer = TimerModule::instance->getTimer();
+		this->masterTimer->setMode(REPEATED);
+		this->masterTimer->setCallback((ControllerCallback)&BLEController::masterRoleCallback, this);
+		this->masterTimer->update(this->hopInterval * 1250UL);
+		//this->masterTimer->start();
+	}
+
+	this->sync = true;
+	this->controllerState = SIMULATING_MASTER;
+	this->setAnchorPoint(TimerModule::instance->getTimestamp());
 
 	// Radio configuration
 	this->setHardwareConfiguration(accessAddress, crcInit);
@@ -1436,8 +1456,8 @@ bool BLEController::sendFirstConnectionPacket() {
 	uint8_t chM[] = {0xFF, 0xFF, 0xFF, 0xFF, 0x1F};
 
 	this->initializeConnection(
-		54,
-		8,
+		39,
+		2,
 		chM,
 		0xaf9a9394,
 		0xac1369,
@@ -1445,9 +1465,9 @@ bool BLEController::sendFirstConnectionPacket() {
 		0
 	);
 	TimerModule::instance->hardwareTimer->release();
-	this->lastMasterTimestamp = TimerModule::instance->getTimestamp() - 350;
+
 	uint8_t data1[2];
-	data1[0] = (0x01 & 0xF3) | (0  << 2) | (0 << 3);
+	data1[0] = (0x01 & 0xF3) | (this->simulatedMasterSequenceNumbers.nesn  << 2) | (this->simulatedMasterSequenceNumbers.sn << 3);
 	data1[1] = 0x00;
 	this->radio->send(data1,2,BLEController::channelToFrequency(this->channel),this->channel);
 	//nrf_delay_us(10*8);
@@ -1475,11 +1495,11 @@ void BLEController::connectionInitiationProcessing(BLEPacket *pkt) {
 					0xac1369, // uint32_t crcInit
 					30, // uint8_t windowSize
 					5, // uint16_t windowOffset
-					54, // uint16_t hopInterval
+					39, // uint16_t hopInterval
 					0, // uint16_t slaveLatency
 					42, // uint16_t timeout
 					5,
-					8,
+					2,
 					chM // uint8_t *channelMap
 			);
 		this->radio->updateTXBuffer(payload, payload_size);
@@ -1904,20 +1924,13 @@ void BLEController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer,
 			}
 		}
 		else {
-			if (this->controllerState == CONNECTION_INITIATION) {
+			/*if (this->controllerState == CONNECTION_INITIATION) {
 				bsp_board_led_invert(1);
-				this->sync = true;
-				this->controllerState = SIMULATING_MASTER;
-				this->masterTimer = TimerModule::instance->getTimer();
-				this->masterTimer->setMode(REPEATED);
-				this->masterTimer->setCallback((ControllerCallback)&BLEController::masterRoleCallback, this);
-				this->setAnchorPoint(timestamp - 230);
-
 			}
-			else {
+			else {*/
 				// If the packet is a connection packet, call onConnectionPacket
 				this->connectionPacketProcessing(pkt);
-			}
+			//}
 		}
 
 		// Delete the packet object if it is not NULL
