@@ -21,7 +21,21 @@ TimerModule::TimerModule() {
 		| TIMER_INTENCLR_COMPARE4_Msk
 		| TIMER_INTENCLR_COMPARE5_Msk;
 
+		NRF_TIMER3->MODE = TIMER_MODE_MODE_Timer;
+		NRF_TIMER3->BITMODE = TIMER_BITMODE_BITMODE_32Bit;
+		NRF_TIMER3->PRESCALER = TIMER_PRESCALER;
+
+		NRF_TIMER3->INTENCLR = TIMER_INTENCLR_COMPARE0_Msk
+			| TIMER_INTENCLR_COMPARE1_Msk
+			| TIMER_INTENCLR_COMPARE2_Msk
+			| TIMER_INTENCLR_COMPARE3_Msk
+			| TIMER_INTENCLR_COMPARE4_Msk
+			| TIMER_INTENCLR_COMPARE5_Msk;
+
+	NVIC_SetPriority(TIMER3_IRQn, 1);
 	NVIC_SetPriority(TIMER4_IRQn, 1);
+
+	NRF_TIMER3->TASKS_CLEAR = 1;
 
 	NRF_TIMER4->TASKS_CLEAR = 1;
 	NRF_TIMER4->TASKS_START = 1;
@@ -29,6 +43,8 @@ TimerModule::TimerModule() {
   for (int i=0;i<NUMBER_OF_TIMERS;i++) {
     this->timers[i] = new Timer(i);
   }
+
+	this->hardwareTimer = new HardwareControlledTimer();
 }
 
 uint32_t TimerModule::getTimestamp() {
@@ -59,6 +75,16 @@ void TimerModule::releaseTimer(Timer* timer) {
         break;
       }
     }
+}
+
+HardwareControlledTimer* TimerModule::getHardwareControlledTimer() {
+	if (this->hardwareTimer->isUsed()) {
+		return NULL;
+	}
+	else {
+		this->hardwareTimer->setUsed(true);
+		return this->hardwareTimer;
+	}
 }
 
 Timer::Timer(int id) {
@@ -152,7 +178,82 @@ TimerMode Timer::getMode() {
 int Timer::getDuration() {
   return this->duration;
 }
+HardwareControlledTimer::HardwareControlledTimer() {
+	this->callback = NULL;
+  this->controller = NULL;
+  this->duration = 1000000;
+  this->used = false;
+}
 
+void HardwareControlledTimer::enable(volatile void* event) {
+		NVIC_DisableIRQ(TIMER3_IRQn);
+		NRF_TIMER3->CC[0] = this->duration;
+		NRF_TIMER3->INTENSET |= (1 << 16);
+
+	  NRF_PPI->CH[0].EEP = (uint32_t)&(event);
+	  NRF_PPI->CH[0].TEP = (uint32_t)&(NRF_TIMER3->TASKS_START);
+
+		NRF_PPI->CH[1].EEP = (uint32_t)&(event);
+		NRF_PPI->CH[1].TEP = (uint32_t)&(NRF_TIMER3->TASKS_CLEAR);
+
+	  NRF_PPI->CHEN = 3;
+		NVIC_ClearPendingIRQ(TIMER3_IRQn);
+		NVIC_EnableIRQ(TIMER3_IRQn);
+}
+void HardwareControlledTimer::disable() {
+	NRF_TIMER3->TASKS_STOP = 1;
+	NRF_TIMER3->TASKS_CLEAR = 1;
+
+	NRF_PPI->CH[0].EEP = 0;
+	NRF_PPI->CH[0].TEP = 0;
+
+	NRF_PPI->CH[1].EEP = 0;
+	NRF_PPI->CH[1].TEP = 0;
+
+	NRF_PPI->CHEN = 0;
+}
+
+void HardwareControlledTimer::setCallback(ControllerCallback callback, Controller* controller) {
+  this->callback = callback;
+  this->controller = controller;
+}
+
+bool HardwareControlledTimer::isUsed() {
+	return this->used;
+}
+
+ControllerCallback HardwareControlledTimer::getCallback() {
+	return this->callback;
+}
+Controller* HardwareControlledTimer::getController() {
+	return this->controller;
+}
+
+int HardwareControlledTimer::getDuration() {
+	return this->duration;
+}
+void HardwareControlledTimer::setDuration(int duration) {
+	this->duration = duration;
+}
+
+void HardwareControlledTimer::setUsed(bool used) {
+	this->used = used;
+}
+
+void HardwareControlledTimer::release() {
+	// disable PPI
+	this->disable();
+	this->used = false;
+}
+
+extern "C" void TIMER3_IRQHandler(void) {
+	if (NRF_TIMER3->EVENTS_COMPARE[0]) {
+		NRF_TIMER3->EVENTS_COMPARE[0] = 0UL;
+		HardwareControlledTimer* timer = TimerModule::instance->hardwareTimer;
+		(timer->getController() ->* timer->getCallback())();
+		NRF_TIMER3->CC[0] = 0;
+	}
+}
 extern "C" void TIMER4_IRQHandler(void) {
 
   for (int i=0;i<NUMBER_OF_TIMERS;i++) {

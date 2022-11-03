@@ -1360,7 +1360,7 @@ void BLEController::connect(uint8_t *address, bool random) {
 
 	size_t payload_size;
 	uint8_t *payload;
-	/*
+
 	uint8_t chM[] = {0xFF, 0xFF, 0xFF, 0xFF, 0x1F};
 	BLEPacket::forgeConnectionRequest(
 			&payload,//uint8_t **payload
@@ -1380,15 +1380,11 @@ void BLEController::connect(uint8_t *address, bool random) {
 			8,
 			chM // uint8_t *channelMap
 	);
-	*/
-	BLEPacket::forgeScanRequest(
-			&payload,//uint8_t **payload
-			&payload_size, //size_t *size
-			this->own.bytes, // uint8_t *initiator
-			this->ownRandom, // bool initiatorRandom
-			this->filter.bytes, // uint8_t *responder
-			this->responderRandom // bool responderRandom
-	);
+
+	HardwareControlledTimer* timer = TimerModule::instance->getHardwareControlledTimer();
+	timer->setCallback((ControllerCallback)&BLEController::sendFirstConnectionPacket, this);
+	timer->setDuration(43*8 + 1250 +1250*6);
+	timer->enable(&(NRF_RADIO->TASKS_TXEN));
 
 	this->radio->updateTXBuffer(payload, payload_size);
 
@@ -1472,26 +1468,39 @@ bool BLEController::sendFirstConnectionPacket() {
 
 
 void BLEController::connectionInitiationProcessing(BLEPacket *pkt) {
-	/*
+
 	if (pkt->extractAdvertisementType() == ADV_IND) {
-		// Timers configuration
-		if (this->initTimer == NULL) {
-			this->initTimer = this->timerModule->getTimer();
-			this->initTimer->setMode(SINGLE_SHOT);
-			this->initTimer->setCallback((ControllerCallback)&BLEController::sendFirstConnectionPacket, this);
-			this->initTimer->update((pkt->extractPayloadLength()+4+3)*8 + 150 + 43*8 + 1250 + 1250 * 15, pkt->getTimestamp());
+		this->addPacket(pkt);
 
-			this->radio->setFastRampUpTime(false);
-			this->radio->setInterFrameSpacing(145);
-			this->radio->enableAutoTXafterRX();
-			this->radio->reload();
+		uint8_t *payload;
+		size_t payload_size;
 
-		}
-		else {
-			if (!this->initTimer->isStarted()) this->initTimer->start();
-		}
-	}*/
-	this->addPacket(pkt);
+		uint8_t chM[] = {0xFF, 0xFF, 0xFF, 0xFF, 0x1F};
+		BLEPacket::forgeConnectionRequest(
+				&payload,//uint8_t **payload
+				&payload_size, //size_t *size
+				this->own.bytes, // uint8_t *initiator
+				this->ownRandom, // bool initiatorRandom
+				this->filter.bytes, // uint8_t *responder
+				this->responderRandom, // bool responderRandom
+				0xaf9a9394, //uint32_t accessAddress
+				0xac1369, // uint32_t crcInit
+				10, // uint8_t windowSize
+				5, // uint16_t windowOffset
+				54, // uint16_t hopInterval
+				0, // uint16_t slaveLatency
+				42, // uint16_t timeout
+				5,
+				8,
+				chM // uint8_t *channelMap
+		);
+
+		this->radio->updateTXBuffer(payload, payload_size);
+
+		this->radio->setFastRampUpTime(false);
+		this->radio->setInterFrameSpacing(145);
+		this->radio->enableAutoTXafterRX();
+	}
 }
 
 void BLEController::advertisementSniffingProcessing(BLEPacket *pkt) {

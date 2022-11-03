@@ -43,14 +43,42 @@ class Timer {
     void release();
 };
 
+class HardwareControlledTimer {
+  private:
+    int duration;
+    Controller *controller;
+    ControllerCallback callback;
+    bool used;
+
+  public:
+    HardwareControlledTimer();
+
+    void enable(volatile void* event);
+    void disable();
+
+    bool isUsed();
+    ControllerCallback getCallback();
+    Controller* getController();
+    int getDuration();
+
+    void setCallback(ControllerCallback callback, Controller* controller);
+    void setDuration(int duration);
+
+    void setUsed(bool used);
+    void release();
+};
+
 class TimerModule {
 	public:
     Timer* timers[5];
+    HardwareControlledTimer* hardwareTimer;
+
 		static TimerModule *instance;
 
     TimerModule();
     uint32_t getTimestamp();
     Timer* getTimer();
+    HardwareControlledTimer* getHardwareControlledTimer();
     void releaseTimer(Timer* timer);
 };
 #endif
