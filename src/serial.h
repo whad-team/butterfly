@@ -43,10 +43,11 @@ typedef struct rxUartState {
 typedef struct txUartState {
   size_t size;
   bool waiting;
+  bool done;
 } txUartState;
 
 class SerialComm {
-  private:
+public:
     CoreCallback inputCallback;
 		Core *coreInstance;
 
@@ -55,7 +56,6 @@ class SerialComm {
     uint8_t rxBuffer[RX_BUFFER_SIZE];
     uint8_t txBuffer[TX_BUFFER_SIZE];
 
-  public:
     uint8_t currentByte;
 		static SerialComm *instance;
 
@@ -66,7 +66,7 @@ class SerialComm {
 		SerialComm(CoreCallback inputCallback,Core *coreInstance);
 
     void readInputByte(uint8_t byte);
-    void send(uint8_t *buffer, size_t size);
+    bool send(uint8_t *buffer, size_t size);
 		void init();
 		void process();
 

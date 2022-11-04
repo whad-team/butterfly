@@ -248,6 +248,7 @@ class BLEController : public Controller {
 		void sendConnectionReport(ConnectionStatus status);
 		void sendAccessAddressReport(uint32_t accessAddress, uint32_t timestamp, int32_t rssi);
 		void sendExistingConnectionReport(uint32_t accessAddress, uint32_t crcInit, uint8_t *channelMap, uint16_t hopInterval, uint8_t hopIncrement);
+		void sendConnectedReport();
 
 		void setMonitoredChannels(uint8_t *channels);
 
@@ -359,7 +360,7 @@ class BLEController : public Controller {
 
 		bool sendFirstConnectionPacket();
 		void initializeConnection(uint16_t hopInterval, uint8_t hopIncrement, uint8_t *channelMap,uint32_t accessAddress,uint32_t crcInit,  int masterSCA,uint16_t latency);
-		
+
 		// Packets processing methods
 		void accessAddressProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi);
 		void crcInitRecoveryProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi);

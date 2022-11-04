@@ -301,6 +301,16 @@ Message* Whad::buildBLEHijackedMessage(bool success, uint32_t accessAddress) {
   return msg;
 }
 
+Message* Whad::buildBLEConnectedMessage(uint8_t *initiator, uint8_t *advertiser, uint32_t accessAddress) {
+  Message* msg = Whad::buildMessage();
+  msg->which_msg = Message_ble_tag;
+  msg->msg.ble.which_msg = ble_Message_connected_tag;
+  memcpy(msg->msg.ble.msg.connected.initiator, initiator, 6);
+  memcpy(msg->msg.ble.msg.connected.advertiser, advertiser, 6);
+
+  msg->msg.ble.msg.connected.access_address = accessAddress;
+  return msg;
+}
 
 Message* Whad::buildBLEAccessAddressDiscoveredMessage(uint32_t accessAddress, uint32_t timestamp, int32_t rssi) {
   Message* msg = Whad::buildMessage();

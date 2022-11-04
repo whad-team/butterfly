@@ -1034,10 +1034,10 @@ bool Radio::send(uint8_t *data,int size,int frequency, uint8_t channel) {
 	NRF_RADIO->INTENSET =  0x00000008;
 
 	NVIC_EnableIRQ(RADIO_IRQn);
+
 	NRF_RADIO->EVENTS_READY = 0;
 	NRF_RADIO->EVENTS_END = 0;
 	NRF_RADIO->TASKS_TXEN = 1;
-
 
 	return false;
 }
@@ -1133,6 +1133,7 @@ extern "C" void RADIO_IRQHandler(void) {
 						Phy p = Radio::instance->getPhy();
 
 						Radio::instance->currentTimestamp = now - (Radio::instance->getPreamble().size+bufferSize)  * 4 * (p == BLE_2MBITS || p == ESB_2MBITS ? 1 : 2) - 100;
+
 						controller->onReceive(Radio::instance->currentTimestamp,bufferSize,buffer,crcValue, rssi);
 
 						free(buffer);

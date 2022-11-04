@@ -877,11 +877,12 @@ Message* Core::popMessageFromQueue() {
 	}
 }
 
-void Core::sendMessage(Message *msg) {
+bool Core::sendMessage(Message *msg) {
   uint8_t buffer[1024];
   size_t size = Whad::encodeMessage(msg, buffer, 1024);
-	this->serialModule->send(buffer,size);
-	free(msg);
+	bool success = this->serialModule->send(buffer,size);
+  if (success) free(msg);
+  return success;
 }
 
 void Core::sendVerbose(const char* data) {
@@ -890,12 +891,18 @@ void Core::sendVerbose(const char* data) {
 }
 
 void Core::loop() {
+  Message *msg = this->popMessageFromQueue();
 	while (true) {
 		this->serialModule->process();
-    Message *msg = this->popMessageFromQueue();
-    while (msg != NULL) {
-    	this->sendMessage(msg);
-    	msg = this->popMessageFromQueue();
+
+
+    if (msg != NULL) {
+    	if (this->sendMessage(msg)) {
+        msg = this->popMessageFromQueue();
+      }
+    }
+    else {
+      msg = this->popMessageFromQueue();
     }
 		// Even if we miss an event enabling USB, USB event would wake us up.
 		__WFE();
