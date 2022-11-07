@@ -419,6 +419,8 @@ bool BLEController::goToNextChannel() {
 
 }
 void BLEController::start() {
+	if (this->controllerState == CONNECTION_INITIATION) return;
+
 	this->remappingTable = NULL;
 	this->lastAdvertisingChannel = 37;
 	this->follow = true;
@@ -1427,14 +1429,14 @@ void BLEController::initializeConnection(uint16_t hopInterval, uint8_t hopIncrem
 
 
 	this->clearConnectionUpdate();
-	/*
+
 	// Timers configuration
 	if (this->connectionTimer == NULL) {
 		this->connectionTimer = this->timerModule->getTimer();
 		this->connectionTimer->setMode(REPEATED);
 		this->connectionTimer->setCallback((ControllerCallback)&BLEController::goToNextChannel, this);
 		this->connectionTimer->update(this->hopInterval * 1250UL - 250);
-		//this->connectionTimer->start();
+		this->connectionTimer->start();
 	}
 	if (this->masterTimer == NULL) {
 
@@ -1442,13 +1444,12 @@ void BLEController::initializeConnection(uint16_t hopInterval, uint8_t hopIncrem
 		this->masterTimer->setMode(REPEATED);
 		this->masterTimer->setCallback((ControllerCallback)&BLEController::masterRoleCallback, this);
 		this->masterTimer->update(this->hopInterval * 1250UL);
-		//this->masterTimer->start();
+		this->masterTimer->start();
 	}
 
-	this->sync = true;*/
+	this->sync = false;
 	this->controllerState = CONNECTION_INITIATION;
-	//this->setAnchorPoint(TimerModule::instance->getTimestamp());
-
+	this->setAnchorPoint(TimerModule::instance->getTimestamp());
 	// Radio configuration
 	this->setHardwareConfiguration(accessAddress, crcInit);
 
@@ -1475,7 +1476,7 @@ bool BLEController::sendFirstConnectionPacket() {
 	data1[0] = (0x01 & 0xF3) | (this->simulatedMasterSequenceNumbers.nesn  << 2) | (this->simulatedMasterSequenceNumbers.sn << 3);
 	data1[1] = 0x00;
 	this->radio->send(data1,2,BLEController::channelToFrequency(this->channel),this->channel);
-
+	TimerModule::instance->hardwareTimer->disable();
 	return false;
 }
 
@@ -1483,7 +1484,7 @@ bool BLEController::sendFirstConnectionPacket() {
 void BLEController::connectionInitiationProcessing(BLEPacket *pkt) {
 
 	if (pkt->extractAdvertisementType() == ADV_IND) {
-		//this->addPacket(pkt);
+		this->addPacket(pkt);
 
 			size_t payload_size;
 			uint8_t *payload;
@@ -1932,7 +1933,14 @@ void BLEController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer,
 		}
 		else {
 			// If the packet is a connection packet, call onConnectionPacket
-			this->connectionPacketProcessing(pkt);
+			if (this->controllerState == CONNECTION_INITIATION) {
+				this->addPacket(pkt);
+				bsp_board_led_invert(0);
+				bsp_board_led_invert(1);
+			}
+			else  {
+				this->connectionPacketProcessing(pkt);
+			}
 		}
 
 		// Delete the packet object if it is not NULL

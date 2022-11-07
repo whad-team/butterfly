@@ -22,27 +22,27 @@ TimerModule::TimerModule() {
 		| TIMER_INTENCLR_COMPARE4_Msk
 		| TIMER_INTENCLR_COMPARE5_Msk;
 
-		NRF_TIMER2->MODE = TIMER_MODE_MODE_Timer;
-		NRF_TIMER2->BITMODE = TIMER_BITMODE_BITMODE_32Bit;
-		NRF_TIMER2->PRESCALER = TIMER_PRESCALER;
+		NRF_TIMER3->MODE = TIMER_MODE_MODE_Timer;
+		NRF_TIMER3->BITMODE = TIMER_BITMODE_BITMODE_32Bit;
+		NRF_TIMER3->PRESCALER = TIMER_PRESCALER;
 
-		NRF_TIMER2->INTENCLR = TIMER_INTENCLR_COMPARE0_Msk
+		NRF_TIMER3->INTENCLR = TIMER_INTENCLR_COMPARE0_Msk
 			| TIMER_INTENCLR_COMPARE1_Msk
 			| TIMER_INTENCLR_COMPARE2_Msk
 			| TIMER_INTENCLR_COMPARE3_Msk
 			| TIMER_INTENCLR_COMPARE4_Msk
 			| TIMER_INTENCLR_COMPARE5_Msk;
 
-	NVIC_SetPriority(TIMER2_IRQn, 1);
+	NVIC_SetPriority(TIMER3_IRQn, 1);
 	NVIC_SetPriority(TIMER4_IRQn, 1);
 
-	NRF_TIMER2->TASKS_CLEAR = 1;
+	NRF_TIMER3->TASKS_CLEAR = 1;
 	NRF_TIMER4->TASKS_CLEAR = 1;
 
-	//NRF_TIMER2->CC[0] = 1000000;
-	NRF_TIMER2->INTENSET = (1 << 16);
+	//NRF_TIMER3->CC[0] = 1000000;
+	NRF_TIMER3->INTENSET = (1 << 16);
 
-	//NRF_TIMER2->TASKS_START = 1;
+	//NRF_TIMER3->TASKS_START = 1;
 	NRF_TIMER4->TASKS_START = 1;
 
   for (int i=0;i<NUMBER_OF_TIMERS;i++) {
@@ -191,24 +191,26 @@ HardwareControlledTimer::HardwareControlledTimer() {
 }
 
 void HardwareControlledTimer::enable(volatile void* event) {
-		NVIC_DisableIRQ(TIMER2_IRQn);
-		NRF_TIMER2->CC[0] = this->duration;
-		NRF_TIMER2->INTENSET = (1 << 16);
+		NVIC_DisableIRQ(TIMER3_IRQn);
+		NRF_TIMER3->CC[0] = this->duration;
+		NRF_TIMER3->INTENSET = (1 << 16);
 
 	  NRF_PPI->CH[0].EEP = (uint32_t)event;
-	  NRF_PPI->CH[0].TEP = (uint32_t)&(NRF_TIMER2->TASKS_START);
+	  NRF_PPI->CH[0].TEP = (uint32_t)&(NRF_TIMER3->TASKS_START);
 
 		NRF_PPI->CH[1].EEP = (uint32_t)event;
-		NRF_PPI->CH[1].TEP = (uint32_t)&(NRF_TIMER2->TASKS_CLEAR);
+		NRF_PPI->CH[1].TEP = (uint32_t)&(NRF_TIMER3->TASKS_CLEAR);
 
 	  NRF_PPI->CHEN = 3;
-		//NVIC_ClearPendingIRQ(TIMER2_IRQn);
-		NVIC_EnableIRQ(TIMER2_IRQn);
+		NVIC_ClearPendingIRQ(TIMER3_IRQn);
+		NVIC_EnableIRQ(TIMER3_IRQn);
 }
 
 void HardwareControlledTimer::disable() {
-	NRF_TIMER2->TASKS_STOP = 1;
-	//NRF_TIMER2->TASKS_CLEAR = 1;
+	NVIC_DisableIRQ(TIMER3_IRQn);
+
+	NRF_TIMER3->TASKS_STOP = 1;
+	NRF_TIMER3->TASKS_CLEAR = 1;
 
 	NRF_PPI->CH[0].EEP = 0;
 	NRF_PPI->CH[0].TEP = 0;
@@ -217,6 +219,9 @@ void HardwareControlledTimer::disable() {
 	NRF_PPI->CH[1].TEP = 0;
 
 	NRF_PPI->CHEN = 0;
+	NVIC_ClearPendingIRQ(TIMER3_IRQn);
+	NVIC_EnableIRQ(TIMER3_IRQn);
+
 }
 
 void HardwareControlledTimer::setCallback(ControllerCallback callback, Controller* controller) {
@@ -252,13 +257,12 @@ void HardwareControlledTimer::release() {
 	this->used = false;
 }
 
-extern "C" void TIMER2_IRQHandler(void) {
-	if (NRF_TIMER2->EVENTS_COMPARE[0]) {
-		NRF_TIMER2->EVENTS_COMPARE[0] = 0UL;
+extern "C" void TIMER3_IRQHandler(void) {
+	if (NRF_TIMER3->EVENTS_COMPARE[0]) {
+		NRF_TIMER3->EVENTS_COMPARE[0] = 0UL;
 		HardwareControlledTimer* timer = TimerModule::instance->hardwareTimer;
 		(timer->getController() ->* timer->getCallback())();
-		NRF_TIMER2->CC[0] = 0;
-		NRF_TIMER2->INTENCLR |= (1 << 16);
+		NRF_TIMER3->CC[0] = 0;
 	}
 }
 extern "C" void TIMER4_IRQHandler(void) {
