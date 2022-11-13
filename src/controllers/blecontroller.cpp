@@ -17,15 +17,12 @@ BLEController::BLEController(Radio *radio) : Controller(radio) {
 	this->injectionTimer = NULL;
 	this->masterTimer = NULL;
 	this->discoveryTimer = NULL;
-	this->initTimer = NULL;
 	this->advertisementsTransmitIndicator = true;
-	this->own.bytes[0] = 0x11;
-	this->own.bytes[1] = 0x22;
-	this->own.bytes[2] = 0x33;
-	this->own.bytes[3] = 0x44;
-	this->own.bytes[4] = 0x55;
-	this->own.bytes[5] = 0x66;
-	this->ownRandom = true;
+	this->softwareFilterEnabled = false;
+
+	// Configure arbitrary BD address for now
+	uint8_t oaddr[] = {0x11,	0x22, 0x33, 0x44,	0x55, 0x66};
+	this->setOwnAddress(oaddr, 6);
 }
 
 void BLEController::setOwnAddress(uint8_t *address, bool random) {
@@ -356,6 +353,8 @@ void BLEController::setMasterPayload(uint8_t *payload, size_t size) {
 
 bool BLEController::connectionLost() {
 	// Stop the timers
+
+
 	if (this->injectionTimer != NULL) {
 		this->injectionTimer->stop();
 		this->injectionTimer->release();
@@ -386,11 +385,12 @@ bool BLEController::connectionLost() {
 bool BLEController::goToNextChannel() {
 
 	if (this->controllerState != SNIFFING_ADVERTISEMENTS) {
-
 		// If we have not observed at least one packet, increase desyncCounter by one, otherwise resets this counter
 		this->desyncCounter = (this->packetCount == 0 ? this->desyncCounter + 1 : 0);
 		// If the desyncCounter is greater than three, the connection is considered lost
 		if (this->desyncCounter > 5 && !this->attackStatus.running) {
+			bsp_board_led_invert(0);
+			bsp_board_led_invert(1);
 			return this->connectionLost();
 		}
 		// If we are still following the connection
@@ -419,13 +419,12 @@ bool BLEController::goToNextChannel() {
 
 }
 void BLEController::start() {
-	if (this->controllerState == CONNECTION_INITIATION) return;
-
 	this->remappingTable = NULL;
 	this->lastAdvertisingChannel = 37;
 	this->follow = true;
 
 	if (this->controllerState == SNIFFING_ADVERTISEMENTS) {
+
 		this->setHardwareConfiguration(0x8e89bed6,0x555555);
 	}
 	else if (this->controllerState == SNIFFING_ACCESS_ADDRESS) {
@@ -881,7 +880,7 @@ void BLEController::setHardwareConfiguration(uint32_t accessAddress, uint32_t cr
 
 void BLEController::followAdvertisingDevice(uint8_t a,uint8_t b,uint8_t c,uint8_t d,uint8_t e,uint8_t f) {
 	this->controllerState = COLLECTING_ADVINTERVAL;
-	this->setFilter(a,b,c,d,e,f);
+	this->setFilter(true, a,b,c,d,e,f);
 	this->collectedIntervals = 0;
 	this->setChannel(37);
 }
@@ -899,13 +898,33 @@ void BLEController::calculateAdvertisingIntervals() {
 	this->controllerState = SNIFFING_ADVERTISEMENTS;
 	this->collectedIntervals = 0;
 }
-void BLEController::setFilter(uint8_t a,uint8_t b,uint8_t c,uint8_t d,uint8_t e,uint8_t f) {
+void BLEController::setFilter(bool hardwareFilter, uint8_t a,uint8_t b,uint8_t c,uint8_t d,uint8_t e,uint8_t f) {
 	this->filter.bytes[0] = a;
 	this->filter.bytes[1] = b;
 	this->filter.bytes[2] = c;
 	this->filter.bytes[3] = d;
 	this->filter.bytes[4] = e;
 	this->filter.bytes[5] = f;
+
+	if (hardwareFilter) {
+		this->softwareFilterEnabled = false;
+		if (a == 0xFF && b == 0xFF && c == 0xFF && d == 0xFF && e == 0xFF && f == 0xFF) {
+			//this->radio->disable();
+			this->radio->disableFilter();
+			this->radio->reload();
+		}
+		else {
+
+			//this->radio->disable();
+			this->radio->enableFilter(this->filter);
+			this->radio->reload();
+		}
+	}
+	else {
+		this->softwareFilterEnabled = true;
+		this->radio->disableFilter();
+		this->radio->reload();
+	}
 }
 
 void BLEController::followConnection(uint16_t hopInterval, uint8_t hopIncrement, uint8_t *channelMap,uint32_t accessAddress,uint32_t crcInit,  int masterSCA,uint16_t latency) {
@@ -960,7 +979,6 @@ void BLEController::followConnection(uint16_t hopInterval, uint8_t hopIncrement,
 	this->slaveSCA = 20;
 	this->sendConnectionReport(CONNECTION_STARTED);
 }
-
 
 void BLEController::prepareInjectionToMaster() {
 	this->controllerState = INJECTING_TO_MASTER;
@@ -1113,8 +1131,7 @@ bool BLEController::masterRoleCallback(BLEPacket *pkt) {
 		uint8_t data1[2];
 		data1[0] = (0x01 & 0xF3) | (this->simulatedMasterSequenceNumbers.nesn  << 2) | (this->simulatedMasterSequenceNumbers.sn << 3);
 		data1[1] = 0x00;
-		this->radio->send(data1,2,BLEController::channelToFrequency(this->channel),this->channel);
-		nrf_delay_us(80);
+		this->radio->send(data1,10,BLEController::channelToFrequency(this->channel),this->channel);
 	}
 
 	return true;
@@ -1296,11 +1313,6 @@ void BLEController::sendExistingConnectionReport(uint32_t accessAddress, uint32_
 	Core::instance->pushMessageToQueue(msg);
 }
 
-void BLEController::sendConnectedReport() {
-	Message *msg = Whad::buildBLEConnectedMessage(this->own.bytes, this->filter.bytes, this->accessAddress);
-	Core::instance->pushMessageToQueue(msg);
-}
-
 void BLEController::sendConnectionReport(ConnectionStatus status) {
 	if (status == CONNECTION_STARTED) {
 			Message* msg = Whad::buildBLESynchronizedMessage(this->accessAddress, this->crcInit, this->hopInterval, this->hopIncrement, this->channelMap);
@@ -1348,197 +1360,88 @@ void BLEController::releaseTimers() {
 	}
 }
 
-
 void BLEController::connect(uint8_t *address, bool random) {
+	uint8_t channelMap[5] = {
+		0xFF,
+		0xFF,
+		0xFF,
+		0xFF,
+		0x1F
+	};
+	this->connect(address, random, 0x23a3d487, 0x049095, 3,9,56,0,42,1,9,channelMap);
+
+}
+void BLEController::connect(uint8_t *address, bool random,  uint32_t accessAddress,  uint32_t crcInit, uint8_t windowSize, uint16_t windowOffset, uint16_t hopInterval, uint16_t slaveLatency, uint16_t timeout, uint8_t sca, uint8_t hopIncrement, uint8_t *channelMap) {
+	// Configure connection parameters according to provided arguments
+	memcpy(this->connectionInitiationData.responder.bytes, address, 6);
+	this->connectionInitiationData.responderRandom = random;
+	this->connectionInitiationData.accessAddress = accessAddress;
+	this->connectionInitiationData.crcInit = crcInit;
+	this->connectionInitiationData.windowSize = windowSize;
+	this->connectionInitiationData.windowOffset = windowOffset;
+	this->connectionInitiationData.hopInterval = hopInterval;
+	this->connectionInitiationData.slaveLatency = slaveLatency;
+	this->connectionInitiationData.timeout = timeout;
+	this->connectionInitiationData.sca = sca;
+	this->connectionInitiationData.hopIncrement = hopIncrement;
+	memcpy(this->connectionInitiationData.channelMap, channelMap, 5);
+
 	// Enter Connection Initiation mode
 	this->controllerState = CONNECTION_INITIATION;
 
 	// Configure Hardware to monitor advertisements
 	this->setHardwareConfiguration(0x8e89bed6,0x555555);
 
-
-	// Configure radio to monitor only advertisements from targeted device
-	this->setFilter(address[0], address[1], address[2], address[3], address[4], address[5]);
-	this->responderRandom = random;
-	this->radio->enableFilter(this->filter);
-
-	// Configure arbitrary BD address for now
-	uint8_t oaddr[] = {0x11,	0x11, 0x11, 0x11,	0x11, 0x11};
-	this->setOwnAddress(oaddr, 6);
-
-	// Configure Hardware to monitor advertisements
-	this->setHardwareConfiguration(0x8e89bed6,0x555555);
-
-	HardwareControlledTimer* timer = TimerModule::instance->getHardwareControlledTimer();
-	timer->setCallback((ControllerCallback)&BLEController::sendFirstConnectionPacket, this);
-	timer->setDuration(150 + 43*8 + 1250 + 9*1250);
-	timer->enable(&(NRF_RADIO->EVENTS_CRCOK));
+	// Configure radio to monitor only advertisements from targeted device (hardware filter needed)
+	this->setFilter(true, address[0], address[1], address[2], address[3], address[4], address[5]);
 
 	this->radio->setFastRampUpTime(false);
 	this->radio->setInterFrameSpacing(145);
 	this->radio->enableAutoTXafterRX();
 
-	// Reload Radio configuration (to take into account hardware filter)
+	// Reload Radio configuration (to take into account radio custom parameters)
 	this->radio->reload();
-
-
-	/*
-	TODO:
-	- harmonize configuration of addresses (initiator and responder)
-	- add a parameter to setFilter to configure software or hardware filter
-	*/
 }
 
-void BLEController::initializeConnection(uint16_t hopInterval, uint8_t hopIncrement, uint8_t *channelMap,uint32_t accessAddress,uint32_t crcInit,  int masterSCA,uint16_t latency) {
-	// We update the parameters needed to follow the connection
-	this->updateHopInterval(hopInterval);
-	this->updateHopIncrement(hopIncrement);
-	this->updateChannelsInUse(channelMap);
-
-	this->controllerState = CONNECTION_INITIATION;
-
-	this->emptyTransmitIndicator = true;
-
-	this->radio->disableFilter();
-	this->radio->disableAutoTXafterRX();
-	this->radio->setFastRampUpTime(true);
-
-	this->latency = latency;
-
-	this->packetCount = 0;
-	this->connectionEventCount = 0;
-
-	// Reset attack status
-	this->attackStatus.attack = BLE_ATTACK_NONE;
-	this->attackStatus.running = false;
-	this->attackStatus.injecting = false;
-	this->attackStatus.successful = false;
-
-	// Initially, we are not synchronized
-	this->sync = false;
-
-	// This counter indicates if we have lost the connection
-	this->desyncCounter = 0;
-
-
-	// We calculate the first channel
-	this->lastUnmappedChannel = 0;
-	this->channel = this->nextChannel();
-
-	this->masterPayload.transmitted = true;
-
-
-	this->clearConnectionUpdate();
-
-	// Timers configuration
-	if (this->connectionTimer == NULL) {
-		this->connectionTimer = this->timerModule->getTimer();
-		this->connectionTimer->setMode(REPEATED);
-		this->connectionTimer->setCallback((ControllerCallback)&BLEController::goToNextChannel, this);
-		this->connectionTimer->update(this->hopInterval * 1250UL - 250);
-		this->connectionTimer->start();
-	}
-	if (this->masterTimer == NULL) {
-
-		this->masterTimer = TimerModule::instance->getTimer();
-		this->masterTimer->setMode(REPEATED);
-		this->masterTimer->setCallback((ControllerCallback)&BLEController::masterRoleCallback, this);
-		this->masterTimer->update(this->hopInterval * 1250UL);
-		this->masterTimer->start();
-	}
-
-	this->sync = false;
-	this->controllerState = CONNECTION_INITIATION;
-	this->setAnchorPoint(TimerModule::instance->getTimestamp());
-	// Radio configuration
-	this->setHardwareConfiguration(accessAddress, crcInit);
-
-	this->masterSCA = masterSCA;
-	this->slaveSCA = 20;
-
-}
-
-bool BLEController::sendFirstConnectionPacket() {
-	uint8_t chM[] = {0xFF, 0xFF, 0xFF, 0xFF, 0x1F};
-
-	this->initializeConnection(
-		56,
-		9,
-		chM,
-		0x23a3d487,
-		0x049095,
-		1,
-		0
-	);
-	this->simulatedMasterSequenceNumbers.nesn = 0;
-	this->simulatedMasterSequenceNumbers.sn = 0;
-	uint8_t data1[2];
-	data1[0] = (0x01 & 0xF3) | (this->simulatedMasterSequenceNumbers.nesn  << 2) | (this->simulatedMasterSequenceNumbers.sn << 3);
-	data1[1] = 0x00;
-	this->radio->send(data1,2,BLEController::channelToFrequency(this->channel),this->channel);
-	TimerModule::instance->hardwareTimer->disable();
-	return false;
-}
-
-
-void BLEController::connectionInitiationProcessing(BLEPacket *pkt) {
-
+void BLEController::connectionInitiationAdvertisementProcessing(BLEPacket *pkt) {
 	if (pkt->extractAdvertisementType() == ADV_IND) {
-		this->addPacket(pkt);
-
-			size_t payload_size;
-			uint8_t *payload;
-
-			uint8_t chM[] = {0xFF, 0xFF, 0xFF, 0xFF, 0x1F};
-			BLEPacket::forgeConnectionRequest(
-					&payload,//uint8_t **payload
-					&payload_size, //size_t *size
-					this->own.bytes, // uint8_t *initiator
-					this->ownRandom, // bool initiatorRandom
-					this->filter.bytes, // uint8_t *responder
-					this->responderRandom, // bool responderRandom
-					0x23a3d487, //uint32_t accessAddress
-					0x049095, // uint32_t crcInit
-					3, // uint8_t windowSize
-					9, // uint16_t windowOffset
-					56, // uint16_t hopInterval
-					0, // uint16_t slaveLatency
-					42, // uint16_t timeout
-					1,
-					9,
-					chM // uint8_t *channelMap
-			);
-		this->radio->updateTXBuffer(payload, payload_size);
-
 
 	}
+}
+
+void BLEController::connectionInitiationConnectedProcessing(BLEPacket *pkt) {
+
 }
 
 void BLEController::advertisementSniffingProcessing(BLEPacket *pkt) {
 	// Release all timers
 	this->releaseTimers();
 
-	// Check the indicators and the packet type to decide if the packet must be transmitted to host
-	if (!this->follow || this->advertisementsTransmitIndicator || pkt->extractAdvertisementType() == CONNECT_REQ) {
-		// Update the packet direction
-		pkt->updateSource(DIRECTION_UNKNOWN);
-		// Transmit the packet to host
-		this->addPacket(pkt);
+	if (this->controllerState == CONNECTION_INITIATION) {
+		this->connectionInitiationAdvertisementProcessing(pkt);
 	}
+	else {
+			// Check the indicators and the packet type to decide if the packet must be transmitted to host
+		if (!this->follow || this->advertisementsTransmitIndicator || pkt->extractAdvertisementType() == CONNECT_REQ) {
+			// Update the packet direction
+			pkt->updateSource(DIRECTION_UNKNOWN);
+			// Transmit the packet to host
+			this->addPacket(pkt);
+		}
 
-	// We receive a CONNECT_REQ and the follow mode is enabled...
-	if (pkt->extractAdvertisementType() == CONNECT_REQ && this->follow) {
-
-		// Start following the connection
-		this->followConnection(
-			pkt->extractHopInterval(),
-			pkt->extractHopIncrement(),
-			pkt->extractChannelMap(),
-			pkt->extractAccessAddress(),
-			pkt->extractCrcInit(),
-			pkt->extractSCA(),
-			pkt->extractLatency()
-		);
+		// We receive a CONNECT_REQ and the follow mode is enabled...
+		if (pkt->extractAdvertisementType() == CONNECT_REQ && this->follow) {
+			// Start following the connection
+			this->followConnection(
+				pkt->extractHopInterval(),
+				pkt->extractHopIncrement(),
+				pkt->extractChannelMap(),
+				pkt->extractAccessAddress(),
+				pkt->extractCrcInit(),
+				pkt->extractSCA(),
+				pkt->extractLatency()
+			);
+		}
 	}
 }
 
@@ -1732,7 +1635,7 @@ void BLEController::roleSimulationProcessing(BLEPacket* pkt) {
 		this->masterSimulationControlFlowProcessing(pkt);
 	}
 	// If we are simulating a master
-	else if (this->controllerState == SIMULATING_MASTER || this->controllerState == CONNECTION_INITIATION)  {
+	else if (this->controllerState == SIMULATING_MASTER) {
 		this->slavePacketProcessing(pkt);
 
 		// Calculate our last transmitted packet size
@@ -1755,26 +1658,29 @@ void BLEController::connectionPacketProcessing(BLEPacket *pkt) {
 	// Increment the packet counter
 	this->packetCount++;
 
-	// Process packets related to connection management (requiring a fast processing)
-	this->connectionManagementProcessing(pkt);
-
-	// Process packets to manage sniffer synchronization
-	this->connectionSynchronizationProcessing(pkt);
-
-	// If we are in an attack synchronization, run the corresponding processing
-	if (this->controllerState == SYNCHRONIZING_MITM || this->controllerState == SYNCHRONIZING_MASTER || this->controllerState == INJECTING_TO_MASTER) {
-		this->attackSynchronizationProcessing(pkt);
+	if (this->controllerState == CONNECTION_INITIATION) {
+		this->connectionInitiationConnectedProcessing(pkt);
 	}
-	// If we are in a role simulation, run the corresponding processing
-	else if (
-		this->controllerState == SIMULATING_MASTER ||
-		this->controllerState == SIMULATING_SLAVE ||
-		this->controllerState == PERFORMING_MITM ||
-		this->controllerState == CONNECTION_INITIATION
-	) {
-		this->roleSimulationProcessing(pkt);
-	}
+	else {
+		// Process packets related to connection management (requiring a fast processing)
+		this->connectionManagementProcessing(pkt);
 
+		// Process packets to manage sniffer synchronization
+		this->connectionSynchronizationProcessing(pkt);
+
+		// If we are in an attack synchronization, run the corresponding processing
+		if (this->controllerState == SYNCHRONIZING_MITM || this->controllerState == SYNCHRONIZING_MASTER || this->controllerState == INJECTING_TO_MASTER) {
+			this->attackSynchronizationProcessing(pkt);
+		}
+		// If we are in a role simulation, run the corresponding processing
+		else if (
+			this->controllerState == SIMULATING_MASTER ||
+			this->controllerState == SIMULATING_SLAVE ||
+			this->controllerState == PERFORMING_MITM
+		) {
+			this->roleSimulationProcessing(pkt);
+		}
+	}
 	// Decide if the packet must be transmitted to host
 	if (pkt->extractPayloadLength() > 2 || this->emptyTransmitIndicator) {
 		this->addPacket(pkt);
@@ -1783,7 +1689,7 @@ void BLEController::connectionPacketProcessing(BLEPacket *pkt) {
 
 void BLEController::advertisementPacketProcessing(BLEPacket *pkt) {
 	// If the packet doesn't match the filter, drop it
-	if (!pkt->checkAdvertiserAddress(this->filter)) return;
+	if (this->softwareFilterEnabled && !pkt->checkAdvertiserAddress(this->filter)) return;
 
 	if (this->controllerState == SNIFFING_ADVERTISEMENTS) {
 		this->advertisementSniffingProcessing(pkt);
@@ -1917,30 +1823,14 @@ void BLEController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer,
 		this->hopIncrementRecoveryProcessing(timestamp, size, buffer ,crcValue, rssi);
 	}
 	else if (crcValue.validity == VALID_CRC) {
-
 		BLEPacket *pkt = new BLEPacket(this->accessAddress,buffer, size,timestamp, (this->accessAddress != 0x8e89bed6 ? (int32_t)(timestamp - this->lastAnchorPoint) : 0), 0, this->channel,rssi, crcValue);
 		if (pkt->isAdvertisement()) {
-			// If the packet is an advertisement...
-
-			if (this->controllerState == CONNECTION_INITIATION) {
-				// call connectionInitiationProcessing if we are initiating a connection
-				this->connectionInitiationProcessing(pkt);
-			}
-			else {
-				// if not, call onAdvertisementPacket method
-				this->advertisementPacketProcessing(pkt);
-			}
+			// If the packet is an advertisement, call onAdvertisementPacket method
+			this->advertisementPacketProcessing(pkt);
 		}
 		else {
 			// If the packet is a connection packet, call onConnectionPacket
-			if (this->controllerState == CONNECTION_INITIATION) {
-				this->addPacket(pkt);
-				bsp_board_led_invert(0);
-				bsp_board_led_invert(1);
-			}
-			else  {
-				this->connectionPacketProcessing(pkt);
-			}
+			this->connectionPacketProcessing(pkt);
 		}
 
 		// Delete the packet object if it is not NULL

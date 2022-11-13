@@ -224,14 +224,7 @@ void Core::processBLEInputMessage(ble_Message msg) {
     this->selectController(BLE_PROTOCOL);
   }
 
-  if (msg.which_msg == ble_Message_set_bd_addr_tag) {
-    this->bleController->setOwnAddress(
-      msg.msg.set_bd_addr.bd_address,
-      msg.msg.set_bd_addr.addr_type == ble_BleAddrType_RANDOM
-    );
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
-  }
-  else if (msg.which_msg == ble_Message_sniff_adv_tag) {
+  if (msg.which_msg == ble_Message_sniff_adv_tag) {
 
     // bool enableExtended = msg.msg.sniff_adv.use_extended_adv;
 
@@ -239,6 +232,7 @@ void Core::processBLEInputMessage(ble_Message msg) {
     this->bleController->setChannel(channel);
     this->bleController->setAdvertisementsTransmitIndicator(true);
     this->bleController->setFilter(
+                                    true,
                                     msg.msg.sniff_adv.bd_address[5],
                                     msg.msg.sniff_adv.bd_address[4],
                                     msg.msg.sniff_adv.bd_address[3],
@@ -269,6 +263,7 @@ void Core::processBLEInputMessage(ble_Message msg) {
     this->bleController->setAdvertisementsTransmitIndicator(show_advertisements);
     this->bleController->setEmptyTransmitIndicator(show_empty_packets);
     this->bleController->setFilter(
+                                    false,
                                     msg.msg.sniff_connreq.bd_address[5],
                                     msg.msg.sniff_connreq.bd_address[4],
                                     msg.msg.sniff_connreq.bd_address[3],
@@ -359,12 +354,12 @@ void Core::processBLEInputMessage(ble_Message msg) {
         response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
   }
   else if (msg.which_msg == ble_Message_central_mode_tag) {
-      //if (this->bleController->getState() == CONNECTION_INITIATION || this->bleController->getState() == SIMULATING_MASTER || this->bleController->getState() == PERFORMING_MITM) {
+      if (this->bleController->getState() == SIMULATING_MASTER || this->bleController->getState() == PERFORMING_MITM) {
         response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
-      /*}
+      }
       else {
         response = Whad::buildResultMessage(generic_ResultCode_WRONG_MODE);
-      }*/
+      }
   }
 
   else if (msg.which_msg == ble_Message_periph_mode_tag) {
@@ -374,23 +369,6 @@ void Core::processBLEInputMessage(ble_Message msg) {
       else {
         response = Whad::buildResultMessage(generic_ResultCode_WRONG_MODE);
       }
-  }
-  else if (msg.which_msg == ble_Message_connect_tag) {
-    this->bleController->setChannel(37);
-    uint8_t address[6];
-    address[0] = msg.msg.connect.bd_address[5];
-    address[1] = msg.msg.connect.bd_address[4];
-    address[2] = msg.msg.connect.bd_address[3];
-    address[3] = msg.msg.connect.bd_address[2];
-    address[4] = msg.msg.connect.bd_address[1];
-    address[5] = msg.msg.connect.bd_address[0];
-
-    this->bleController->connect(
-        address,
-        msg.msg.connect.addr_type == ble_BleAddrType_RANDOM
-    );
-
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
   }
   /*
   else if (msg.which_msg == ble_Message_jam_adv_chan_tag) {
@@ -877,12 +855,11 @@ Message* Core::popMessageFromQueue() {
 	}
 }
 
-bool Core::sendMessage(Message *msg) {
+void Core::sendMessage(Message *msg) {
   uint8_t buffer[1024];
   size_t size = Whad::encodeMessage(msg, buffer, 1024);
-	bool success = this->serialModule->send(buffer,size);
-  if (success) free(msg);
-  return success;
+	this->serialModule->send(buffer,size);
+	free(msg);
 }
 
 void Core::sendVerbose(const char* data) {
@@ -891,18 +868,12 @@ void Core::sendVerbose(const char* data) {
 }
 
 void Core::loop() {
-  Message *msg = this->popMessageFromQueue();
 	while (true) {
 		this->serialModule->process();
-
-
-    if (msg != NULL) {
-    	if (this->sendMessage(msg)) {
-        msg = this->popMessageFromQueue();
-      }
-    }
-    else {
-      msg = this->popMessageFromQueue();
+    Message *msg = this->popMessageFromQueue();
+    while (msg != NULL) {
+    	this->sendMessage(msg);
+    	msg = this->popMessageFromQueue();
     }
 		// Even if we miss an event enabling USB, USB event would wake us up.
 		__WFE();

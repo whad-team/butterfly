@@ -481,10 +481,11 @@ bool Radio::disable() {
 	{
 		NVIC_ClearPendingIRQ(RADIO_IRQn);
 		NVIC_DisableIRQ(RADIO_IRQn);
+
 		NRF_RADIO->EVENTS_DISABLED = 0;
 		NRF_RADIO->TASKS_EDSTOP = 1;
 		NRF_RADIO->TASKS_DISABLE = 1;
-		while (NRF_RADIO->EVENTS_DISABLED == 0);
+		while (NRF_RADIO->EVENTS_DISABLED == 0) {}
 		success = true;
 	}
 	return success;
@@ -911,6 +912,7 @@ bool Radio::enable() {
 	bool success = true;
 	this->disable();
 
+
 	NRF_CLOCK->EVENTS_HFCLKSTARTED = 0;
 	NRF_CLOCK->TASKS_HFCLKSTART = 1;
 	while (NRF_CLOCK->EVENTS_HFCLKSTARTED == 0);
@@ -931,21 +933,32 @@ bool Radio::enable() {
 		NRF_RADIO->PACKETPTR = (uint32_t)(this->rxBuffer);
 		if (this->mode == MODE_NORMAL) {
 			if (this->isFilterEnabled()) {
+
+				NRF_RADIO->EVENTS_DEVMISS = 0;
+				NRF_RADIO->EVENTS_DEVMATCH = 0;
+
 				NRF_RADIO->DAB[0] = ((uint32_t)(this->filter.bytes[2] << 24) |
 				(uint32_t)(this->filter.bytes[3] << 16) |
 				(uint32_t)(this->filter.bytes[4] << 8) |
 				(uint32_t)(this->filter.bytes[5]));
 				NRF_RADIO->DAP[0] = (uint32_t)(this->filter.bytes[0] << 8) | (uint32_t)(this->filter.bytes[1]);
-				NRF_RADIO->DACNF = 1;
-				NRF_RADIO->INTENSET = 0x00000008 | 1 << 6;
+
+				NRF_RADIO->DAB[1] = NRF_RADIO->DAB[0];
+				NRF_RADIO->DAP[1] = NRF_RADIO->DAP[0];
+				NRF_RADIO->DACNF = (1 << 8) | 3;
 			}
 			else {
-				NRF_RADIO->DAP[0] = 0;
+				NRF_RADIO->EVENTS_DEVMISS = 0;
+				NRF_RADIO->EVENTS_DEVMATCH = 0;
+
 				NRF_RADIO->DAB[0] = 0;
+				NRF_RADIO->DAP[0] = 0;
+				NRF_RADIO->DAB[1] = 0;
+				NRF_RADIO->DAP[1] = 0;
 				NRF_RADIO->DACNF = 0;
-				NRF_RADIO->INTENSET = 0x00000008;
 			}
 
+			NRF_RADIO->INTENSET = 0x00000008;
 			NVIC_ClearPendingIRQ(RADIO_IRQn);
 			NVIC_EnableIRQ(RADIO_IRQn);
 
@@ -1021,8 +1034,6 @@ bool Radio::send(uint8_t *data,int size,int frequency, uint8_t channel) {
 	NRF_RADIO->SHORTS = 0;
 	NRF_RADIO->EVENTS_DISABLED = 0;
 	NRF_RADIO->TASKS_DISABLE = 1;
-	memcpy(Radio::instance->txBuffer, data, size);
-	NRF_RADIO->MODECNF0 |= 1;
 	while(NRF_RADIO->EVENTS_DISABLED == 0);
 
 	NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_RXEN_Msk;
@@ -1031,17 +1042,17 @@ bool Radio::send(uint8_t *data,int size,int frequency, uint8_t channel) {
 	}
 	NRF_RADIO->FREQUENCY = frequency;
 	NRF_RADIO->DATAWHITEIV = channel;
-	NRF_RADIO->PACKETPTR = (uint32_t)Radio::instance->txBuffer;
+	NRF_RADIO->PACKETPTR = (uint32_t)data;
 
 	// Turn on the transmitter, and wait for it to signal that it's ready to use.
 	this->state = TX;
 	NRF_RADIO->INTENSET =  0x00000008;
-	NVIC_ClearPendingIRQ(RADIO_IRQn);
-	NVIC_EnableIRQ(RADIO_IRQn);
 
+	NVIC_EnableIRQ(RADIO_IRQn);
 	NRF_RADIO->EVENTS_READY = 0;
 	NRF_RADIO->EVENTS_END = 0;
 	NRF_RADIO->TASKS_TXEN = 1;
+
 
 	return false;
 }
@@ -1050,34 +1061,26 @@ bool Radio::send(uint8_t *data,int size,int frequency, uint8_t channel) {
 static uint8_t jamBuffer[] = {0x00,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
 extern "C" void RADIO_IRQHandler(void) {
 
-	if (Radio::instance->isFilterEnabled()) {
-		if (NRF_RADIO->EVENTS_DEVMATCH == 1) {
-			NRF_RADIO->EVENTS_DEVMATCH = 0;
-		}
-		if (NRF_RADIO->EVENTS_DEVMISS == 1) {
-			NRF_RADIO->INTENSET = 0x00000008 | 1 << 6;
-			NRF_RADIO->EVENTS_DEVMISS = 0;
-			Radio::instance->reload();
-			return;
-		}
-		else {
-			NRF_RADIO->EVENTS_DEVMISS = 0;
-			NRF_RADIO->EVENTS_DEVMATCH = 0;
-			NRF_RADIO->INTENSET = 0x00000008;
-		}
-	}
 	if (NRF_RADIO->EVENTS_READY) {
 		NRF_RADIO->EVENTS_READY = 0;
 		NRF_RADIO->TASKS_START = 1;
 	}
-
-	/*if (NRF_RADIO->EVENTS_BCMATCH) {
+	/*
+	if (NRF_RADIO->EVENTS_DEVMATCH) {
+		NRF_RADIO->EVENTS_DEVMATCH = 0;
+	}
+	if (NRF_RADIO->EVENTS_DEVMISS) {
+		NRF_RADIO->EVENTS_DEVMISS = 0;
+		NRF_RADIO->TASKS_STOP = 1;
+		NRF_RADIO->TASKS_START = 1;
+	}*/
+	if (NRF_RADIO->EVENTS_BCMATCH) {
 		NRF_RADIO->EVENTS_BCMATCH = 0;
 		if (Radio::instance->getMode() == MODE_NORMAL) {
 			Controller *controller = Radio::instance->getController();
 			controller->onMatch(Radio::instance->rxBuffer, Radio::instance->getMatchingSize());
 			NRF_RADIO->TASKS_BCSTOP = 1;
-		}*/
+		}
 		/*
 		else if (Radio::instance->getMode() == MODE_JAMMER) {
 			bsp_board_led_invert(0);
@@ -1086,7 +1089,7 @@ extern "C" void RADIO_IRQHandler(void) {
 				Radio::instance->reload();
 			}
 		}*/
-	//}
+	}
 	if (NRF_RADIO->EVENTS_EDEND) {
 		uint8_t sample = NRF_RADIO->EDSAMPLE;
 		NRF_RADIO->EVENTS_EDEND = 0;
@@ -1098,9 +1101,10 @@ extern "C" void RADIO_IRQHandler(void) {
 		NRF_RADIO->TASKS_EDSTART = 1;
 
 	}
-	if (NRF_RADIO->EVENTS_END/* && (Radio::instance->isFilterEnabled() ? NRF_RADIO->EVENTS_DEVMATCH : 1)*/) {
+	if (NRF_RADIO->EVENTS_END/* && (Radio::instance->isFilterEnabled() ?*/ /* : 1)*/) {
 		NRF_RADIO->EVENTS_END = 0;
 
+		if (Radio::instance->isFilterEnabled() && NRF_RADIO->EVENTS_DEVMATCH == 0) {NRF_RADIO->TASKS_START = 1; return;}
 		//NRF_RADIO->TASKS_BCSTART = 1;
 		NRF_TIMER4->TASKS_CAPTURE[5] = 1UL;
 		uint32_t now = NRF_TIMER4->CC[5];
@@ -1109,9 +1113,7 @@ extern "C" void RADIO_IRQHandler(void) {
 		if (controller != NULL) {
 			if (Radio::instance->getMode() == MODE_NORMAL) {
 				if (Radio::instance->getState() == TX) {
-
 					//LedManager::instance->toggle(LED1);
-					NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_RXEN_Msk;
 					NRF_RADIO->PACKETPTR = (uint32_t)Radio::instance->rxBuffer;
 					Radio::instance->setState(RX);
 				}
@@ -1146,7 +1148,6 @@ extern "C" void RADIO_IRQHandler(void) {
 						Phy p = Radio::instance->getPhy();
 
 						Radio::instance->currentTimestamp = now - (Radio::instance->getPreamble().size+bufferSize)  * 4 * (p == BLE_2MBITS || p == ESB_2MBITS ? 1 : 2) - 100;
-
 						controller->onReceive(Radio::instance->currentTimestamp,bufferSize,buffer,crcValue, rssi);
 
 						free(buffer);
@@ -1193,5 +1194,6 @@ extern "C" void RADIO_IRQHandler(void) {
 		}
 		NRF_RADIO->TASKS_START = 1;
 	}
-
+	NRF_RADIO->EVENTS_DEVMATCH = 0;
+	NRF_RADIO->EVENTS_DEVMISS = 0;
 }

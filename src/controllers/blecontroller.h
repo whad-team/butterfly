@@ -146,6 +146,21 @@ typedef struct ReactiveJammingPattern {
 	int position;
 } ReactiveJammingPattern;
 
+typedef struct ConnectionInitiationData {
+		BLEAddress responder;
+		bool responderRandom;
+		uint32_t accessAddress;
+		uint32_t crcInit;
+		uint8_t windowSize;
+		uint16_t windowOffset;
+		uint16_t hopInterval;
+		uint16_t slaveLatency;
+		uint16_t timeout;
+		uint8_t sca;
+		uint8_t hopIncrement;
+		uint8_t channelMap[5];
+} ConnectionInitiationData;
+
 class BLEController : public Controller {
 	protected:
 		TimerModule *timerModule;
@@ -154,10 +169,6 @@ class BLEController : public Controller {
 		Timer* injectionTimer;
 		Timer* masterTimer;
 		Timer* discoveryTimer;
-		Timer* initTimer;
-
-		uint32_t connectionStep;
-
 
 		uint32_t lastAnchorPoint;
 		bool emptyTransmitIndicator;
@@ -218,14 +229,16 @@ class BLEController : public Controller {
 		int collectedIntervals;
 
 		BLEAddress filter;
-		bool responderRandom;
+		bool softwareFilterEnabled;
 
 		// Discovery related data
 		ActiveConnectionRecovery activeConnectionRecovery;
 
+		// Connection initiation related data
+		ConnectionInitiationData connectionInitiationData;
+
 		BLEAddress own;
 		bool ownRandom;
-
 	public:
 		static int channelToFrequency(int channel);
 
@@ -233,10 +246,8 @@ class BLEController : public Controller {
 		void start();
 		void stop();
 
-		void setOwnAddress(uint8_t *address, bool random);
 		void sniff();
 
-		void connect(uint8_t *address, bool random);
 		void setAnchorPoint(uint32_t timestamp);
 
 		bool whitelistAdvAddress(bool enable, uint8_t a, uint8_t b, uint8_t c,uint8_t d, uint8_t e, uint8_t f);
@@ -248,7 +259,6 @@ class BLEController : public Controller {
 		void sendConnectionReport(ConnectionStatus status);
 		void sendAccessAddressReport(uint32_t accessAddress, uint32_t timestamp, int32_t rssi);
 		void sendExistingConnectionReport(uint32_t accessAddress, uint32_t crcInit, uint8_t *channelMap, uint16_t hopInterval, uint8_t hopIncrement);
-		void sendConnectedReport();
 
 		void setMonitoredChannels(uint8_t *channels);
 
@@ -312,7 +322,7 @@ class BLEController : public Controller {
 
 		void setAdvertisementsTransmitIndicator(bool advertisementsTransmitIndicator);
 		void setEmptyTransmitIndicator(bool emptyTransmitIndicator);
-		void setFilter(uint8_t a,uint8_t b,uint8_t c,uint8_t d,uint8_t e,uint8_t f);
+		void setFilter(bool hardwareFilter, uint8_t a,uint8_t b,uint8_t c,uint8_t d,uint8_t e,uint8_t f);
 
 		// Attack related methods
 		void setAttackPayload(uint8_t *payload, size_t size);
@@ -357,11 +367,16 @@ class BLEController : public Controller {
 
 		void releaseTimers();
 
+		// Connection related data
+		void setOwnAddress(uint8_t *address, bool random);
 
-		bool sendFirstConnectionPacket();
-		void initializeConnection(uint16_t hopInterval, uint8_t hopIncrement, uint8_t *channelMap,uint32_t accessAddress,uint32_t crcInit,  int masterSCA,uint16_t latency);
+		void connect(uint8_t *address, bool random);
+		void connect(uint8_t *address, bool random,  uint32_t accessAddress,  uint32_t crcInit, uint8_t windowSize, uint16_t windowOffset, uint16_t hopInterval, uint16_t slaveLatency, uint16_t timeout, uint8_t sca, uint8_t hopIncrement, uint8_t *channelMap);
 
 		// Packets processing methods
+		void connectionInitiationAdvertisementProcessing(BLEPacket *pkt);
+		void connectionInitiationConnectedProcessing(BLEPacket *pkt);
+
 		void accessAddressProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi);
 		void crcInitRecoveryProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi);
 		void channelMapRecoveryProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi);
@@ -373,9 +388,6 @@ class BLEController : public Controller {
 
 		void advertisementSniffingProcessing(BLEPacket *pkt);
 		void advertisingIntervalEstimationProcessing(BLEPacket *pkt);
-
-		void connectionInitiationProcessing(BLEPacket *pkt);
-
 
 		void connectionManagementProcessing(BLEPacket *pkt);
 		void connectionSynchronizationProcessing(BLEPacket *pkt);

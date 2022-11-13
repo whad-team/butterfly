@@ -19,7 +19,6 @@ void SerialComm::cdcAcmHandler(app_usbd_class_inst_t const * p_inst,app_usbd_cdc
 			break;
 
 		case APP_USBD_CDC_ACM_USER_EVT_TX_DONE:
-			//SerialComm::instance->txState.done = true;
 			break;
 
 		case APP_USBD_CDC_ACM_USER_EVT_RX_DONE:
@@ -80,8 +79,8 @@ SerialComm::SerialComm(CoreCallback inputCallback,Core *coreInstance) {
   this->rxState.last_received_byte = 0x00;
 
   this->txState.size = 0;
-  this->txState.waiting = false;
-	this->txState.done = true;
+  this->txState.waiting = 0;
+
   this->currentByte = 0x00;
 	this->init();
 }
@@ -145,7 +144,7 @@ void SerialComm::init() {
 	}
 }
 
-bool SerialComm::send(uint8_t *buffer, size_t size) {
+void SerialComm::send(uint8_t *buffer, size_t size) {
 	uint16_t message_size = size;
 	this->txBuffer[0] = PREAMBLE_WHAD_1;
 	this->txBuffer[1] = PREAMBLE_WHAD_2;
@@ -153,16 +152,14 @@ bool SerialComm::send(uint8_t *buffer, size_t size) {
 	this->txBuffer[3] = (uint8_t)((message_size & 0xFF00) >> 8);
   memcpy(this->txBuffer+4,buffer, size);
   this->txState.size = size+4;
-  ret_code_t ret = app_usbd_cdc_acm_write(&m_app_cdc_acm,&this->txBuffer,this->txState.size);
-	return ret == NRF_SUCCESS;
+  this->txState.waiting = true;
 }
 
 void SerialComm::process() {
 	while (app_usbd_event_queue_process());
-  /*if (this->txState.waiting && this->txState.done) {
-		this->txState.done = false;
-
+  if (this->txState.waiting) {
+    app_usbd_cdc_acm_write(&m_app_cdc_acm,&this->txBuffer,this->txState.size);
     this->txState.waiting = false;
-  }*/
+  }
 
 }
