@@ -27,7 +27,12 @@ BLEController::BLEController(Radio *radio) : Controller(radio) {
 }
 
 void BLEController::setOwnAddress(uint8_t *address, bool random) {
-	memcpy(this->own.bytes, address, 6);
+	this->own.bytes[0] = address[5];
+	this->own.bytes[1] = address[4];
+	this->own.bytes[2] = address[3];
+	this->own.bytes[3] = address[2];
+	this->own.bytes[4] = address[1];
+	this->own.bytes[5] = address[0];
 	this->ownRandom = random;
 }
 
@@ -356,11 +361,7 @@ bool BLEController::connectionLost() {
 	// Stop the timers
 
 
-	if (this->injectionTimer != NULL) {
-		this->injectionTimer->stop();
-		this->injectionTimer->release();
-		this->injectionTimer = NULL;
-	}
+	this->releaseTimers();
 
 
 	// We are not synchronized anymore
@@ -372,8 +373,6 @@ bool BLEController::connectionLost() {
 
 	//We are sending a notification to Host
 	this->sendConnectionReport(CONNECTION_LOST);
-
-	while(true);
 
 	// Reconfigure radio to receive advertisements
 	this->setHardwareConfiguration(0x8e89bed6,0x555555);
@@ -393,8 +392,7 @@ bool BLEController::goToNextChannel() {
 		this->desyncCounter = (this->packetCount == 0 ? this->desyncCounter + 1 : 0);
 		// If the desyncCounter is greater than three, the connection is considered lost
 		if (this->desyncCounter > 5 && !this->attackStatus.running) {
-			bsp_board_led_invert(0);
-			bsp_board_led_invert(1);
+
 			return this->connectionLost();
 		}
 		// If we are still following the connection
@@ -1375,8 +1373,14 @@ void BLEController::connect(uint8_t *address, bool random) {
 		0x1F
 	};
 	this->connect(address, random, 0x23a3d487, 0x049095, 3,9,56,0,42,1,9,channelMap);
-
 }
+
+
+void BLEController::sendConnectedReport() {
+	Message *msg = Whad::buildBLEConnectedMessage(this->own.bytes, this->ownRandom, this->connectionInitiationData.responder.bytes, this->connectionInitiationData.responderRandom, this->accessAddress);
+	Core::instance->pushMessageToQueue(msg);
+}
+
 void BLEController::connect(uint8_t *address, bool random,  uint32_t accessAddress,  uint32_t crcInit, uint8_t windowSize, uint16_t windowOffset, uint16_t hopInterval, uint16_t slaveLatency, uint16_t timeout, uint8_t sca, uint8_t hopIncrement, uint8_t *channelMap) {
 	// Configure connection parameters according to provided arguments
 	memcpy(this->connectionInitiationData.responder.bytes, address, 6);
@@ -1445,7 +1449,7 @@ void BLEController::initializeConnection() {
 	this->updateHopIncrement(this->connectionInitiationData.hopIncrement);
 	this->updateChannelsInUse(this->connectionInitiationData.channelMap);
 
-	this->emptyTransmitIndicator = true;
+	//this->emptyTransmitIndicator = true;
 
 	this->radio->disableFilter();
 	this->radio->disableAutoTXafterRX();
@@ -1539,10 +1543,8 @@ void BLEController::connectionInitiationConnectedProcessing(BLEPacket *pkt) {
 	if (!this->sync) {
 		this->sync = true;
 
-		bsp_board_led_invert(0);
-		bsp_board_led_invert(1);
-
 		this->controllerState = SIMULATING_MASTER;
+		this->sendConnectedReport();
 	}
 }
 

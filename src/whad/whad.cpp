@@ -315,3 +315,28 @@ Message* Whad::buildBLEAccessAddressDiscoveredMessage(uint32_t accessAddress, ui
 
   return msg;
 }
+
+Message* Whad::buildBLEConnectedMessage(uint8_t *initiator, bool initiatorRandom, uint8_t *advertiser, bool advertiserRandom, uint32_t accessAddress) {
+  Message* msg = Whad::buildMessage();
+  msg->which_msg = Message_ble_tag;
+  msg->msg.ble.which_msg = ble_Message_connected_tag;
+  msg->msg.ble.msg.connected.initiator[0] = initiator[5];
+  msg->msg.ble.msg.connected.initiator[1] = initiator[4];
+  msg->msg.ble.msg.connected.initiator[2] = initiator[3];
+  msg->msg.ble.msg.connected.initiator[3] = initiator[2];
+  msg->msg.ble.msg.connected.initiator[4] = initiator[1];
+  msg->msg.ble.msg.connected.initiator[5] = initiator[0];
+
+  msg->msg.ble.msg.connected.advertiser[0] = advertiser[5];
+  msg->msg.ble.msg.connected.advertiser[1] = advertiser[4];
+  msg->msg.ble.msg.connected.advertiser[2] = advertiser[3];
+  msg->msg.ble.msg.connected.advertiser[3] = advertiser[2];
+  msg->msg.ble.msg.connected.advertiser[4] = advertiser[1];
+  msg->msg.ble.msg.connected.advertiser[5] = advertiser[0];
+
+  msg->msg.ble.msg.connected.access_address = accessAddress;
+  msg->msg.ble.msg.connected.conn_handle = 0;
+  msg->msg.ble.msg.connected.adv_addr_type = advertiserRandom ? ble_BleAddrType_RANDOM : ble_BleAddrType_PUBLIC;
+  msg->msg.ble.msg.connected.init_addr_type = initiatorRandom ? ble_BleAddrType_RANDOM : ble_BleAddrType_PUBLIC;
+  return msg;
+}
