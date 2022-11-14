@@ -1499,7 +1499,7 @@ void BLEController::initializeConnection() {
 		this->masterTimer->start();
 	}
 
-	this->setAnchorPoint(TimerModule::instance->getTimestamp());
+	this->setAnchorPoint(TimerModule::instance->getTimestamp() + 200);
 
 	// Radio configuration
 	this->setHardwareConfiguration(this->connectionInitiationData.accessAddress, this->connectionInitiationData.crcInit);

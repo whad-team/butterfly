@@ -389,6 +389,15 @@ void Core::processBLEInputMessage(ble_Message msg) {
 
     response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
   }
+
+  else if (msg.which_msg == ble_Message_disconnect_tag) {
+    uint8_t *terminate_ind;
+    size_t terminate_ind_size;
+    BLEPacket::forgeTerminateInd(&terminate_ind, &terminate_ind_size,0x13);
+    this->bleController->setMasterPayload(terminate_ind,terminate_ind_size);
+    while (!this->bleController->isMasterPayloadTransmitted()) {}
+    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+  }
   /*
   else if (msg.which_msg == ble_Message_jam_adv_chan_tag) {
     int channel = msg.msg.jam_adv_chan.channel;
