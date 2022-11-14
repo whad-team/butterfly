@@ -32,7 +32,8 @@ const DeviceCapability CAPABILITIES[] = {
       CMD(ble_BleCommand_CentralMode) |
       CMD(ble_BleCommand_PeripheralMode) |
       CMD(ble_BleCommand_SniffAccessAddress) |
-      CMD(ble_BleCommand_ReactiveJam)
+      CMD(ble_BleCommand_ReactiveJam) |
+      CMD(ble_BleCommand_ConnectTo)
 
 
 

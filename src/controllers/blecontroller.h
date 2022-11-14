@@ -169,6 +169,7 @@ class BLEController : public Controller {
 		Timer* injectionTimer;
 		Timer* masterTimer;
 		Timer* discoveryTimer;
+		Timer* initTimer;
 
 		uint32_t lastAnchorPoint;
 		bool emptyTransmitIndicator;
@@ -367,11 +368,14 @@ class BLEController : public Controller {
 
 		void releaseTimers();
 
-		// Connection related data
+		// Connection initiation methods
 		void setOwnAddress(uint8_t *address, bool random);
 
 		void connect(uint8_t *address, bool random);
 		void connect(uint8_t *address, bool random,  uint32_t accessAddress,  uint32_t crcInit, uint8_t windowSize, uint16_t windowOffset, uint16_t hopInterval, uint16_t slaveLatency, uint16_t timeout, uint8_t sca, uint8_t hopIncrement, uint8_t *channelMap);
+
+		bool sendFirstConnectionPacket();
+		void initializeConnection();
 
 		// Packets processing methods
 		void connectionInitiationAdvertisementProcessing(BLEPacket *pkt);

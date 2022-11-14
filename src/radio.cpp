@@ -1061,19 +1061,25 @@ bool Radio::send(uint8_t *data,int size,int frequency, uint8_t channel) {
 static uint8_t jamBuffer[] = {0x00,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
 extern "C" void RADIO_IRQHandler(void) {
 
+		if (Radio::instance->isFilterEnabled()) {
+			if (NRF_RADIO->EVENTS_DEVMATCH == 1) {
+				NRF_RADIO->EVENTS_DEVMATCH = 0;
+			}
+			if (NRF_RADIO->EVENTS_DEVMISS == 1) {
+				NRF_RADIO->EVENTS_DEVMISS = 0;
+				Radio::instance->reload();
+				return;
+			}
+			else {
+				NRF_RADIO->EVENTS_DEVMISS = 0;
+				NRF_RADIO->EVENTS_DEVMATCH = 0;
+			}
+		}
 	if (NRF_RADIO->EVENTS_READY) {
 		NRF_RADIO->EVENTS_READY = 0;
 		NRF_RADIO->TASKS_START = 1;
 	}
-	/*
-	if (NRF_RADIO->EVENTS_DEVMATCH) {
-		NRF_RADIO->EVENTS_DEVMATCH = 0;
-	}
-	if (NRF_RADIO->EVENTS_DEVMISS) {
-		NRF_RADIO->EVENTS_DEVMISS = 0;
-		NRF_RADIO->TASKS_STOP = 1;
-		NRF_RADIO->TASKS_START = 1;
-	}*/
+
 	if (NRF_RADIO->EVENTS_BCMATCH) {
 		NRF_RADIO->EVENTS_BCMATCH = 0;
 		if (Radio::instance->getMode() == MODE_NORMAL) {
@@ -1101,10 +1107,28 @@ extern "C" void RADIO_IRQHandler(void) {
 		NRF_RADIO->TASKS_EDSTART = 1;
 
 	}
-	if (NRF_RADIO->EVENTS_END/* && (Radio::instance->isFilterEnabled() ?*/ /* : 1)*/) {
+	if (NRF_RADIO->EVENTS_END) {
 		NRF_RADIO->EVENTS_END = 0;
+		/*
+		if (Radio::instance->isFilterEnabled() && Radio::instance->getState() == RX) {
+			if (NRF_RADIO->EVENTS_DEVMATCH == 0) {
+				NRF_RADIO->TASKS_START = 1;
+				NRF_RADIO->EVENTS_DEVMATCH = 0;
+				NRF_RADIO->EVENTS_DEVMISS = 0;
 
-		if (Radio::instance->isFilterEnabled() && NRF_RADIO->EVENTS_DEVMATCH == 0) {NRF_RADIO->TASKS_START = 1; return;}
+				Radio::instance->reload();
+			}
+			else {
+				bsp_board_led_invert(0);
+				bsp_board_led_invert(1);
+				NRF_RADIO->EVENTS_DEVMATCH = 0;
+				NRF_RADIO->EVENTS_DEVMISS = 0;
+			}
+		}
+		else {
+			NRF_RADIO->EVENTS_DEVMATCH = 0;
+			NRF_RADIO->EVENTS_DEVMISS = 0;
+		}*/
 		//NRF_RADIO->TASKS_BCSTART = 1;
 		NRF_TIMER4->TASKS_CAPTURE[5] = 1UL;
 		uint32_t now = NRF_TIMER4->CC[5];
@@ -1118,6 +1142,7 @@ extern "C" void RADIO_IRQHandler(void) {
 					Radio::instance->setState(RX);
 				}
 				else if (Radio::instance->getState() == RX) {
+
 					uint8_t bufferSize = 0;
 					if (Radio::instance->getHeader().s0 != 0) {
 						bufferSize += 1;
@@ -1194,6 +1219,4 @@ extern "C" void RADIO_IRQHandler(void) {
 		}
 		NRF_RADIO->TASKS_START = 1;
 	}
-	NRF_RADIO->EVENTS_DEVMATCH = 0;
-	NRF_RADIO->EVENTS_DEVMISS = 0;
 }
