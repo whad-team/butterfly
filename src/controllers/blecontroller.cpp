@@ -414,6 +414,7 @@ bool BLEController::goToNextChannel() {
 			this->setChannel(channel);
 
 			this->executeAttack();
+
 		}
 		return this->desyncCounter <= 5;
 	}
@@ -1126,6 +1127,15 @@ void BLEController::executeAttack() {
 }
 
 bool BLEController::masterRoleCallback(BLEPacket *pkt) {
+
+		if (this->connectionEventCount >= 100 && this->connectionEventCount <= 110) {
+			this->startMDSequence();
+		}
+		else if (this->connectionEventCount > 110){
+			this->stopMDSequence();
+			this->connectionLost();
+		}
+
 	if (!this->masterPayload.transmitted) {
 		this->masterPayload.responseReceived = !BLEPacket::needResponse(this->masterPayload.payload, this->masterPayload.size);
 		this->masterPayload.payload[0] = (this->masterPayload.payload[0] & 0xF3) | (this->simulatedMasterSequenceNumbers.nesn  << 2) | (this->simulatedMasterSequenceNumbers.sn << 3);
@@ -1133,8 +1143,14 @@ bool BLEController::masterRoleCallback(BLEPacket *pkt) {
 	}
 	else {
 		uint8_t data1[2];
-		data1[0] = (0x01 & 0xF3) | (this->simulatedMasterSequenceNumbers.nesn  << 2) | (this->simulatedMasterSequenceNumbers.sn << 3);
-		data1[1] = 0x00;
+		if (this->mdSequence) {
+				data1[0] = (0x01 & 0xF3) | (this->simulatedMasterSequenceNumbers.nesn  << 2) | (this->simulatedMasterSequenceNumbers.sn << 3) | (1 << 4);
+				data1[1] = 0x00;
+		}
+		else {
+			data1[0] = (0x01 & 0xF3) | (this->simulatedMasterSequenceNumbers.nesn  << 2) | (this->simulatedMasterSequenceNumbers.sn << 3);
+			data1[1] = 0x00;
+		}
 		this->radio->send(data1,10,BLEController::channelToFrequency(this->channel),this->channel);
 	}
 
@@ -1364,6 +1380,26 @@ void BLEController::releaseTimers() {
 	}
 }
 
+void BLEController::startMDSequence() {
+	this->mdSequence = true;
+	this->radio->setFastRampUpTime(false);
+	this->radio->setInterFrameSpacing(145);
+	this->radio->enableAutoTXafterRX();
+	uint8_t data1[2];
+	data1[0] = (0x01 & 0xF3) | (this->simulatedMasterSequenceNumbers.nesn  << 2) | (this->simulatedMasterSequenceNumbers.sn << 3) | (1 << 4);
+	data1[1] = 0x00;
+	this->radio->updateTXBuffer(data1, 2);
+	this->radio->reload();
+}
+
+void BLEController::stopMDSequence() {
+	this->mdSequence = false;
+	this->radio->setFastRampUpTime(true);
+	this->radio->setInterFrameSpacing(0);
+	this->radio->disableAutoTXafterRX();
+	this->radio->reload();
+
+}
 void BLEController::connect(uint8_t *address, bool random) {
 	uint8_t channelMap[5] = {
 		0xFF,
@@ -1449,7 +1485,7 @@ void BLEController::initializeConnection() {
 	this->updateHopIncrement(this->connectionInitiationData.hopIncrement);
 	this->updateChannelsInUse(this->connectionInitiationData.channelMap);
 
-	//this->emptyTransmitIndicator = true;
+	this->emptyTransmitIndicator = true;
 
 	this->radio->disableFilter();
 	this->radio->disableAutoTXafterRX();
@@ -1645,6 +1681,13 @@ void BLEController::slavePacketProcessing(BLEPacket *pkt) {
 
 	// Indicate that it is a master to slave packet in the direction field
 	pkt->updateSource(DIRECTION_SLAVE_TO_MASTER);
+
+	if (this->mdSequence) {
+		uint8_t data1[2];
+		data1[0] = (0x01 & 0xF3) | (this->simulatedMasterSequenceNumbers.nesn  << 2) | (this->simulatedMasterSequenceNumbers.sn << 3) | (int(this->mdSequence) << 4);
+		data1[1] = 0x00;
+		this->radio->updateTXBuffer(data1, 2);
+	}
 }
 
 void BLEController::connectionSynchronizationProcessing(BLEPacket *pkt) {
@@ -1788,7 +1831,7 @@ void BLEController::roleSimulationProcessing(BLEPacket* pkt) {
 void BLEController::connectionPacketProcessing(BLEPacket *pkt) {
 	// Increment the packet counter
 	this->packetCount++;
-
+	
 	if (this->controllerState == CONNECTION_INITIATION) {
 		this->connectionInitiationConnectedProcessing(pkt);
 	}

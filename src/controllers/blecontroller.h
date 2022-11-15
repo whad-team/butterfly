@@ -240,6 +240,8 @@ class BLEController : public Controller {
 
 		BLEAddress own;
 		bool ownRandom;
+
+		bool mdSequence;
 	public:
 		static int channelToFrequency(int channel);
 
@@ -377,6 +379,10 @@ class BLEController : public Controller {
 
 		bool sendFirstConnectionPacket();
 		void initializeConnection();
+
+		// Connection manipulation methods
+		void startMDSequence();
+		void stopMDSequence();
 
 		// Packets processing methods
 		void connectionInitiationAdvertisementProcessing(BLEPacket *pkt);
