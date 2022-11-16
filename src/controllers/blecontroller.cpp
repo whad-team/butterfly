@@ -1382,22 +1382,10 @@ void BLEController::releaseTimers() {
 
 void BLEController::startMDSequence() {
 	this->mdSequence = true;
-	this->radio->setFastRampUpTime(false);
-	this->radio->setInterFrameSpacing(145);
-	this->radio->enableAutoTXafterRX();
-	uint8_t data1[2];
-	data1[0] = (0x01 & 0xF3) | (this->simulatedMasterSequenceNumbers.nesn  << 2) | (this->simulatedMasterSequenceNumbers.sn << 3) | (1 << 4);
-	data1[1] = 0x00;
-	this->radio->updateTXBuffer(data1, 2);
-	this->radio->reload();
 }
 
 void BLEController::stopMDSequence() {
 	this->mdSequence = false;
-	this->radio->setFastRampUpTime(true);
-	this->radio->setInterFrameSpacing(0);
-	this->radio->disableAutoTXafterRX();
-	this->radio->reload();
 
 }
 void BLEController::connect(uint8_t *address, bool random) {
@@ -1681,13 +1669,6 @@ void BLEController::slavePacketProcessing(BLEPacket *pkt) {
 
 	// Indicate that it is a master to slave packet in the direction field
 	pkt->updateSource(DIRECTION_SLAVE_TO_MASTER);
-
-	if (this->mdSequence) {
-		uint8_t data1[2];
-		data1[0] = (0x01 & 0xF3) | (this->simulatedMasterSequenceNumbers.nesn  << 2) | (this->simulatedMasterSequenceNumbers.sn << 3) | (int(this->mdSequence) << 4);
-		data1[1] = 0x00;
-		this->radio->updateTXBuffer(data1, 2);
-	}
 }
 
 void BLEController::connectionSynchronizationProcessing(BLEPacket *pkt) {
@@ -1831,7 +1812,24 @@ void BLEController::roleSimulationProcessing(BLEPacket* pkt) {
 void BLEController::connectionPacketProcessing(BLEPacket *pkt) {
 	// Increment the packet counter
 	this->packetCount++;
-	
+
+	if (this->mdSequence) {
+		for (int i=0;i<15;i++) {
+			nrf_delay_us(80);
+			uint8_t data1[2];
+			data1[0] = (0x01 & 0xF3) | (this->simulatedMasterSequenceNumbers.nesn  << 2) | (this->simulatedMasterSequenceNumbers.sn << 3) | (1 << 4);
+			data1[1] = 0x00;
+			this->simulatedMasterSequenceNumbers.sn = (this->simulatedMasterSequenceNumbers.sn + 1) % 2;
+			this->simulatedMasterSequenceNumbers.nesn = (this->simulatedMasterSequenceNumbers.nesn + 1) % 2;
+			this->radio->send(data1, 2, BLEController::channelToFrequency(this->channel), this->channel);//this->radio->updateTXBuffer(data1, 2);
+			nrf_delay_us(140);
+
+		}
+		this->addPacket(pkt);
+		//this->startMDSequence();
+		return;
+	}
+
 	if (this->controllerState == CONNECTION_INITIATION) {
 		this->connectionInitiationConnectedProcessing(pkt);
 	}
