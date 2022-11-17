@@ -28,6 +28,7 @@ BLEController::BLEController(Radio *radio) : Controller(radio) {
 	this->setOwnAddress(oaddr, 6);
 
 	// Testing sequences
+	/*
 	uint8_t packet1[9] = {0x02,0x07,0x03,0x00,0x04,0x00,0x0a,0x01,0x00};
 	uint8_t packet2[9] ={0x02,0x07,0x03,0x00,0x04,0x00,0x0a,0x41,0x00};
 	ConnectionEventTrigger *trigger = new ConnectionEventTrigger(100);
@@ -42,6 +43,7 @@ BLEController::BLEController(Radio *radio) : Controller(radio) {
 	ManualTrigger *trigger2 = new ManualTrigger();
 	PacketSequence* sequence2 = this->sequenceModule->createSequence(1, trigger2, BLE_TO_SLAVE);
 	sequence2->preparePacket(packet3, 9, true);
+	*/
 }
 
 void BLEController::checkManualTriggers() {

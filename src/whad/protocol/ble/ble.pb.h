@@ -13,68 +13,68 @@
 typedef enum _ble_BleCommand { /* *
  Low-level commands */
     /* Set BD address. */
-    ble_BleCommand_SetBdAddress = 0, 
+    ble_BleCommand_SetBdAddress = 0,
     /* Sniff advertisements. */
-    ble_BleCommand_SniffAdv = 1, 
+    ble_BleCommand_SniffAdv = 1,
     /* Jam advertisements. */
-    ble_BleCommand_JamAdv = 2, 
+    ble_BleCommand_JamAdv = 2,
     /* Jam advertisements on a single channel. */
-    ble_BleCommand_JamAdvOnChannel = 3, 
+    ble_BleCommand_JamAdvOnChannel = 3,
     /* Sniff CONN_REQ PDUs and sync with connection. */
-    ble_BleCommand_SniffConnReq = 4, 
+    ble_BleCommand_SniffConnReq = 4,
     /* Sniff active connection. */
-    ble_BleCommand_SniffAccessAddress = 5, 
-    ble_BleCommand_SniffActiveConn = 6, 
+    ble_BleCommand_SniffAccessAddress = 5,
+    ble_BleCommand_SniffActiveConn = 6,
     /* Connection jamming. */
-    ble_BleCommand_JamConn = 7, 
+    ble_BleCommand_JamConn = 7,
     /* Scanner mode. */
-    ble_BleCommand_ScanMode = 8, 
+    ble_BleCommand_ScanMode = 8,
     /* Advertiser mode. */
-    ble_BleCommand_AdvMode = 9, 
+    ble_BleCommand_AdvMode = 9,
     ble_BleCommand_SetAdvData = 10, /* SetAdvData shared with Peripheral mode. */
     /* Central mode. */
-    ble_BleCommand_CentralMode = 11, 
-    ble_BleCommand_ConnectTo = 12, 
-    ble_BleCommand_SendRawPDU = 13, 
-    ble_BleCommand_SendPDU = 14, 
-    ble_BleCommand_Disconnect = 15, 
+    ble_BleCommand_CentralMode = 11,
+    ble_BleCommand_ConnectTo = 12,
+    ble_BleCommand_SendRawPDU = 13,
+    ble_BleCommand_SendPDU = 14,
+    ble_BleCommand_Disconnect = 15,
     /* Peripheral mode. */
     ble_BleCommand_PeripheralMode = 16, /* SetAdvData and SetScanRspData are shared accross
  Peripheral and Advertiser modes
  SendPDU is shared with Central mode
  Disconnect is shared with Central mode */
     /* Common to multiple modes. */
-    ble_BleCommand_Start = 17, 
-    ble_BleCommand_Stop = 18, 
+    ble_BleCommand_Start = 17,
+    ble_BleCommand_Stop = 18,
     /* Hijack mode. */
-    ble_BleCommand_HijackMaster = 19, 
-    ble_BleCommand_HijackSlave = 20, 
-    ble_BleCommand_HijackBoth = 21, 
-    ble_BleCommand_ReactiveJam = 22, 
+    ble_BleCommand_HijackMaster = 19,
+    ble_BleCommand_HijackSlave = 20,
+    ble_BleCommand_HijackBoth = 21,
+    ble_BleCommand_ReactiveJam = 22,
     /* Sequence mode */
-    ble_BleCommand_PrepareSequence = 23 
+    ble_BleCommand_PrepareSequence = 23
 } ble_BleCommand;
 
-typedef enum _ble_BleAdvType { 
-    ble_BleAdvType_ADV_UNKNOWN = 0, 
-    ble_BleAdvType_ADV_IND = 1, 
-    ble_BleAdvType_ADV_DIRECT_IND = 2, 
-    ble_BleAdvType_ADV_NONCONN_IND = 3, 
-    ble_BleAdvType_ADV_SCAN_IND = 4, 
-    ble_BleAdvType_ADV_SCAN_RSP = 5 
+typedef enum _ble_BleAdvType {
+    ble_BleAdvType_ADV_UNKNOWN = 0,
+    ble_BleAdvType_ADV_IND = 1,
+    ble_BleAdvType_ADV_DIRECT_IND = 2,
+    ble_BleAdvType_ADV_NONCONN_IND = 3,
+    ble_BleAdvType_ADV_SCAN_IND = 4,
+    ble_BleAdvType_ADV_SCAN_RSP = 5
 } ble_BleAdvType;
 
-typedef enum _ble_BleDirection { 
-    ble_BleDirection_UNKNOWN = 0, 
-    ble_BleDirection_MASTER_TO_SLAVE = 1, 
-    ble_BleDirection_SLAVE_TO_MASTER = 2, 
-    ble_BleDirection_INJECTION_TO_SLAVE = 3, 
-    ble_BleDirection_INJECTION_TO_MASTER = 4 
+typedef enum _ble_BleDirection {
+    ble_BleDirection_UNKNOWN = 0,
+    ble_BleDirection_MASTER_TO_SLAVE = 1,
+    ble_BleDirection_SLAVE_TO_MASTER = 2,
+    ble_BleDirection_INJECTION_TO_SLAVE = 3,
+    ble_BleDirection_INJECTION_TO_MASTER = 4
 } ble_BleDirection;
 
-typedef enum _ble_BleAddrType { 
-    ble_BleAddrType_PUBLIC = 0, 
-    ble_BleAddrType_RANDOM = 1 
+typedef enum _ble_BleAddrType {
+    ble_BleAddrType_PUBLIC = 0,
+    ble_BleAddrType_RANDOM = 1
 } ble_BleAddrType;
 
 /* Struct definitions */
@@ -82,19 +82,19 @@ typedef enum _ble_BleAddrType {
  CentralModeCmd
 
  Enable central mode. */
-typedef struct _ble_CentralModeCmd { 
+typedef struct _ble_CentralModeCmd {
     char dummy_field;
 } ble_CentralModeCmd;
 
-typedef struct _ble_JamAdvCmd { 
+typedef struct _ble_JamAdvCmd {
     char dummy_field;
 } ble_JamAdvCmd;
 
-typedef struct _ble_PrepareSequenceCmd_ManualTrigger { 
+typedef struct _ble_PrepareSequenceCmd_ManualTrigger {
     char dummy_field;
 } ble_PrepareSequenceCmd_ManualTrigger;
 
-typedef struct _ble_SetAdvDataCmd { 
+typedef struct _ble_SetAdvDataCmd {
     pb_callback_t scan_data;
     pb_callback_t scanrsp_data;
 } ble_SetAdvDataCmd;
@@ -103,7 +103,7 @@ typedef struct _ble_SetAdvDataCmd {
  StartCmd
 
  Enable peripheral advertising and accept connections. */
-typedef struct _ble_StartCmd { 
+typedef struct _ble_StartCmd {
     char dummy_field;
 } ble_StartCmd;
 
@@ -111,13 +111,13 @@ typedef struct _ble_StartCmd {
  StopCmd
 
  Terminate active connection and stop peripheral. */
-typedef struct _ble_StopCmd { 
+typedef struct _ble_StopCmd {
     char dummy_field;
 } ble_StopCmd;
 
 /* *
  Desynchronized */
-typedef struct _ble_AccessAddressDiscovered { 
+typedef struct _ble_AccessAddressDiscovered {
     uint32_t access_address;
     bool has_rssi;
     int32_t rssi;
@@ -127,13 +127,13 @@ typedef struct _ble_AccessAddressDiscovered {
 
 typedef PB_BYTES_ARRAY_T(31) ble_AdvModeCmd_scan_data_t;
 typedef PB_BYTES_ARRAY_T(31) ble_AdvModeCmd_scanrsp_data_t;
-typedef struct _ble_AdvModeCmd { 
+typedef struct _ble_AdvModeCmd {
     ble_AdvModeCmd_scan_data_t scan_data;
     ble_AdvModeCmd_scanrsp_data_t scanrsp_data;
 } ble_AdvModeCmd;
 
 typedef PB_BYTES_ARRAY_T(31) ble_AdvPduReceived_adv_data_t;
-typedef struct _ble_AdvPduReceived { 
+typedef struct _ble_AdvPduReceived {
     ble_BleAdvType adv_type;
     int32_t rssi;
     pb_byte_t bd_address[6];
@@ -145,14 +145,14 @@ typedef struct _ble_AdvPduReceived {
  ConnectToCmd
 
  Connect to a specific target device. */
-typedef struct _ble_ConnectToCmd { 
+typedef struct _ble_ConnectToCmd {
     pb_byte_t bd_address[6];
     ble_BleAddrType addr_type;
 } ble_ConnectToCmd;
 
 /* *
  Injected */
-typedef struct _ble_Connected { 
+typedef struct _ble_Connected {
     pb_byte_t initiator[6];
     pb_byte_t advertiser[6];
     uint32_t access_address;
@@ -161,16 +161,16 @@ typedef struct _ble_Connected {
     ble_BleAddrType init_addr_type;
 } ble_Connected;
 
-typedef struct _ble_Desynchronized { 
+typedef struct _ble_Desynchronized {
     /* Messages */
     uint32_t access_address;
 } ble_Desynchronized;
 
-typedef struct _ble_DisconnectCmd { 
+typedef struct _ble_DisconnectCmd {
     int32_t conn_handle;
 } ble_DisconnectCmd;
 
-typedef struct _ble_Disconnected { 
+typedef struct _ble_Disconnected {
     uint32_t reason;
     uint32_t conn_handle;
 } ble_Disconnected;
@@ -183,11 +183,11 @@ typedef struct _ble_Disconnected {
 
  `access_address` specifies the target Access Address
     of the connection to hijack. */
-typedef struct _ble_HijackBothCmd { 
+typedef struct _ble_HijackBothCmd {
     uint32_t access_address;
 } ble_HijackBothCmd;
 
-typedef struct _ble_HijackMasterCmd { 
+typedef struct _ble_HijackMasterCmd {
     uint32_t access_address;
 } ble_HijackMasterCmd;
 
@@ -199,31 +199,31 @@ typedef struct _ble_HijackMasterCmd {
 
  `access_address` specifies the target Access Address
     of the connection to hijack. */
-typedef struct _ble_HijackSlaveCmd { 
+typedef struct _ble_HijackSlaveCmd {
     uint32_t access_address;
 } ble_HijackSlaveCmd;
 
-typedef struct _ble_Hijacked { 
+typedef struct _ble_Hijacked {
     bool success;
     uint32_t access_address;
 } ble_Hijacked;
 
-typedef struct _ble_Injected { 
+typedef struct _ble_Injected {
     bool success;
     uint32_t access_address;
     uint32_t injection_attempts;
 } ble_Injected;
 
-typedef struct _ble_JamAdvOnChannelCmd { 
+typedef struct _ble_JamAdvOnChannelCmd {
     uint32_t channel;
 } ble_JamAdvOnChannelCmd;
 
-typedef struct _ble_JamConnCmd { 
+typedef struct _ble_JamConnCmd {
     uint32_t access_address;
 } ble_JamConnCmd;
 
 typedef PB_BYTES_ARRAY_T(300) ble_PduReceived_pdu_t;
-typedef struct _ble_PduReceived { 
+typedef struct _ble_PduReceived {
     ble_BleDirection direction;
     ble_PduReceived_pdu_t pdu;
     uint32_t conn_handle;
@@ -237,30 +237,30 @@ typedef PB_BYTES_ARRAY_T(31) ble_PeripheralModeCmd_scanrsp_data_t;
  PeripheralModeCmd
 
  Enable peripheral mode. */
-typedef struct _ble_PeripheralModeCmd { 
+typedef struct _ble_PeripheralModeCmd {
     ble_PeripheralModeCmd_scan_data_t scan_data;
     ble_PeripheralModeCmd_scanrsp_data_t scanrsp_data;
 } ble_PeripheralModeCmd;
 
-typedef struct _ble_PrepareSequenceCmd_ConnectionEventTrigger { 
+typedef struct _ble_PrepareSequenceCmd_ConnectionEventTrigger {
     uint32_t connection_event;
 } ble_PrepareSequenceCmd_ConnectionEventTrigger;
 
 typedef PB_BYTES_ARRAY_T(255) ble_PrepareSequenceCmd_PendingPacket_packet_t;
-typedef struct _ble_PrepareSequenceCmd_PendingPacket { 
+typedef struct _ble_PrepareSequenceCmd_PendingPacket {
     ble_PrepareSequenceCmd_PendingPacket_packet_t packet;
 } ble_PrepareSequenceCmd_PendingPacket;
 
 typedef PB_BYTES_ARRAY_T(255) ble_PrepareSequenceCmd_ReceptionTrigger_pattern_t;
 typedef PB_BYTES_ARRAY_T(255) ble_PrepareSequenceCmd_ReceptionTrigger_mask_t;
-typedef struct _ble_PrepareSequenceCmd_ReceptionTrigger { 
+typedef struct _ble_PrepareSequenceCmd_ReceptionTrigger {
     ble_PrepareSequenceCmd_ReceptionTrigger_pattern_t pattern;
     ble_PrepareSequenceCmd_ReceptionTrigger_mask_t mask;
     uint32_t offset;
 } ble_PrepareSequenceCmd_ReceptionTrigger;
 
 typedef PB_BYTES_ARRAY_T(255) ble_RawPduReceived_pdu_t;
-typedef struct _ble_RawPduReceived { 
+typedef struct _ble_RawPduReceived {
     ble_BleDirection direction;
     uint32_t channel;
     bool has_rssi;
@@ -280,13 +280,13 @@ typedef struct _ble_RawPduReceived {
 } ble_RawPduReceived;
 
 typedef PB_BYTES_ARRAY_T(20) ble_ReactiveJamCmd_pattern_t;
-typedef struct _ble_ReactiveJamCmd { 
+typedef struct _ble_ReactiveJamCmd {
     uint32_t channel;
     ble_ReactiveJamCmd_pattern_t pattern;
     uint32_t position;
 } ble_ReactiveJamCmd;
 
-typedef struct _ble_ScanModeCmd { 
+typedef struct _ble_ScanModeCmd {
     bool active_scan;
 } ble_ScanModeCmd;
 
@@ -303,7 +303,7 @@ typedef PB_BYTES_ARRAY_T(300) ble_SendPDUCmd_pdu_t;
 
  If device is able to send raw packets, `access_address` and
  `crc` can be provided. */
-typedef struct _ble_SendPDUCmd { 
+typedef struct _ble_SendPDUCmd {
     ble_BleDirection direction;
     uint32_t conn_handle;
     ble_SendPDUCmd_pdu_t pdu;
@@ -319,7 +319,7 @@ typedef PB_BYTES_ARRAY_T(300) ble_SendRawPDUCmd_pdu_t;
 
  If device is able to send raw packets, `access_address` and
  `crc` can be provided. */
-typedef struct _ble_SendRawPDUCmd { 
+typedef struct _ble_SendRawPDUCmd {
     ble_BleDirection direction;
     uint32_t conn_handle;
     uint32_t access_address;
@@ -328,12 +328,12 @@ typedef struct _ble_SendRawPDUCmd {
     bool encrypt;
 } ble_SendRawPDUCmd;
 
-typedef struct _ble_SetBdAddressCmd { 
+typedef struct _ble_SetBdAddressCmd {
     pb_byte_t bd_address[6];
     ble_BleAddrType addr_type;
 } ble_SetBdAddressCmd;
 
-typedef struct _ble_SetEncryptionCmd { 
+typedef struct _ble_SetEncryptionCmd {
     bool enabled;
     pb_byte_t key[16];
     pb_byte_t iv[8];
@@ -346,11 +346,11 @@ typedef struct _ble_SetEncryptionCmd {
 
  Will send AccessAddressDiscovered notifications each
  time an AccessAddress has been found. */
-typedef struct _ble_SniffAccessAddressCmd { 
+typedef struct _ble_SniffAccessAddressCmd {
     pb_byte_t monitored_channels[5];
 } ble_SniffAccessAddressCmd;
 
-typedef struct _ble_SniffActiveConnCmd { 
+typedef struct _ble_SniffActiveConnCmd {
     uint32_t access_address;
     uint32_t crc_init;
     pb_byte_t channel_map[5];
@@ -359,7 +359,7 @@ typedef struct _ble_SniffActiveConnCmd {
     pb_byte_t monitored_channels[5];
 } ble_SniffActiveConnCmd;
 
-typedef struct _ble_SniffAdvCmd { 
+typedef struct _ble_SniffAdvCmd {
     /* Extended advertisements (BLE 5). */
     bool use_extended_adv;
     /* Channel can be specified, the device will only
@@ -368,14 +368,14 @@ listen on this specific channel. */
     pb_byte_t bd_address[6];
 } ble_SniffAdvCmd;
 
-typedef struct _ble_SniffConnReqCmd { 
+typedef struct _ble_SniffConnReqCmd {
     bool show_empty_packets;
     bool show_advertisements;
     uint32_t channel;
     pb_byte_t bd_address[6];
 } ble_SniffConnReqCmd;
 
-typedef struct _ble_Synchronized { 
+typedef struct _ble_Synchronized {
     uint32_t access_address;
     uint32_t crc_init;
     uint32_t hop_interval;
@@ -385,7 +385,7 @@ typedef struct _ble_Synchronized {
 
 /* *
  Disconnected */
-typedef struct _ble_PrepareSequenceCmd_Trigger { 
+typedef struct _ble_PrepareSequenceCmd_Trigger {
     pb_size_t which_trigger;
     union {
         ble_PrepareSequenceCmd_ReceptionTrigger reception;
@@ -394,7 +394,7 @@ typedef struct _ble_PrepareSequenceCmd_Trigger {
     } trigger;
 } ble_PrepareSequenceCmd_Trigger;
 
-typedef struct _ble_PrepareSequenceCmd { 
+typedef struct _ble_PrepareSequenceCmd {
     bool has_trigger;
     ble_PrepareSequenceCmd_Trigger trigger;
     ble_BleDirection direction;
@@ -402,7 +402,7 @@ typedef struct _ble_PrepareSequenceCmd {
     ble_PrepareSequenceCmd_PendingPacket sequence[25];
 } ble_PrepareSequenceCmd;
 
-typedef struct _ble_Message { 
+typedef struct _ble_Message {
     pb_size_t which_msg;
     union {
         ble_SetBdAddressCmd set_bd_addr;

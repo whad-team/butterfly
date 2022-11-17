@@ -398,6 +398,56 @@ void Core::processBLEInputMessage(ble_Message msg) {
     while (!this->bleController->isMasterPayloadTransmitted()) {}
     response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
   }
+  else if (msg.which_msg == ble_Message_prepare_tag) {
+    SequenceDirection direction = BLE_TO_SLAVE;
+    Trigger* trigger = NULL;
+
+    if (
+      msg.msg.prepare.direction == ble_BleDirection_INJECTION_TO_SLAVE ||
+      msg.msg.prepare.direction == ble_BleDirection_MASTER_TO_SLAVE
+    ) {
+      direction = BLE_TO_SLAVE;
+    }
+    else if (
+      msg.msg.prepare.direction == ble_BleDirection_INJECTION_TO_MASTER ||
+      msg.msg.prepare.direction == ble_BleDirection_SLAVE_TO_MASTER
+    ) {
+      direction = BLE_TO_MASTER;
+    }
+    else {
+      response = Whad::buildResultMessage(generic_ResultCode_WRONG_MODE);
+    }
+    if (response != NULL) {
+      if (msg.msg.prepare.trigger.which_trigger == ble_PrepareSequenceCmd_Trigger_reception_tag) {
+        trigger = new ReceptionTrigger(
+            msg.msg.prepare.trigger.trigger.reception.pattern.bytes,
+            msg.msg.prepare.trigger.trigger.reception.mask.bytes,
+            msg.msg.prepare.trigger.trigger.reception.pattern.size,
+            msg.msg.prepare.trigger.trigger.reception.offset
+         );
+      }
+      else if (msg.msg.prepare.trigger.which_trigger == ble_PrepareSequenceCmd_Trigger_connection_event_tag) {
+        trigger = new ConnectionEventTrigger(
+          msg.msg.prepare.trigger.trigger.connection_event.connection_event
+        );
+      }
+      else if (msg.msg.prepare.trigger.which_trigger == ble_PrepareSequenceCmd_Trigger_manual_tag) {
+        trigger = new ManualTrigger();
+      }
+      else {
+        response = Whad::buildResultMessage(generic_ResultCode_WRONG_MODE);
+      }
+    }
+    if (trigger != NULL) {
+      int numberOfPackets = msg.msg.prepare.sequence_count;
+      PacketSequence *sequence = this->sequenceModule->createSequence(numberOfPackets, trigger, direction);
+      for (int i=0;i<numberOfPackets;i++) {
+        sequence->preparePacket(msg.msg.prepare.sequence[i].packet.bytes,msg.msg.prepare.sequence[i].packet.size, true);
+      }
+      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    }
+
+  }
   /*
   else if (msg.which_msg == ble_Message_jam_adv_chan_tag) {
     int channel = msg.msg.jam_adv_chan.channel;
