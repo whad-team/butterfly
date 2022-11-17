@@ -34,6 +34,18 @@ BLEController::BLEController(Radio *radio) : Controller(radio) {
 	PacketSequence* sequence = this->sequenceModule->createSequence(2, trigger, BLE_TO_SLAVE);
 	sequence->preparePacket(packet1, 9, true);
 	sequence->preparePacket(packet2, 9, true);
+
+	uint8_t packet3[9] = {0x02,0x07,0x03,0x00,0x04,0x00,0x0a,0x08,0x00};
+	uint8_t packet4[9] ={0x02,0x07,0x03,0x00,0x04,0x00,0x0a,0x09,0x00};
+	uint8_t packet5[9] ={0x02,0x07,0x03,0x00,0x04,0x00,0x0a,0x0a,0x00};
+	uint8_t packet6[9] ={0x02,0x07,0x03,0x00,0x04,0x00,0x0a,0x0b,0x00};
+	ConnectionEventTrigger *trigger2 = new ConnectionEventTrigger(102);
+	PacketSequence* sequence2 = this->sequenceModule->createSequence(4, trigger2, BLE_TO_SLAVE);
+	sequence2->preparePacket(packet3, 9, true);
+	sequence2->preparePacket(packet4, 9, true);
+	sequence2->preparePacket(packet5, 9, true);
+	sequence2->preparePacket(packet6, 9, true);
+
 }
 
 void BLEController::checkSequenceConnectionEventTriggers(uint16_t connectionEvent) {
@@ -41,7 +53,7 @@ void BLEController::checkSequenceConnectionEventTriggers(uint16_t connectionEven
 		if (
 				this->sequenceModule->sequences[i] != NULL &&
 				this->sequenceModule->sequences[i]->isReady() &&
-				!this->sequenceModule->sequences[i]->isTriggered() &&
+				!(this->sequenceModule->sequences[i]->isTriggered()) &&
 				this->sequenceModule->sequences[i]->getTrigger()->getType() == CONNECTION_EVENT_TRIGGER
 			) {
 				ConnectionEventTrigger* trigger = (ConnectionEventTrigger*)this->sequenceModule->sequences[i]->getTrigger();
@@ -59,15 +71,20 @@ void BLEController::executeSequences() {
 				this->sequenceModule->sequences[i]->isReady() &&
 				this->sequenceModule->sequences[i]->isTriggered()
 			) {
-				if (!this->sequenceModule->sequences[i]->isTerminated()) {
+				if (!(this->sequenceModule->sequences[i]->isTerminated())) {
 					if (
 						this->sequenceModule->sequences[i]->getDirection() == BLE_TO_SLAVE &&
 						(this->controllerState == SIMULATING_MASTER || this->controllerState == PERFORMING_MITM)
 					) {
+
 						uint8_t *packet;
 						size_t packetSize;
 						bool updateHeader; // ignored for now
 						this->sequenceModule->sequences[i]->processPacket(&packet, &packetSize, &updateHeader);
+						if (packet[0] == 0x02) {
+							bsp_board_led_invert(0);
+							bsp_board_led_invert(1);
+						}
 						this->setMasterPayload(packet, packetSize);
 					}
 					else if (

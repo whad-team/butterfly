@@ -15,6 +15,7 @@ bool PacketSequence::isReady() {
 
 bool PacketSequence::preparePacket(uint8_t *packet, size_t packetSize, bool updateHeader) {
     this->sequence[this->sequenceIndex].packet = (uint8_t*)malloc(packetSize);
+    memcpy(this->sequence[this->sequenceIndex].packet, packet, packetSize);
     this->sequence[this->sequenceIndex].packetSize = packetSize;
     this->sequence[this->sequenceIndex].updateHeader = updateHeader;
     this->sequence[this->sequenceIndex].processed = false;
@@ -51,7 +52,7 @@ void PacketSequence::processPacket(uint8_t **packet, size_t *packetSize, bool* u
     }
 
     (*packetSize) = this->sequence[this->sequenceIndex].packetSize;
-    (*packet) = (uint8_t*)malloc(*packetSize);
+    (*packet) = (uint8_t*)malloc(this->sequence[this->sequenceIndex].packetSize);
     memcpy(*packet, this->sequence[this->sequenceIndex].packet, this->sequence[this->sequenceIndex].packetSize);
     (*updateHeader) = this->sequence[this->sequenceIndex].updateHeader;
     this->sequence[this->sequenceIndex].processed = true;
