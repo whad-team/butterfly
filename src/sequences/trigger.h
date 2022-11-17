@@ -5,8 +5,8 @@
 #include "stdlib.h"
 
 typedef enum TriggerType {
-    RECEPTION_TRIGGER, 
-    MANUAL_TRIGGER, 
+    RECEPTION_TRIGGER,
+    MANUAL_TRIGGER,
     CONNECTION_EVENT_TRIGGER
 } TriggerType;
 
@@ -14,7 +14,7 @@ class Trigger {
     protected:
         bool triggered;
         TriggerType type;
-        
+
     public:
         Trigger(TriggerType triggerType);
         bool isTriggered();
@@ -28,7 +28,7 @@ class ReceptionTrigger : public Trigger {
         uint8_t *mask;
         size_t patternSize;
         uint8_t offset;
-        
+
     public:
         ReceptionTrigger(uint8_t *pattern, uint8_t *mask, size_t patternSize, uint8_t offset);
         bool evaluate(uint8_t *payload, size_t payloadSize);
@@ -37,13 +37,14 @@ class ReceptionTrigger : public Trigger {
 
 
 class ManualTrigger : public Trigger {
+  public:
         ManualTrigger();
 };
 
 class ConnectionEventTrigger : public Trigger {
     protected:
         uint16_t connectionEvent;
-        
+
     public:
         ConnectionEventTrigger(uint16_t connectionEvent);
         bool evaluate(uint16_t connectionEvent);

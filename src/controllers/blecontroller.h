@@ -343,6 +343,9 @@ class BLEController : public Controller {
 		void executeInjectionToMaster();
 		void executeMasterRelatedHijacking();
 
+		// Sequences related methods
+		void checkManualTriggers();
+		void checkSequenceReceptionTriggers(uint8_t *packet, size_t size);
 		void checkSequenceConnectionEventTriggers(uint16_t connectionEvent);
 		void executeSequences();
 

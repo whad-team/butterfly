@@ -35,19 +35,44 @@ BLEController::BLEController(Radio *radio) : Controller(radio) {
 	sequence->preparePacket(packet1, 9, true);
 	sequence->preparePacket(packet2, 9, true);
 
-	uint8_t packet3[9] = {0x02,0x07,0x03,0x00,0x04,0x00,0x0a,0x08,0x00};
-	uint8_t packet4[9] ={0x02,0x07,0x03,0x00,0x04,0x00,0x0a,0x09,0x00};
-	uint8_t packet5[9] ={0x02,0x07,0x03,0x00,0x04,0x00,0x0a,0x0a,0x00};
-	uint8_t packet6[9] ={0x02,0x07,0x03,0x00,0x04,0x00,0x0a,0x0b,0x00};
-	ConnectionEventTrigger *trigger2 = new ConnectionEventTrigger(102);
-	PacketSequence* sequence2 = this->sequenceModule->createSequence(4, trigger2, BLE_TO_SLAVE);
-	sequence2->preparePacket(packet3, 9, true);
-	sequence2->preparePacket(packet4, 9, true);
-	sequence2->preparePacket(packet5, 9, true);
-	sequence2->preparePacket(packet6, 9, true);
+	uint8_t packet3[9] = {0x02,0x07,0x03,0x00,0x04,0x00,0x0a,0x69,0x00};
+	uint8_t opcode[3] = {1, 28, 0x41};
+	uint8_t mask[3] = {0xff, 0x00, 0xff};
 
+	ManualTrigger *trigger2 = new ManualTrigger();
+	PacketSequence* sequence2 = this->sequenceModule->createSequence(1, trigger2, BLE_TO_SLAVE);
+	sequence2->preparePacket(packet3, 9, true);
 }
 
+void BLEController::checkManualTriggers() {
+	for (int i=0;i<MAX_SEQUENCES;i++) {
+		if (
+				this->sequenceModule->sequences[i] != NULL &&
+				this->sequenceModule->sequences[i]->isReady() &&
+				!(this->sequenceModule->sequences[i]->isTriggered()) &&
+				this->sequenceModule->sequences[i]->getTrigger()->getType() == MANUAL_TRIGGER
+			) {
+				ManualTrigger* trigger = (ManualTrigger*)this->sequenceModule->sequences[i]->getTrigger();
+				trigger->trigger();
+		}
+	}
+}
+
+void BLEController::checkSequenceReceptionTriggers(uint8_t *packet, size_t size) {
+	for (int i=0;i<MAX_SEQUENCES;i++) {
+		if (
+				this->sequenceModule->sequences[i] != NULL &&
+				this->sequenceModule->sequences[i]->isReady() &&
+				!(this->sequenceModule->sequences[i]->isTriggered()) &&
+				this->sequenceModule->sequences[i]->getTrigger()->getType() == RECEPTION_TRIGGER
+			) {
+				ReceptionTrigger* trigger = (ReceptionTrigger*)this->sequenceModule->sequences[i]->getTrigger();
+				if (trigger->evaluate(packet, size)) {
+					trigger->trigger();
+				}
+		}
+	}
+}
 void BLEController::checkSequenceConnectionEventTriggers(uint16_t connectionEvent) {
 	for (int i=0;i<MAX_SEQUENCES;i++) {
 		if (
@@ -81,10 +106,6 @@ void BLEController::executeSequences() {
 						size_t packetSize;
 						bool updateHeader; // ignored for now
 						this->sequenceModule->sequences[i]->processPacket(&packet, &packetSize, &updateHeader);
-						if (packet[0] == 0x02) {
-							bsp_board_led_invert(0);
-							bsp_board_led_invert(1);
-						}
 						this->setMasterPayload(packet, packetSize);
 					}
 					else if (
@@ -93,11 +114,33 @@ void BLEController::executeSequences() {
 					) {
 						uint8_t *packet;
 						size_t packetSize;
-						bool updateHeader; // ignored for now
+						bool updateHeader;
 						this->sequenceModule->sequences[i]->processPacket(&packet, &packetSize, &updateHeader);
 						this->setSlavePayload(packet, packetSize);
 					}
-					// implement injection
+					else if (
+						this->sequenceModule->sequences[i]->getDirection() == BLE_TO_MASTER &&
+						this->controllerState == SNIFFING_CONNECTION
+					) {
+						uint8_t *packet;
+						size_t packetSize;
+						bool updateHeader;
+						this->sequenceModule->sequences[i]->processPacket(&packet, &packetSize, &updateHeader);
+						this->setAttackPayload(packet, packetSize);
+						this->startAttack(BLE_ATTACK_FRAME_INJECTION_TO_MASTER);
+					}
+					else if (
+						this->sequenceModule->sequences[i]->getDirection() == BLE_TO_SLAVE &&
+						this->controllerState == SNIFFING_CONNECTION
+					) {
+						uint8_t *packet;
+						size_t packetSize;
+						bool updateHeader;
+						this->sequenceModule->sequences[i]->processPacket(&packet, &packetSize, &updateHeader);
+						this->setAttackPayload(packet, packetSize);
+						this->startAttack(BLE_ATTACK_FRAME_INJECTION_TO_SLAVE);
+					}
+
 				}
 				else {
 					this->sequenceModule->deleteSequence(this->sequenceModule->sequences[i]);
@@ -493,6 +536,7 @@ bool BLEController::goToNextChannel() {
 			int channel = this->nextChannel();
 			this->setChannel(channel);
 
+			if (this->connectionEventCount == 30) this->checkManualTriggers();
 			this->executeAttack();
 			this->checkSequenceConnectionEventTriggers(this->connectionEventCount);
 			this->executeSequences();
@@ -1554,7 +1598,7 @@ void BLEController::initializeConnection() {
 	this->updateHopIncrement(this->connectionInitiationData.hopIncrement);
 	this->updateChannelsInUse(this->connectionInitiationData.channelMap);
 
-	this->emptyTransmitIndicator = true;
+	//this->emptyTransmitIndicator = true;
 
 	this->radio->disableFilter();
 	this->radio->disableAutoTXafterRX();
@@ -2088,7 +2132,7 @@ void BLEController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer,
 			// If the packet is a connection packet, call onConnectionPacket
 			this->connectionPacketProcessing(pkt);
 		}
-
+		this->checkSequenceReceptionTriggers(buffer, size);
 		// Delete the packet object if it is not NULL
 		if (pkt != NULL) delete pkt;
 	}

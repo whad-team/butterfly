@@ -78,6 +78,24 @@ PB_BIND(ble_SetEncryptionCmd, ble_SetEncryptionCmd, AUTO)
 PB_BIND(ble_ReactiveJamCmd, ble_ReactiveJamCmd, AUTO)
 
 
+PB_BIND(ble_PrepareSequenceCmd, ble_PrepareSequenceCmd, 4)
+
+
+PB_BIND(ble_PrepareSequenceCmd_ReceptionTrigger, ble_PrepareSequenceCmd_ReceptionTrigger, 2)
+
+
+PB_BIND(ble_PrepareSequenceCmd_ConnectionEventTrigger, ble_PrepareSequenceCmd_ConnectionEventTrigger, AUTO)
+
+
+PB_BIND(ble_PrepareSequenceCmd_ManualTrigger, ble_PrepareSequenceCmd_ManualTrigger, AUTO)
+
+
+PB_BIND(ble_PrepareSequenceCmd_Trigger, ble_PrepareSequenceCmd_Trigger, 2)
+
+
+PB_BIND(ble_PrepareSequenceCmd_PendingPacket, ble_PrepareSequenceCmd_PendingPacket, 2)
+
+
 PB_BIND(ble_AccessAddressDiscovered, ble_AccessAddressDiscovered, AUTO)
 
 
@@ -108,7 +126,7 @@ PB_BIND(ble_RawPduReceived, ble_RawPduReceived, 2)
 PB_BIND(ble_PduReceived, ble_PduReceived, 2)
 
 
-PB_BIND(ble_Message, ble_Message, 2)
+PB_BIND(ble_Message, ble_Message, 4)
 
 
 
