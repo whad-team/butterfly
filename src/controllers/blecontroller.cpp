@@ -13,6 +13,8 @@ int BLEController::channelToFrequency(int channel) {
 
 BLEController::BLEController(Radio *radio) : Controller(radio) {
 	this->timerModule = Core::instance->getTimerModule();
+	this->sequenceModule = Core::instance->getSequenceModule();
+	this->sequenceModule->reset();
 	this->connectionTimer = NULL;
 	this->injectionTimer = NULL;
 	this->masterTimer = NULL;
@@ -24,8 +26,69 @@ BLEController::BLEController(Radio *radio) : Controller(radio) {
 	// Configure arbitrary BD address for now
 	uint8_t oaddr[] = {0x11,	0x22, 0x33, 0x44,	0x55, 0x66};
 	this->setOwnAddress(oaddr, 6);
+
+	// Testing sequences
+	uint8_t packet1[9] = {0x02,0x07,0x03,0x00,0x04,0x00,0x0a,0x01,0x00};
+	uint8_t packet2[9] ={0x02,0x07,0x03,0x00,0x04,0x00,0x0a,0x41,0x00};
+	ConnectionEventTrigger *trigger = new ConnectionEventTrigger(100);
+	PacketSequence* sequence = this->sequenceModule->createSequence(2, trigger, BLE_TO_SLAVE);
+	sequence->preparePacket(packet1, 9, true);
+	sequence->preparePacket(packet2, 9, true);
 }
 
+void BLEController::checkSequenceConnectionEventTriggers(uint16_t connectionEvent) {
+	for (int i=0;i<MAX_SEQUENCES;i++) {
+		if (
+				this->sequenceModule->sequences[i] != NULL &&
+				this->sequenceModule->sequences[i]->isReady() &&
+				!this->sequenceModule->sequences[i]->isTriggered() &&
+				this->sequenceModule->sequences[i]->getTrigger()->getType() == CONNECTION_EVENT_TRIGGER
+			) {
+				ConnectionEventTrigger* trigger = (ConnectionEventTrigger*)this->sequenceModule->sequences[i]->getTrigger();
+				if (trigger->evaluate(connectionEvent)) {
+					trigger->trigger();
+				}
+		}
+	}
+}
+
+void BLEController::executeSequences() {
+	for (int i=0;i<MAX_SEQUENCES;i++) {
+		if (
+				this->sequenceModule->sequences[i] != NULL &&
+				this->sequenceModule->sequences[i]->isReady() &&
+				this->sequenceModule->sequences[i]->isTriggered()
+			) {
+				if (!this->sequenceModule->sequences[i]->isTerminated()) {
+					if (
+						this->sequenceModule->sequences[i]->getDirection() == BLE_TO_SLAVE &&
+						(this->controllerState == SIMULATING_MASTER || this->controllerState == PERFORMING_MITM)
+					) {
+						uint8_t *packet;
+						size_t packetSize;
+						bool updateHeader; // ignored for now
+						this->sequenceModule->sequences[i]->processPacket(&packet, &packetSize, &updateHeader);
+						this->setMasterPayload(packet, packetSize);
+					}
+					else if (
+						this->sequenceModule->sequences[i]->getDirection() == BLE_TO_MASTER &&
+						(this->controllerState == SIMULATING_SLAVE || this->controllerState == PERFORMING_MITM)
+					) {
+						uint8_t *packet;
+						size_t packetSize;
+						bool updateHeader; // ignored for now
+						this->sequenceModule->sequences[i]->processPacket(&packet, &packetSize, &updateHeader);
+						this->setSlavePayload(packet, packetSize);
+					}
+					// implement injection
+				}
+				else {
+					this->sequenceModule->deleteSequence(this->sequenceModule->sequences[i]);
+				}
+
+			}
+	}
+}
 void BLEController::setOwnAddress(uint8_t *address, bool random) {
 	this->own.bytes[0] = address[5];
 	this->own.bytes[1] = address[4];
@@ -414,7 +477,8 @@ bool BLEController::goToNextChannel() {
 			this->setChannel(channel);
 
 			this->executeAttack();
-
+			this->checkSequenceConnectionEventTriggers(this->connectionEventCount);
+			this->executeSequences();
 		}
 		return this->desyncCounter <= 5;
 	}
@@ -1127,15 +1191,15 @@ void BLEController::executeAttack() {
 }
 
 bool BLEController::masterRoleCallback(BLEPacket *pkt) {
-
-		if (this->connectionEventCount >= 100 && this->connectionEventCount <= 110) {
-			this->startMDSequence();
-		}
-		else if (this->connectionEventCount > 110){
-			this->stopMDSequence();
-			this->connectionLost();
-		}
-
+	/*
+	if (this->connectionEventCount >= 100 && this->connectionEventCount <= 110) {
+		this->startMDSequence();
+	}
+	else if (this->connectionEventCount > 110){
+		this->stopMDSequence();
+		this->connectionLost();
+	}
+	*/
 	if (!this->masterPayload.transmitted) {
 		this->masterPayload.responseReceived = !BLEPacket::needResponse(this->masterPayload.payload, this->masterPayload.size);
 		this->masterPayload.payload[0] = (this->masterPayload.payload[0] & 0xF3) | (this->simulatedMasterSequenceNumbers.nesn  << 2) | (this->simulatedMasterSequenceNumbers.sn << 3);
@@ -1812,7 +1876,7 @@ void BLEController::roleSimulationProcessing(BLEPacket* pkt) {
 void BLEController::connectionPacketProcessing(BLEPacket *pkt) {
 	// Increment the packet counter
 	this->packetCount++;
-
+	/*
 	if (this->mdSequence) {
 		for (int i=0;i<15;i++) {
 			nrf_delay_us(80);
@@ -1826,9 +1890,8 @@ void BLEController::connectionPacketProcessing(BLEPacket *pkt) {
 
 		}
 		this->addPacket(pkt);
-		//this->startMDSequence();
 		return;
-	}
+	}*/
 
 	if (this->controllerState == CONNECTION_INITIATION) {
 		this->connectionInitiationConnectedProcessing(pkt);

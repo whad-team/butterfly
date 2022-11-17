@@ -11,8 +11,8 @@
 #include "led.h"
 #include "serial.h"
 #include "timer.h"
-#include "link.h"
 #include "radio.h"
+#include "sequences/sequenceModule.h"
 
 #include "messageQueue.h"
 
@@ -31,7 +31,7 @@ class Core {
 		LedModule *ledModule;
 		SerialComm *serialModule;
 		TimerModule *timerModule;
-		//LinkModule *linkModule;
+		SequenceModule *sequenceModule;
 		Radio *radio;
 
 		MessageQueue messageQueue;
@@ -51,7 +51,7 @@ class Core {
 		Core();
 		LedModule *getLedModule();
 		SerialComm *getSerialModule();
-		//LinkModule *getLinkModule();
+		SequenceModule *getSequenceModule();
 		TimerModule *getTimerModule();
 		Radio *getRadioModule();
 

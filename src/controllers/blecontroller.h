@@ -1,9 +1,10 @@
 #ifndef BLECONTROLLER_H
 #define BLECONTROLLER_H
-#include "../packet.h"
-#include "../controller.h"
-#include "../timer.h"
+#include "packet.h"
+#include "controller.h"
+#include "timer.h"
 #include "whad/whad.h"
+#include "sequences/sequenceModule.h"
 
 #define ADV_REPORT_SIZE 25
 
@@ -164,6 +165,7 @@ typedef struct ConnectionInitiationData {
 class BLEController : public Controller {
 	protected:
 		TimerModule *timerModule;
+		SequenceModule *sequenceModule;
 
 		Timer* connectionTimer;
 		Timer* injectionTimer;
@@ -341,6 +343,8 @@ class BLEController : public Controller {
 		void executeInjectionToMaster();
 		void executeMasterRelatedHijacking();
 
+		void checkSequenceConnectionEventTriggers(uint16_t connectionEvent);
+		void executeSequences();
 
 		void checkAttackSuccess();
 

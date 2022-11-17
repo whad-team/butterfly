@@ -172,8 +172,10 @@ SRC_FILES += \
 	$(PROJ_DIR)/led.cpp \
 	$(PROJ_DIR)/timer.cpp \
 	$(PROJ_DIR)/helpers.cpp \
-	$(PROJ_DIR)/link.cpp \
 	$(PROJ_DIR)/serial.cpp \
+	$(PROJ_DIR)/sequences/trigger.cpp \
+	$(PROJ_DIR)/sequences/sequence.cpp \
+	$(PROJ_DIR)/sequences/sequenceModule.cpp \
 	$(PROJ_DIR)/radio.cpp \
 	$(PROJ_DIR)/controller.cpp \
 	$(PROJ_DIR)/packet.cpp \

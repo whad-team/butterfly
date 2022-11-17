@@ -722,7 +722,7 @@ Core::Core() {
 	instance = this;
 	this->ledModule = new LedModule();
 	this->timerModule = new TimerModule();
-	//this->linkModule = new LinkModule();
+	this->sequenceModule = new SequenceModule();
 	this->serialModule = new SerialComm((CoreCallback)&Core::handleInputData,this);
 	this->radio = new Radio();
 
@@ -753,10 +753,10 @@ LedModule* Core::getLedModule() {
 SerialComm *Core::getSerialModule() {
 	return (this->serialModule);
 }
-/*
-LinkModule* Core::getLinkModule() {
-	return (this->linkModule);
-}*/
+
+SequenceModule* Core::getSequenceModule() {
+	return (this->sequenceModule);
+}
 
 TimerModule* Core::getTimerModule() {
 	return (this->timerModule);
