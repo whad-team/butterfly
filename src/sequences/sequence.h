@@ -19,6 +19,7 @@ class PacketSequence {
         size_t sequenceSize;
         uint8_t sequenceIndex;
         Trigger *trigger;
+        uint8_t identifier;
         bool ready;
         SequenceDirection direction;
 
@@ -26,6 +27,8 @@ class PacketSequence {
         PacketSequence(size_t sequenceSize, Trigger *trigger, SequenceDirection direction);
         SequenceDirection getDirection();
         bool isReady();
+        uint8_t getIdentifier();
+        void setIdentifier(uint8_t identifier);
         bool preparePacket(uint8_t *packet, size_t packetSize, bool updateHeader);
         void processPacket(uint8_t **packet, size_t *packetSize, bool* updateHeader);
         bool isTriggered();

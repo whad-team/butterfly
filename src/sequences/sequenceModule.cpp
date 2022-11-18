@@ -16,6 +16,7 @@ PacketSequence* SequenceModule::createSequence(size_t size, Trigger* trigger, Se
     }
     if (selectedSpot != -1) {
         this->sequences[selectedSpot] = new PacketSequence(size, trigger, direction);
+        this->sequences[selectedSpot]->setIdentifier(selectedSpot);
         return this->sequences[selectedSpot];
     }
     else {

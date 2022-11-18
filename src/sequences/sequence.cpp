@@ -12,6 +12,12 @@ PacketSequence::PacketSequence(size_t sequenceSize, Trigger *trigger, SequenceDi
 bool PacketSequence::isReady() {
   return this->ready;
 }
+uint8_t PacketSequence::getIdentifier() {
+  return this->identifier;
+}
+void PacketSequence::setIdentifier(uint8_t identifier) {
+  this->identifier = identifier;
+}
 
 bool PacketSequence::preparePacket(uint8_t *packet, size_t packetSize, bool updateHeader) {
     this->sequence[this->sequenceIndex].packet = (uint8_t*)malloc(packetSize);

@@ -35,7 +35,8 @@ const DeviceCapability CAPABILITIES[] = {
       CMD(ble_BleCommand_ReactiveJam) |
       CMD(ble_BleCommand_ConnectTo) |
       CMD(ble_BleCommand_Disconnect) |
-      CMD(ble_BleCommand_PrepareSequence)
+      CMD(ble_BleCommand_PrepareSequence) |
+      CMD(ble_BleCommand_TriggerSequence)
       )
   },
   {

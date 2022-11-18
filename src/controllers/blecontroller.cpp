@@ -46,7 +46,7 @@ BLEController::BLEController(Radio *radio) : Controller(radio) {
 	*/
 }
 
-void BLEController::checkManualTriggers() {
+bool BLEController::checkManualTriggers(uint8_t id) {
 	for (int i=0;i<MAX_SEQUENCES;i++) {
 		if (
 				this->sequenceModule->sequences[i] != NULL &&
@@ -55,9 +55,13 @@ void BLEController::checkManualTriggers() {
 				this->sequenceModule->sequences[i]->getTrigger()->getType() == MANUAL_TRIGGER
 			) {
 				ManualTrigger* trigger = (ManualTrigger*)this->sequenceModule->sequences[i]->getTrigger();
-				trigger->trigger();
+				if (id == i) {
+					trigger->trigger();
+					return true;
+				}
 		}
 	}
+	return false;
 }
 
 void BLEController::checkSequenceReceptionTriggers(uint8_t *packet, size_t size) {
@@ -538,8 +542,8 @@ bool BLEController::goToNextChannel() {
 			int channel = this->nextChannel();
 			this->setChannel(channel);
 
-			if (this->connectionEventCount == 30) this->checkManualTriggers();
 			this->executeAttack();
+
 			this->checkSequenceConnectionEventTriggers(this->connectionEventCount);
 			this->executeSequences();
 		}

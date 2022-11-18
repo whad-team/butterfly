@@ -446,8 +446,20 @@ void Core::processBLEInputMessage(ble_Message msg) {
         sequence->preparePacket(msg.msg.prepare.sequence[i].packet.bytes,msg.msg.prepare.sequence[i].packet.size, true);
       }
       response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      this->pushMessageToQueue(response);
+
+      response = Whad::buildBLETriggerChangeMessage(sequence->getIdentifier(), false);
     }
 
+  }
+  else if (msg.which_msg == ble_Message_trigger_tag) {
+      uint8_t id = msg.msg.trigger.id;
+      if (this->bleController->checkManualTriggers(id)) {
+        response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      }
+      else {
+        response = Whad::buildResultMessage(generic_ResultCode_ERROR);
+      }
   }
   /*
   else if (msg.which_msg == ble_Message_jam_adv_chan_tag) {
