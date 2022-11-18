@@ -89,14 +89,6 @@ typedef struct _phy_SetBPSKModulationCmd {
 } phy_SetBPSKModulationCmd;
 
 /* *
- SetQPSKModulationCmd
-
- Configure the transceiver to use Quadrature Phase Shift Keying modulation scheme. */
-typedef struct _phy_SetQPSKModulationCmd { 
-    char dummy_field;
-} phy_SetQPSKModulationCmd;
-
-/* *
  StartCmd
 
  Enable current mode. */
@@ -225,6 +217,14 @@ typedef struct _phy_SetGFSKModulationCmd {
 typedef struct _phy_SetPacketSizeCmd { 
     uint32_t size;
 } phy_SetPacketSizeCmd;
+
+/* *
+ SetQPSKModulationCmd
+
+ Configure the transceiver to use Quadrature Phase Shift Keying modulation scheme. */
+typedef struct _phy_SetQPSKModulationCmd { 
+    bool offset_qpsk;
+} phy_SetQPSKModulationCmd;
 
 /* *
  SetSubGhzFrequencyCmd
@@ -399,6 +399,7 @@ extern "C" {
 #define phy_SetFiveGhzFrequencyCmd_frequency_offset_tag 1
 #define phy_SetGFSKModulationCmd_deviation_tag   1
 #define phy_SetPacketSizeCmd_size_tag            1
+#define phy_SetQPSKModulationCmd_offset_qpsk_tag 1
 #define phy_SetSubGhzFrequencyCmd_frequency_offset_tag 1
 #define phy_SetSyncWordCmd_sync_word_tag         1
 #define phy_SetTXPowerCmd_tx_power_tag           1
@@ -451,7 +452,7 @@ X(a, STATIC,   SINGULAR, UINT32,   deviation,         1)
 #define phy_SetBPSKModulationCmd_DEFAULT NULL
 
 #define phy_SetQPSKModulationCmd_FIELDLIST(X, a) \
-
+X(a, STATIC,   SINGULAR, BOOL,     offset_qpsk,       1)
 #define phy_SetQPSKModulationCmd_CALLBACK NULL
 #define phy_SetQPSKModulationCmd_DEFAULT NULL
 
@@ -681,7 +682,7 @@ extern const pb_msgdesc_t phy_Message_msg;
 #define phy_SetFiveGhzFrequencyCmd_size          6
 #define phy_SetGFSKModulationCmd_size            6
 #define phy_SetPacketSizeCmd_size                6
-#define phy_SetQPSKModulationCmd_size            0
+#define phy_SetQPSKModulationCmd_size            2
 #define phy_SetSubGhzFrequencyCmd_size           6
 #define phy_SetSyncWordCmd_size                  12
 #define phy_SetTXPowerCmd_size                   2

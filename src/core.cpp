@@ -417,7 +417,7 @@ void Core::processBLEInputMessage(ble_Message msg) {
     else {
       response = Whad::buildResultMessage(generic_ResultCode_WRONG_MODE);
     }
-    if (response != NULL) {
+    if (response == NULL) {
       if (msg.msg.prepare.trigger.which_trigger == ble_PrepareSequenceCmd_Trigger_reception_tag) {
         trigger = new ReceptionTrigger(
             msg.msg.prepare.trigger.trigger.reception.pattern.bytes,
@@ -435,6 +435,7 @@ void Core::processBLEInputMessage(ble_Message msg) {
         trigger = new ManualTrigger();
       }
       else {
+
         response = Whad::buildResultMessage(generic_ResultCode_WRONG_MODE);
       }
     }
