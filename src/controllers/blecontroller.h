@@ -50,7 +50,9 @@ typedef enum BLEControllerState {
 	JAMMING_CONNECT_REQ,
 	REACTIVE_JAMMING,
 
-	CONNECTION_INITIATION
+	CONNECTION_INITIATION,
+	SCANNING,
+	ADVERTISING
 } BLEControllerState;
 
 // Connection update definitions
@@ -162,6 +164,22 @@ typedef struct ConnectionInitiationData {
 		uint8_t channelMap[5];
 } ConnectionInitiationData;
 
+typedef struct AdvertisingData {
+	uint8_t advertisingData[255];
+	size_t advertisingDataSize;
+
+	uint8_t scanData[255];
+	size_t scanDataSize;
+
+	uint32_t advertisingInterval;
+	uint32_t advertisingDelay;
+
+	uint32_t lastAdvertisingEvent;
+	uint32_t lastAdvertisementTimestamp;
+
+	bool connectable;
+} AdvertisingData;
+
 class BLEController : public Controller {
 	protected:
 		TimerModule *timerModule;
@@ -172,11 +190,16 @@ class BLEController : public Controller {
 		Timer* masterTimer;
 		Timer* discoveryTimer;
 		Timer* initTimer;
+		Timer* timeoutTimer;
+		Timer* scanningTimer;
+		Timer* advertisingTimer;
 
 		uint32_t lastAnchorPoint;
 		bool emptyTransmitIndicator;
 		bool advertisementsTransmitIndicator;
 		bool follow; // follow mode indicator
+
+		bool activeScanning;
 
 		// Channels related attributes
 		int channel;
@@ -244,6 +267,10 @@ class BLEController : public Controller {
 		bool ownRandom;
 
 		bool mdSequence;
+		int mdCount;
+
+		AdvertisingData advertisingData;
+
 	public:
 		static int channelToFrequency(int channel);
 
@@ -254,6 +281,8 @@ class BLEController : public Controller {
 		void sniff();
 
 		void setAnchorPoint(uint32_t timestamp);
+
+		bool newAdvertisingTransmission();
 
 		bool whitelistAdvAddress(bool enable, uint8_t a, uint8_t b, uint8_t c,uint8_t d, uint8_t e, uint8_t f);
 		bool whitelistInitAddress(bool enable, uint8_t a, uint8_t b, uint8_t c,uint8_t d, uint8_t e, uint8_t f);
@@ -281,6 +310,8 @@ class BLEController : public Controller {
 		void setCrcRecoveryConfiguration(uint32_t accessAddress);
 		void setReactiveJammerConfiguration(uint8_t *pattern, size_t size, int position);
 
+		void startScanning(bool active);
+
 		// Follow mode setter
 		void setFollowMode(bool follow);
 
@@ -296,6 +327,10 @@ class BLEController : public Controller {
 		// Connection specific methods
 		void followConnection(uint16_t hopInterval, uint8_t hopIncrement, uint8_t *channelMap,uint32_t accessAddress,uint32_t crcInit,  int masterSCA,uint16_t latency);
 
+		void advertise(uint8_t *advertisingData, size_t advertisingDataSize, uint8_t *scanData, size_t scanDataSize, bool connectable, uint32_t interval);
+
+		bool checkSynchronization();
+		bool stopConnection();
 		int getChannel();
 		void setChannel(int channel);
 		int nextChannel();
@@ -348,6 +383,7 @@ class BLEController : public Controller {
 		void checkSequenceReceptionTriggers(uint8_t *packet, size_t size);
 		void checkSequenceConnectionEventTriggers(uint16_t connectionEvent);
 		void executeSequences();
+		void sendTriggeredReport(uint8_t id);
 
 		void checkAttackSuccess();
 
@@ -387,10 +423,6 @@ class BLEController : public Controller {
 		bool sendFirstConnectionPacket();
 		void initializeConnection();
 
-		// Connection manipulation methods
-		void startMDSequence();
-		void stopMDSequence();
-
 		// Packets processing methods
 		void connectionInitiationAdvertisementProcessing(BLEPacket *pkt);
 		void connectionInitiationConnectedProcessing(BLEPacket *pkt);
@@ -404,6 +436,7 @@ class BLEController : public Controller {
 		void advertisementPacketProcessing(BLEPacket *pkt);
 		void connectionPacketProcessing(BLEPacket *pkt);
 
+		void advertisementScanningProcessing(BLEPacket *pkt);
 		void advertisementSniffingProcessing(BLEPacket *pkt);
 		void advertisingIntervalEstimationProcessing(BLEPacket *pkt);
 

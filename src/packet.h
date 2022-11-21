@@ -73,6 +73,9 @@ class BLEPacket : public Packet {
 		static void forgeConnectionUpdateRequest(uint8_t **payload,size_t *size, uint8_t winSize, uint16_t winOffset, uint16_t interval, uint16_t latency, uint16_t timeout, uint16_t instant);
 		static void forgeChannelMapRequest(uint8_t **payload,size_t *size,uint16_t instant, uint8_t *channelMap);
 		static void forgeConnectionRequest(uint8_t **payload,size_t *size, uint8_t *initiator, bool initiatorRandom,  uint8_t *responder, bool responderRandom, uint32_t accessAddress,  uint32_t crcInit, uint8_t windowSize, uint16_t windowOffset, uint16_t hopInterval, uint16_t slaveLatency, uint16_t timeout, uint8_t sca, uint8_t hopIncrement, uint8_t *channelMap);
+		static void forgeScanRequest(uint8_t **payload,size_t *size, uint8_t *initiator, bool initiatorRandom,  uint8_t *responder, bool responderRandom);
+		static void forgeAdvInd(uint8_t **payload,size_t *size, uint8_t *advertiser, bool advertiserRandom,  uint8_t *data, size_t dataSize);
+		static void forgeScanResponse(uint8_t **payload,size_t *size, uint8_t *advertiser, bool advertiserRandom,  uint8_t *data, size_t dataSize);
 
 		BLEPacket(uint32_t accessAddress,uint8_t *packetBuffer, size_t packetSize, uint32_t timestamp, uint32_t timestampRelative, uint8_t source, uint8_t channel,int8_t rssi,CrcValue crcValue);
 
@@ -96,6 +99,8 @@ class BLEPacket : public Packet {
 		uint8_t* extractChannelMap();
 		uint16_t extractInstant();
 		int extractSCA();
+
+		bool extractAdvertiserAddress(uint8_t *address, bool *random);
 
 		bool checkAdvertiserAddress(BLEAddress address);
 

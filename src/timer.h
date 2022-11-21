@@ -3,7 +3,9 @@
 #include "controller.h"
 
 #define TIMER_PRESCALER 4
-#define NUMBER_OF_TIMERS 5
+#define NUMBER_OF_TIMERS_4 5
+#define NUMBER_OF_TIMERS_3 6
+
 typedef bool (Controller::*ControllerCallback) (void);
 
 typedef enum TimerMode {
@@ -14,6 +16,7 @@ typedef enum TimerMode {
 class Timer {
   private:
     int id;
+    int base;
     int duration;
     int lastTimestamp;
     TimerMode mode;
@@ -23,7 +26,7 @@ class Timer {
     bool used;
 
   public:
-    Timer(int id);
+    Timer(int id, int base);
 
     int getLastTimestamp();
     void setLastTimestamp(int lastTimestamp);
@@ -43,42 +46,16 @@ class Timer {
     void release();
 };
 
-class HardwareControlledTimer {
-  private:
-    int duration;
-    Controller *controller;
-    ControllerCallback callback;
-    bool used;
-
-  public:
-    HardwareControlledTimer();
-
-    void enable(volatile void* event);
-    void disable();
-
-    bool isUsed();
-    ControllerCallback getCallback();
-    Controller* getController();
-    int getDuration();
-
-    void setCallback(ControllerCallback callback, Controller* controller);
-    void setDuration(int duration);
-
-    void setUsed(bool used);
-    void release();
-};
 
 class TimerModule {
 	public:
-    Timer* timers[5];
-    HardwareControlledTimer* hardwareTimer;
+    Timer* timers[NUMBER_OF_TIMERS_4 + NUMBER_OF_TIMERS_3];
 
 		static TimerModule *instance;
 
     TimerModule();
     uint32_t getTimestamp();
     Timer* getTimer();
-    HardwareControlledTimer* getHardwareControlledTimer();
     void releaseTimer(Timer* timer);
 };
 #endif

@@ -99,7 +99,7 @@ PB_BIND(ble_PrepareSequenceCmd_PendingPacket, ble_PrepareSequenceCmd_PendingPack
 PB_BIND(ble_TriggerSequenceCmd, ble_TriggerSequenceCmd, AUTO)
 
 
-PB_BIND(ble_TriggerChange, ble_TriggerChange, AUTO)
+PB_BIND(ble_Triggered, ble_Triggered, AUTO)
 
 
 PB_BIND(ble_AccessAddressDiscovered, ble_AccessAddressDiscovered, AUTO)
@@ -133,7 +133,6 @@ PB_BIND(ble_PduReceived, ble_PduReceived, 2)
 
 
 PB_BIND(ble_Message, ble_Message, 4)
-
 
 
 

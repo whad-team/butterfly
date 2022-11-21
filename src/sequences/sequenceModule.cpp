@@ -6,7 +6,7 @@ SequenceModule::SequenceModule() {
     }
 }
 
-PacketSequence* SequenceModule::createSequence(size_t size, Trigger* trigger, SequenceDirection direction) {
+PacketSequence* SequenceModule::createSequence(size_t size, Trigger* trigger, SequenceDirection direction, uint8_t id) {
     int selectedSpot = -1;
     for (int i=0; i<MAX_SEQUENCES;i++) {
         if (this->sequences[i] == NULL) {
@@ -16,7 +16,7 @@ PacketSequence* SequenceModule::createSequence(size_t size, Trigger* trigger, Se
     }
     if (selectedSpot != -1) {
         this->sequences[selectedSpot] = new PacketSequence(size, trigger, direction);
-        this->sequences[selectedSpot]->setIdentifier(selectedSpot);
+        this->sequences[selectedSpot]->setIdentifier(id);
         return this->sequences[selectedSpot];
     }
     else {

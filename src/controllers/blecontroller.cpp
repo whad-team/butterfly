@@ -20,6 +20,10 @@ BLEController::BLEController(Radio *radio) : Controller(radio) {
 	this->masterTimer = NULL;
 	this->discoveryTimer = NULL;
 	this->initTimer = NULL;
+	this->timeoutTimer = NULL;
+	this->scanningTimer = NULL;
+	this->advertisingTimer = NULL;
+
 	this->advertisementsTransmitIndicator = true;
 	this->softwareFilterEnabled = false;
 
@@ -27,23 +31,6 @@ BLEController::BLEController(Radio *radio) : Controller(radio) {
 	uint8_t oaddr[] = {0x11,	0x22, 0x33, 0x44,	0x55, 0x66};
 	this->setOwnAddress(oaddr, 6);
 
-	// Testing sequences
-	/*
-	uint8_t packet1[9] = {0x02,0x07,0x03,0x00,0x04,0x00,0x0a,0x01,0x00};
-	uint8_t packet2[9] ={0x02,0x07,0x03,0x00,0x04,0x00,0x0a,0x41,0x00};
-	ConnectionEventTrigger *trigger = new ConnectionEventTrigger(100);
-	PacketSequence* sequence = this->sequenceModule->createSequence(2, trigger, BLE_TO_SLAVE);
-	sequence->preparePacket(packet1, 9, true);
-	sequence->preparePacket(packet2, 9, true);
-
-	uint8_t packet3[9] = {0x02,0x07,0x03,0x00,0x04,0x00,0x0a,0x69,0x00};
-	uint8_t opcode[3] = {1, 28, 0x41};
-	uint8_t mask[3] = {0xff, 0x00, 0xff};
-
-	ManualTrigger *trigger2 = new ManualTrigger();
-	PacketSequence* sequence2 = this->sequenceModule->createSequence(1, trigger2, BLE_TO_SLAVE);
-	sequence2->preparePacket(packet3, 9, true);
-	*/
 }
 
 bool BLEController::checkManualTriggers(uint8_t id) {
@@ -52,13 +39,13 @@ bool BLEController::checkManualTriggers(uint8_t id) {
 				this->sequenceModule->sequences[i] != NULL &&
 				this->sequenceModule->sequences[i]->isReady() &&
 				!(this->sequenceModule->sequences[i]->isTriggered()) &&
-				this->sequenceModule->sequences[i]->getTrigger()->getType() == MANUAL_TRIGGER
+				this->sequenceModule->sequences[i]->getTrigger()->getType() == MANUAL_TRIGGER &&
+				this->sequenceModule->sequences[i]->getIdentifier() == id
 			) {
 				ManualTrigger* trigger = (ManualTrigger*)this->sequenceModule->sequences[i]->getTrigger();
-				if (id == i) {
-					trigger->trigger();
-					return true;
-				}
+				trigger->trigger();
+				this->sendTriggeredReport(this->sequenceModule->sequences[i]->getIdentifier());
+				return true;
 		}
 	}
 	return false;
@@ -75,6 +62,7 @@ void BLEController::checkSequenceReceptionTriggers(uint8_t *packet, size_t size)
 				ReceptionTrigger* trigger = (ReceptionTrigger*)this->sequenceModule->sequences[i]->getTrigger();
 				if (trigger->evaluate(packet, size)) {
 					trigger->trigger();
+					this->sendTriggeredReport(this->sequenceModule->sequences[i]->getIdentifier());
 				}
 		}
 	}
@@ -90,6 +78,7 @@ void BLEController::checkSequenceConnectionEventTriggers(uint16_t connectionEven
 				ConnectionEventTrigger* trigger = (ConnectionEventTrigger*)this->sequenceModule->sequences[i]->getTrigger();
 				if (trigger->evaluate(connectionEvent)) {
 					trigger->trigger();
+					this->sendTriggeredReport(this->sequenceModule->sequences[i]->getIdentifier());
 				}
 		}
 	}
@@ -486,10 +475,8 @@ void BLEController::setMasterPayload(uint8_t *payload, size_t size) {
 	this->masterPayload.lastTransmitInstant = 0;
 }
 
-bool BLEController::connectionLost() {
+bool BLEController::stopConnection() {
 	// Stop the timers
-
-
 	this->releaseTimers();
 
 
@@ -499,10 +486,6 @@ bool BLEController::connectionLost() {
 	this->clearConnectionUpdate();
 	// If we were simulating slave, exit slave mode
 	if (this->controllerState == SIMULATING_SLAVE || this->controllerState == PERFORMING_MITM) this->exitSlaveMode();
-
-	//We are sending a notification to Host
-	this->sendConnectionReport(CONNECTION_LOST);
-
 	// Reconfigure radio to receive advertisements
 	this->setHardwareConfiguration(0x8e89bed6,0x555555);
 	// Reset the channel
@@ -514,9 +497,15 @@ bool BLEController::connectionLost() {
 	return false;
 }
 
+bool BLEController::connectionLost() {
+	//We are sending a notification to Host
+	this->sendConnectionReport(CONNECTION_LOST);
+	return this->stopConnection();
+}
+
 bool BLEController::goToNextChannel() {
 
-	if (this->controllerState != SNIFFING_ADVERTISEMENTS) {
+	if (this->controllerState != SNIFFING_ADVERTISEMENTS && this->controllerState != SCANNING) {
 		// If we have not observed at least one packet, increase desyncCounter by one, otherwise resets this counter
 		this->desyncCounter = (this->packetCount == 0 ? this->desyncCounter + 1 : 0);
 		// If the desyncCounter is greater than three, the connection is considered lost
@@ -534,7 +523,6 @@ bool BLEController::goToNextChannel() {
 			this->packetCount = 0;
 			this->connectionEventCount++;
 
-
 			// Check if we have a connection update and apply it if necessary
 			this->applyConnectionUpdate();
 
@@ -542,12 +530,28 @@ bool BLEController::goToNextChannel() {
 			int channel = this->nextChannel();
 			this->setChannel(channel);
 
-			this->executeAttack();
 
 			this->checkSequenceConnectionEventTriggers(this->connectionEventCount);
 			this->executeSequences();
+
+			this->executeAttack();
 		}
 		return this->desyncCounter <= 5;
+	}
+	else if (this->controllerState == SCANNING) {
+		if (this->channel == 37) {
+			this->setChannel(38);
+		}
+		else if (this->channel == 38) {
+			this->setChannel(39);
+		}
+		else if (this->channel == 39) {
+			this->setChannel(37);
+		}
+		else {
+			this->setChannel(37);
+		}
+		return true;
 	}
 	return false;
 
@@ -559,9 +563,32 @@ void BLEController::start() {
 	this->lastAdvertisingChannel = 37;
 	this->follow = true;
 
+	if (this->controllerState == ADVERTISING) {
+		this->setHardwareConfiguration(0x8e89bed6,0x555555);
+		this->newAdvertisingTransmission();
+	}
 	if (this->controllerState == SNIFFING_ADVERTISEMENTS) {
 
 		this->setHardwareConfiguration(0x8e89bed6,0x555555);
+	}
+	else if (this->controllerState == SCANNING) {
+		this->setChannel(37);
+		this->setHardwareConfiguration(0x8e89bed6, 0x555555);
+
+		if (this->activeScanning) {
+			this->radio->enableAutoTXafterRX();
+			this->radio->setInterFrameSpacing(145);
+			this->radio->setFastRampUpTime(false);
+			this->radio->reload();
+		}
+
+		if (this->scanningTimer == NULL) {
+			this->scanningTimer = this->timerModule->getTimer();
+			this->scanningTimer->setMode(REPEATED);
+			this->scanningTimer->setCallback((ControllerCallback)&BLEController::goToNextChannel, this);
+			this->scanningTimer->update(500000);
+			this->scanningTimer->start();
+		}
 	}
 	else if (this->controllerState == SNIFFING_ACCESS_ADDRESS) {
 		this->activeConnectionRecovery.accessAddressPreamble = 0xAA;
@@ -793,6 +820,7 @@ bool BLEController::whitelistConnection(bool enable,uint8_t a, uint8_t b, uint8_
 
 void BLEController::stop() {
 	this->releaseTimers();
+	this->sequenceModule->reset();
 	this->radio->disable();
 }
 
@@ -1014,6 +1042,11 @@ void BLEController::setHardwareConfiguration(uint32_t accessAddress, uint32_t cr
 	this->radio->reload();
 }
 
+void BLEController::startScanning(bool active) {
+	this->controllerState = SCANNING;
+	this->activeScanning = active;
+}
+
 void BLEController::followAdvertisingDevice(uint8_t a,uint8_t b,uint8_t c,uint8_t d,uint8_t e,uint8_t f) {
 	this->controllerState = COLLECTING_ADVINTERVAL;
 	this->setFilter(true, a,b,c,d,e,f);
@@ -1063,6 +1096,53 @@ void BLEController::setFilter(bool hardwareFilter, uint8_t a,uint8_t b,uint8_t c
 	}
 }
 
+void BLEController::advertise(uint8_t *advertisingData, size_t advertisingDataSize, uint8_t *scanData, size_t scanDataSize, bool connectable, uint32_t interval) {
+	memcpy(this->advertisingData.advertisingData, advertisingData, advertisingDataSize);
+	memcpy(this->advertisingData.scanData, scanData, scanDataSize);
+	this->advertisingData.advertisingDataSize = advertisingDataSize;
+	this->advertisingData.scanDataSize = scanDataSize;
+	this->advertisingData.connectable = connectable;
+	this->advertisingData.advertisingInterval = interval;
+	this->advertisingData.advertisingDelay = 0;
+	this->controllerState = ADVERTISING;
+}
+
+bool BLEController::newAdvertisingTransmission() {
+	if (this->advertisingTimer == NULL) {
+		this->advertisingTimer = this->timerModule->getTimer();
+	}
+	this->advertisingTimer->setMode(REPEATED);
+	this->advertisingTimer->setCallback((ControllerCallback)&BLEController::newAdvertisingTransmission, this);
+	this->advertisingTimer->update((this->advertisingData.advertisingInterval * 625) / 3);
+	this->advertisingTimer->start();
+
+	if (this->channel == 37) {
+		this->setChannel(38);
+	}
+	else if (this->channel == 38) {
+		this->setChannel(39);
+	}
+	else if (this->channel == 39) {
+		this->setChannel(37);
+	}
+	else {
+		this->setChannel(37);
+	}
+	this->radio->enableAutoTXafterRX();
+	this->radio->setFastRampUpTime(false);
+	this->radio->setInterFrameSpacing(145);
+	this->radio->reload();
+	this->advertisingData.lastAdvertisingEvent = this->timerModule->getTimestamp();
+	uint8_t *adv_ind;
+	size_t adv_ind_size;
+	BLEPacket::forgeAdvInd(&adv_ind, &adv_ind_size, this->own.bytes, this->ownRandom, this->advertisingData.advertisingData, this->advertisingData.advertisingDataSize);
+	this->radio->send(adv_ind, adv_ind_size, BLEController::channelToFrequency(this->channel),this->channel);
+	bsp_board_led_invert(0);
+	free(adv_ind);
+	return true;
+}
+
+
 void BLEController::followConnection(uint16_t hopInterval, uint8_t hopIncrement, uint8_t *channelMap,uint32_t accessAddress,uint32_t crcInit,  int masterSCA,uint16_t latency) {
 	// We update the parameters needed to follow the connection
 	this->updateHopInterval(hopInterval);
@@ -1075,6 +1155,8 @@ void BLEController::followConnection(uint16_t hopInterval, uint8_t hopIncrement,
 
 	this->packetCount = 0;
 	this->connectionEventCount = 0;
+
+	this->mdCount = 0;
 
 	// Reset attack status
 	this->attackStatus.attack = BLE_ATTACK_NONE;
@@ -1113,11 +1195,63 @@ void BLEController::followConnection(uint16_t hopInterval, uint8_t hopIncrement,
 	}
 	this->masterSCA = masterSCA;
 	this->slaveSCA = 20;
-	this->sendConnectionReport(CONNECTION_STARTED);
+
+
+	if (this->timeoutTimer == NULL) {
+		this->timeoutTimer = this->timerModule->getTimer();
+		this->timeoutTimer->setMode(SINGLE_SHOT);
+		this->timeoutTimer->setCallback((ControllerCallback)&BLEController::checkSynchronization, this);
+		this->timeoutTimer->update(this->hopInterval * 1250UL);
+		this->timeoutTimer->start();
+	}
+
+}
+
+bool BLEController::checkSynchronization() {
+	if (this->sync) {
+		this->sendConnectionReport(CONNECTION_STARTED);
+	}
+	else {
+		this->releaseTimers();
+
+		// We are not synchronized anymore
+		this->sync = false;
+		// We are not waiting for an update
+		this->clearConnectionUpdate();
+
+		if (this->controllerState == CONNECTION_INITIATION) {
+			this->connect(
+				this->connectionInitiationData.responder.bytes,
+				this->connectionInitiationData.responderRandom,
+				this->connectionInitiationData.accessAddress,
+				this->connectionInitiationData.crcInit,
+				this->connectionInitiationData.windowSize,
+				this->connectionInitiationData.windowOffset,
+				this->connectionInitiationData.hopInterval,
+				this->connectionInitiationData.slaveLatency,
+				this->connectionInitiationData.timeout,
+				this->connectionInitiationData.sca,
+				this->connectionInitiationData.hopIncrement,
+				this->connectionInitiationData.channelMap
+			);
+		}
+		else {
+			// Reconfigure radio to receive advertisements
+			this->setHardwareConfiguration(0x8e89bed6,0x555555);
+			// Reset the channel
+			this->setChannel(this->lastAdvertisingChannel);
+
+			this->controllerState = SNIFFING_ADVERTISEMENTS;
+
+			Core::instance->getLedModule()->off(LED2);
+		}
+	}
+	return false;
 }
 
 void BLEController::prepareInjectionToMaster() {
 	this->controllerState = INJECTING_TO_MASTER;
+	this->attackStatus.injecting = true;
 }
 
 void BLEController::prepareInjectionToSlave() {
@@ -1221,7 +1355,6 @@ void BLEController::executeInjectionToMaster() {
 	 //this->simulatedSlaveSequenceNumbers.nesn = (this->simulatedSlaveSequenceNumbers.nesn + 1) % 2; // necessary ?
 	//this->setEmptyTransmitIndicator(true);
 
-
 }
 
 void BLEController::executeMasterRelatedHijacking() {
@@ -1258,31 +1391,26 @@ void BLEController::executeAttack() {
 }
 
 bool BLEController::masterRoleCallback(BLEPacket *pkt) {
-	/*
-	if (this->connectionEventCount >= 100 && this->connectionEventCount <= 110) {
-		this->startMDSequence();
-	}
-	else if (this->connectionEventCount > 110){
-		this->stopMDSequence();
-		this->connectionLost();
-	}
-	*/
+
 	if (!this->masterPayload.transmitted) {
+		if ((this->masterPayload.payload[0] & 0x10) != 0) {
+			this->mdSequence = true;
+			this->mdCount = 4;
+		}
+		else {
+			this->mdCount = 0;
+			this->mdSequence = false;
+		}
 		this->masterPayload.responseReceived = !BLEPacket::needResponse(this->masterPayload.payload, this->masterPayload.size);
 		this->masterPayload.payload[0] = (this->masterPayload.payload[0] & 0xF3) | (this->simulatedMasterSequenceNumbers.nesn  << 2) | (this->simulatedMasterSequenceNumbers.sn << 3);
 		this->radio->send(this->masterPayload.payload,this->masterPayload.size,BLEController::channelToFrequency(this->channel),this->channel);
 	}
 	else {
 		uint8_t data1[2];
-		if (this->mdSequence) {
-				data1[0] = (0x01 & 0xF3) | (this->simulatedMasterSequenceNumbers.nesn  << 2) | (this->simulatedMasterSequenceNumbers.sn << 3) | (1 << 4);
-				data1[1] = 0x00;
-		}
-		else {
-			data1[0] = (0x01 & 0xF3) | (this->simulatedMasterSequenceNumbers.nesn  << 2) | (this->simulatedMasterSequenceNumbers.sn << 3);
-			data1[1] = 0x00;
-		}
-		this->radio->send(data1,10,BLEController::channelToFrequency(this->channel),this->channel);
+		data1[0] = (0x01 & 0xF3) | (this->simulatedMasterSequenceNumbers.nesn  << 2) | (this->simulatedMasterSequenceNumbers.sn << 3);
+		data1[1] = 0x00;
+		//}
+		this->radio->send(data1,2,BLEController::channelToFrequency(this->channel),this->channel);
 	}
 
 	return true;
@@ -1316,8 +1444,8 @@ void BLEController::checkAttackSuccess() {
 			this->attackStatus.attack == BLE_ATTACK_MITM) &&
 			this->attackStatus.injecting
 		) {
-			if (this->attackStatus.injectionTimestamp + BLE_IFS + ((BLE_1MBPS_PREAMBLE_SIZE+ACCESS_ADDRESS_SIZE+CRC_SIZE+this->attackStatus.size)*8) - 5 < this->lastSlaveTimestamp &&
-			this->attackStatus.injectionTimestamp + BLE_IFS + ((BLE_1MBPS_PREAMBLE_SIZE+ACCESS_ADDRESS_SIZE+CRC_SIZE+this->attackStatus.size)*8) + 5 > this->lastSlaveTimestamp &&
+			if (this->attackStatus.injectionTimestamp + BLE_IFS + ((BLE_1MBPS_PREAMBLE_SIZE+ACCESS_ADDRESS_SIZE+CRC_SIZE+this->attackStatus.size)*8) - 15 < this->lastSlaveTimestamp &&
+			this->attackStatus.injectionTimestamp + BLE_IFS + ((BLE_1MBPS_PREAMBLE_SIZE+ACCESS_ADDRESS_SIZE+CRC_SIZE+this->attackStatus.size)*8) + 15 > this->lastSlaveTimestamp &&
 			this->attackStatus.injectedSequenceNumbers.nesn == this->slaveSequenceNumbers.sn &&
 			((this->attackStatus.injectedSequenceNumbers.sn + 1)%2) == this->slaveSequenceNumbers.nesn
 			) {
@@ -1326,13 +1454,37 @@ void BLEController::checkAttackSuccess() {
 					Core::instance->getLedModule()->setColor(GREEN);
 
 					this->sendInjectionReport(true,this->attackStatus.injectionCounter);
+					if (this->attackStatus.attack == BLE_ATTACK_FRAME_INJECTION_TO_SLAVE) {
+						this->controllerState = SNIFFING_CONNECTION;
+						this->attackStatus.attack = BLE_ATTACK_NONE;
+					}
 				}
 				this->attackStatus.running = false;
 				this->attackStatus.successful = true;
 			}
 			this->attackStatus.injecting = false;
 	}
+	if (
+			(this->attackStatus.attack == BLE_ATTACK_FRAME_INJECTION_TO_MASTER) &&
+			this->attackStatus.injecting
+		) {
+			if (this->attackStatus.injectionCounter > 1) {
+				if (!this->attackStatus.successful) {
+					this->exitSlaveMode();
+					Core::instance->getLedModule()->on(LED2);
+					Core::instance->getLedModule()->setColor(GREEN);
 
+					this->sendInjectionReport(true,this->attackStatus.injectionCounter);
+					this->attackStatus.injecting = false;
+					this->controllerState = SNIFFING_CONNECTION;
+					this->attackStatus.attack = BLE_ATTACK_NONE;
+					this->attackStatus.injectionCounter = 0;
+				}
+				this->attackStatus.running = false;
+				this->attackStatus.successful = true;
+
+		}
+	}
 	// In the specific case of slave hijacking, we relies on an hijacking counter to check the attack success
 	else if (this->attackStatus.attack == BLE_ATTACK_SLAVE_HIJACKING) {
 		this->attackStatus.hijackingCounter = (this->packetCount <= 1 ? this->attackStatus.hijackingCounter + 1 : 0);
@@ -1509,16 +1661,34 @@ void BLEController::releaseTimers() {
 		this->initTimer->release();
 		this->initTimer = NULL;
 	}
+	if (this->timeoutTimer != NULL) {
+		this->timeoutTimer->stop();
+		this->timeoutTimer->release();
+		this->timeoutTimer = NULL;
+	}
+	if (this->scanningTimer != NULL) {
+		this->scanningTimer->stop();
+		this->scanningTimer->release();
+		this->scanningTimer = NULL;
+	}
+	if (this->advertisingTimer != NULL) {
+		this->advertisingTimer->stop();
+		this->advertisingTimer->release();
+		this->advertisingTimer = NULL;
+	}
 }
 
-void BLEController::startMDSequence() {
-	this->mdSequence = true;
+void BLEController::sendTriggeredReport(uint8_t id) {
+	Message *msg = Whad::buildBLETriggeredMessage(id);
+	Core::instance->pushMessageToQueue(msg);
 }
 
-void BLEController::stopMDSequence() {
-	this->mdSequence = false;
-
+void BLEController::sendConnectedReport() {
+	Message *msg = Whad::buildBLEConnectedMessage(this->own.bytes, this->ownRandom, this->connectionInitiationData.responder.bytes, this->connectionInitiationData.responderRandom, this->accessAddress);
+	Core::instance->pushMessageToQueue(msg);
 }
+
+
 void BLEController::connect(uint8_t *address, bool random) {
 	uint8_t channelMap[5] = {
 		0xFF,
@@ -1530,11 +1700,6 @@ void BLEController::connect(uint8_t *address, bool random) {
 	this->connect(address, random, 0x23a3d487, 0x049095, 3,9,56,0,42,1,9,channelMap);
 }
 
-
-void BLEController::sendConnectedReport() {
-	Message *msg = Whad::buildBLEConnectedMessage(this->own.bytes, this->ownRandom, this->connectionInitiationData.responder.bytes, this->connectionInitiationData.responderRandom, this->accessAddress);
-	Core::instance->pushMessageToQueue(msg);
-}
 
 void BLEController::connect(uint8_t *address, bool random,  uint32_t accessAddress,  uint32_t crcInit, uint8_t windowSize, uint16_t windowOffset, uint16_t hopInterval, uint16_t slaveLatency, uint16_t timeout, uint8_t sca, uint8_t hopIncrement, uint8_t *channelMap) {
 	// Configure connection parameters according to provided arguments
@@ -1589,7 +1754,7 @@ void BLEController::connect(uint8_t *address, bool random,  uint32_t accessAddre
 
 	// Send the packet
 	this->radio->updateTXBuffer(connection_request, connection_request_size);
-
+	free(connection_request);
 	// Configure radio to monitor only advertisements from targeted device (hardware filter needed)
 	this->setFilter(true, address[0], address[1], address[2], address[3], address[4], address[5]);
 
@@ -1633,7 +1798,8 @@ void BLEController::initializeConnection() {
 	this->channel = this->nextChannel();
 
 	this->masterPayload.transmitted = true;
-
+	this->mdSequence = false;
+	this->mdCount = 0;
 
 	this->clearConnectionUpdate();
 
@@ -1662,6 +1828,13 @@ void BLEController::initializeConnection() {
 	this->masterSCA = this->connectionInitiationData.sca;
 	this->slaveSCA = 20;
 
+	if (this->timeoutTimer == NULL) {
+		this->timeoutTimer = this->timerModule->getTimer();
+		this->timeoutTimer->setMode(SINGLE_SHOT);
+		this->timeoutTimer->setCallback((ControllerCallback)&BLEController::checkSynchronization, this);
+		this->timeoutTimer->update(this->hopInterval * 1250UL);
+		this->timeoutTimer->start();
+	}
 }
 
 bool BLEController::sendFirstConnectionPacket() {
@@ -1702,7 +1875,33 @@ void BLEController::connectionInitiationConnectedProcessing(BLEPacket *pkt) {
 		this->sendConnectedReport();
 	}
 }
+void BLEController::advertisementScanningProcessing(BLEPacket *pkt) {
+	if (this->activeScanning) {
+		// Build connection request
+		size_t scan_request_size;
+		uint8_t *scan_request;
 
+		uint8_t address[6];
+		bool random;
+		if (pkt->extractAdvertiserAddress(address, &random)) {
+			BLEPacket::forgeScanRequest(
+					&scan_request,
+					&scan_request_size,
+					this->own.bytes,
+					this->ownRandom,
+					address,
+					random
+			);
+			bsp_board_led_invert(0);
+			this->radio->updateTXBuffer(scan_request, scan_request_size);
+			free(scan_request);
+		}
+	}
+	// Update the packet direction
+	pkt->updateSource(DIRECTION_UNKNOWN);
+	// Transmit the packet to host
+	this->addPacket(pkt);
+}
 void BLEController::advertisementSniffingProcessing(BLEPacket *pkt) {
 	// Release all timers
 	this->releaseTimers();
@@ -1835,15 +2034,10 @@ void BLEController::connectionSynchronizationProcessing(BLEPacket *pkt) {
 
 void BLEController::attackSynchronizationProcessing(BLEPacket *pkt) {
 	int32_t relativeTimestamp = (int32_t)(pkt->getTimestamp() - this->lastAnchorPoint);
-	if (this->controllerState == INJECTING_TO_MASTER/* && relativeTimestamp > 400*/) {
-		if (pkt->isEncryptionRequest()) {
+	if (this->controllerState == INJECTING_TO_MASTER) {
+		/*if (pkt->isEncryptionRequest()) {
 			this->attackStatus.injecting = true;
-		}
-		if (this->attackStatus.injectionCounter > 3) {
-			this->attackStatus.injecting = false;
-			this->attackStatus.injectionCounter = 0;
-			this->exitSlaveMode();
-		}
+		}*/
 		//this->attackStatus.payload[0] = (this->attackStatus.payload[0] & 0xF3) | (this->simulatedSlaveSequenceNumbers.nesn  << 2) | (this->simulatedSlaveSequenceNumbers.sn << 3); // MD = 1
 		//this->radio->updateTXBuffer(this->attackStatus.payload,this->attackStatus.size);
 	}
@@ -1894,6 +2088,16 @@ void BLEController::masterSimulationControlFlowProcessing(BLEPacket *pkt) {
 			}
 		}
 	}
+	if (this->mdSequence && this->mdCount > 0) {
+			nrf_delay_us(60);
+			uint8_t data1[2];
+			data1[0] = (0x01 & 0xF3) | (this->simulatedMasterSequenceNumbers.nesn  << 2) | (this->simulatedMasterSequenceNumbers.sn << 3) | (1 << 4);
+			data1[1] = 0x00;
+			this->simulatedMasterSequenceNumbers.sn = (this->simulatedMasterSequenceNumbers.sn + 1) % 2;
+			this->simulatedMasterSequenceNumbers.nesn = (this->simulatedMasterSequenceNumbers.nesn + 1) % 2;
+			this->radio->send(data1, 2, BLEController::channelToFrequency(this->channel), this->channel);
+			this->mdCount--;
+	}
 }
 
 void BLEController::roleSimulationProcessing(BLEPacket* pkt) {
@@ -1932,9 +2136,10 @@ void BLEController::roleSimulationProcessing(BLEPacket* pkt) {
 		else {
 			lastTransmittedPacketDuration = 8 * (this->masterPayload.size + BLE_1MBPS_PREAMBLE_SIZE + ACCESS_ADDRESS_SIZE + CRC_SIZE);
 		}
-		// Update the anchor point according to our own packet size
-		this->setAnchorPoint(pkt->getTimestamp() - BLE_IFS - lastTransmittedPacketDuration);
-
+		if (!this->mdSequence) {
+			// Update the anchor point according to our own packet size
+			this->setAnchorPoint(pkt->getTimestamp() - BLE_IFS - lastTransmittedPacketDuration);
+		}
 		// Perform the control flow operations
 		this->masterSimulationControlFlowProcessing(pkt);
 	}
@@ -1943,22 +2148,7 @@ void BLEController::roleSimulationProcessing(BLEPacket* pkt) {
 void BLEController::connectionPacketProcessing(BLEPacket *pkt) {
 	// Increment the packet counter
 	this->packetCount++;
-	/*
-	if (this->mdSequence) {
-		for (int i=0;i<15;i++) {
-			nrf_delay_us(80);
-			uint8_t data1[2];
-			data1[0] = (0x01 & 0xF3) | (this->simulatedMasterSequenceNumbers.nesn  << 2) | (this->simulatedMasterSequenceNumbers.sn << 3) | (1 << 4);
-			data1[1] = 0x00;
-			this->simulatedMasterSequenceNumbers.sn = (this->simulatedMasterSequenceNumbers.sn + 1) % 2;
-			this->simulatedMasterSequenceNumbers.nesn = (this->simulatedMasterSequenceNumbers.nesn + 1) % 2;
-			this->radio->send(data1, 2, BLEController::channelToFrequency(this->channel), this->channel);//this->radio->updateTXBuffer(data1, 2);
-			nrf_delay_us(140);
 
-		}
-		this->addPacket(pkt);
-		return;
-	}*/
 
 	if (this->controllerState == CONNECTION_INITIATION) {
 		this->connectionInitiationConnectedProcessing(pkt);
@@ -1983,6 +2173,7 @@ void BLEController::connectionPacketProcessing(BLEPacket *pkt) {
 			this->roleSimulationProcessing(pkt);
 		}
 	}
+
 	// Decide if the packet must be transmitted to host
 	if (pkt->extractPayloadLength() > 2 || this->emptyTransmitIndicator) {
 		this->addPacket(pkt);
@@ -1995,6 +2186,21 @@ void BLEController::advertisementPacketProcessing(BLEPacket *pkt) {
 
 	if (this->controllerState == CONNECTION_INITIATION) {
 		this->connectionInitiationAdvertisementProcessing(pkt);
+	}
+
+	else if (this->controllerState == SCANNING) {
+		this->advertisementScanningProcessing(pkt);
+	}
+
+	else if (this->controllerState == ADVERTISING) {
+		if (pkt->getTimestamp() - this->advertisingData.lastAdvertisingEvent < 1000) {
+			uint8_t *scan_rsp;
+			size_t scan_rsp_size;
+			BLEPacket::forgeScanResponse(&scan_rsp, &scan_rsp_size, this->own.bytes, this->ownRandom, this->advertisingData.scanData, this->advertisingData.scanDataSize);
+			this->radio->updateTXBuffer(scan_rsp, scan_rsp_size);
+			free(scan_rsp);
+		}
+		else this->radio->updateTXBuffer(NULL, 0);
 	}
 
 	else if (this->controllerState == SNIFFING_ADVERTISEMENTS) {
@@ -2136,9 +2342,11 @@ void BLEController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer,
 		}
 		else {
 			// If the packet is a connection packet, call onConnectionPacket
+			if (this->sync) {
+				this->checkSequenceReceptionTriggers(buffer, size);
+			}
 			this->connectionPacketProcessing(pkt);
 		}
-		this->checkSequenceReceptionTriggers(buffer, size);
 		// Delete the packet object if it is not NULL
 		if (pkt != NULL) delete pkt;
 	}

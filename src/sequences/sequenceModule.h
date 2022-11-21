@@ -11,7 +11,7 @@ class SequenceModule {
         PacketSequence* sequences[MAX_SEQUENCES];
 
         SequenceModule();
-        PacketSequence* createSequence(size_t size, Trigger* trigger, SequenceDirection direction);
+        PacketSequence* createSequence(size_t size, Trigger* trigger, SequenceDirection direction, uint8_t id);
         void deleteSequence(PacketSequence* sequence);
         void reset();
 };

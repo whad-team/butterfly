@@ -99,8 +99,48 @@ bool BLEPacket::needResponse(uint8_t *payload, size_t size) {
 	}
 	return false;
 }
+void BLEPacket::forgeAdvInd(uint8_t **payload,size_t *size, uint8_t *advertiser, bool advertiserRandom,  uint8_t *data, size_t dataSize) {
+	*size=8 + dataSize;
+	*payload = (uint8_t *)malloc(sizeof(uint8_t)*(*size));
+	// Header
 
+	// RxAdd | TxAdd | ChSel | PDU_type = 0
+	(*payload)[0] = 0x00 | ((advertiserRandom) << 6) | ((advertiserRandom) << 7);
+	// Length
+	(*payload)[1] = 6+dataSize;
+	memcpy(&((*payload)[2]), advertiser, 6);
+	memcpy(&((*payload)[8]), data, dataSize);
+}
+void BLEPacket::forgeScanResponse(uint8_t **payload,size_t *size, uint8_t *advertiser, bool advertiserRandom,  uint8_t *data, size_t dataSize) {
+	*size=8 + dataSize;
+	*payload = (uint8_t *)malloc(sizeof(uint8_t)*(*size));
+	// Header
 
+	// RxAdd | TxAdd | ChSel | PDU_type = 0
+	(*payload)[0] = 0x04 | ((advertiserRandom) << 6) | ((advertiserRandom) << 7);
+	// Length
+	(*payload)[1] = 6+dataSize;
+	memcpy(&((*payload)[2]), advertiser, 6);
+	memcpy(&((*payload)[8]), data, dataSize);
+}
+void BLEPacket::forgeScanRequest(uint8_t **payload,size_t *size, uint8_t *initiator, bool initiatorRandom,  uint8_t *responder, bool responderRandom) {
+	*size=14;
+	*payload = (uint8_t *)malloc(sizeof(uint8_t)*(*size));
+	// Header
+
+	// RxAdd | TxAdd | ChSel | PDU_type = 3
+	(*payload)[0] = 0x03 | ((initiatorRandom) << 6) | ((responderRandom) << 7);
+	// Length
+	(*payload)[1] = 12;
+	memcpy(&((*payload)[2]), initiator, 6);
+	//memcpy(&((*payload)[8]), responder, 6);
+	(*payload)[8] = responder[5];
+	(*payload)[9] = responder[4];
+	(*payload)[10] = responder[3];
+	(*payload)[11] = responder[2];
+	(*payload)[12] = responder[1];
+	(*payload)[13] = responder[0];
+}
 void BLEPacket::forgeConnectionRequest(uint8_t **payload,size_t *size, uint8_t *initiator, bool initiatorRandom,  uint8_t *responder, bool responderRandom, uint32_t accessAddress,  uint32_t crcInit, uint8_t windowSize, uint16_t windowOffset, uint16_t hopInterval, uint16_t slaveLatency, uint16_t timeout, uint8_t sca, uint8_t hopIncrement, uint8_t *channelMap) {
 	bool selectAlgorithm2 = false;
 	*size=36;
@@ -222,6 +262,19 @@ uint32_t BLEPacket::getCrc() {
 }
 uint32_t BLEPacket::getRelativeTimestamp() {
 	return this->timestampRelative;
+}
+bool BLEPacket::extractAdvertiserAddress(uint8_t *address, bool *random) {
+	if (this->extractAdvertisementType() == ADV_IND || this->extractAdvertisementType() == ADV_DIRECT_IND || this->extractAdvertisementType() == SCAN_RSP) {
+		address[0] = this->packetPointer[11];
+		address[1] = this->packetPointer[10];
+		address[2] = this->packetPointer[9];
+		address[3] = this->packetPointer[8];
+		address[4] = this->packetPointer[7];
+		address[5] = this->packetPointer[6];
+		*random = (this->packetPointer[4] & 0x40) >> 6;
+		return true;
+	}
+	return false;
 }
 
 bool BLEPacket::checkAdvertiserAddress(BLEAddress address) {

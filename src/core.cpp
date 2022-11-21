@@ -314,6 +314,11 @@ void Core::processBLEInputMessage(ble_Message msg) {
     response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
   }
 
+  else if (msg.which_msg == ble_Message_scan_mode_tag) {
+    this->bleController->startScanning(msg.msg.scan_mode.active_scan);
+    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+  }
+
   else if (msg.which_msg == ble_Message_send_raw_pdu_tag) {
 
 
@@ -368,7 +373,9 @@ void Core::processBLEInputMessage(ble_Message msg) {
         response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
       }
       else {
-        response = Whad::buildResultMessage(generic_ResultCode_WRONG_MODE);
+        this->bleController->advertise(msg.msg.periph_mode.scan_data.bytes, msg.msg.periph_mode.scan_data.size, msg.msg.periph_mode.scanrsp_data.bytes, msg.msg.periph_mode.scanrsp_data.size, true, 600);
+        this->bleController->start();
+        response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
       }
   }
 
@@ -441,14 +448,12 @@ void Core::processBLEInputMessage(ble_Message msg) {
     }
     if (trigger != NULL) {
       int numberOfPackets = msg.msg.prepare.sequence_count;
-      PacketSequence *sequence = this->sequenceModule->createSequence(numberOfPackets, trigger, direction);
+      uint8_t identifier = msg.msg.prepare.id;
+      PacketSequence *sequence = this->sequenceModule->createSequence(numberOfPackets, trigger, direction, identifier);
       for (int i=0;i<numberOfPackets;i++) {
         sequence->preparePacket(msg.msg.prepare.sequence[i].packet.bytes,msg.msg.prepare.sequence[i].packet.size, true);
       }
       response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
-      this->pushMessageToQueue(response);
-
-      response = Whad::buildBLETriggerChangeMessage(sequence->getIdentifier(), false);
     }
 
   }

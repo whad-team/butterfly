@@ -281,12 +281,11 @@ Message* Whad::buildBLEDesynchronizedMessage(uint32_t accessAddress) {
   msg->msg.ble.msg.desynchronized.access_address = accessAddress;
   return msg;
 }
-Message* Whad::buildBLETriggerChangeMessage(uint8_t identifier, bool triggered) {
+Message* Whad::buildBLETriggeredMessage(uint8_t identifier) {
   Message* msg = Whad::buildMessage();
   msg->which_msg = Message_ble_tag;
-  msg->msg.ble.which_msg = ble_Message_trigger_change_tag;
-  msg->msg.ble.msg.trigger_change.id = identifier;
-  msg->msg.ble.msg.trigger_change.state = (triggered ? ble_TriggerState_TRIGGERED : ble_TriggerState_UNTRIGGERED);
+  msg->msg.ble.which_msg = ble_Message_triggered_tag;
+  msg->msg.ble.msg.triggered.id = identifier;
   return msg;
 }
 

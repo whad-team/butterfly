@@ -78,11 +78,6 @@ typedef enum _ble_BleAddrType {
     ble_BleAddrType_RANDOM = 1 
 } ble_BleAddrType;
 
-typedef enum _ble_TriggerState { 
-    ble_TriggerState_UNTRIGGERED = 0, 
-    ble_TriggerState_TRIGGERED = 1 
-} ble_TriggerState;
-
 /* Struct definitions */
 /* *
  CentralModeCmd
@@ -394,16 +389,15 @@ typedef struct _ble_Synchronized {
     pb_byte_t channel_map[5];
 } ble_Synchronized;
 
-typedef struct _ble_TriggerChange { 
-    uint32_t id;
-    ble_TriggerState state;
-} ble_TriggerChange;
-
 /* *
  Disconnected */
 typedef struct _ble_TriggerSequenceCmd { 
     uint32_t id;
 } ble_TriggerSequenceCmd;
+
+typedef struct _ble_Triggered { 
+    uint32_t id;
+} ble_Triggered;
 
 typedef struct _ble_PrepareSequenceCmd_Trigger { 
     pb_size_t which_trigger;
@@ -417,6 +411,7 @@ typedef struct _ble_PrepareSequenceCmd_Trigger {
 typedef struct _ble_PrepareSequenceCmd { 
     bool has_trigger;
     ble_PrepareSequenceCmd_Trigger trigger;
+    uint32_t id;
     ble_BleDirection direction;
     pb_size_t sequence_count;
     ble_PrepareSequenceCmd_PendingPacket sequence[25];
@@ -461,7 +456,7 @@ typedef struct _ble_Message {
         ble_ReactiveJamCmd reactive_jam;
         ble_PrepareSequenceCmd prepare;
         ble_TriggerSequenceCmd trigger;
-        ble_TriggerChange trigger_change;
+        ble_Triggered triggered;
     } msg;
 } ble_Message;
 
@@ -482,10 +477,6 @@ typedef struct _ble_Message {
 #define _ble_BleAddrType_MIN ble_BleAddrType_PUBLIC
 #define _ble_BleAddrType_MAX ble_BleAddrType_RANDOM
 #define _ble_BleAddrType_ARRAYSIZE ((ble_BleAddrType)(ble_BleAddrType_RANDOM+1))
-
-#define _ble_TriggerState_MIN ble_TriggerState_UNTRIGGERED
-#define _ble_TriggerState_MAX ble_TriggerState_TRIGGERED
-#define _ble_TriggerState_ARRAYSIZE ((ble_TriggerState)(ble_TriggerState_TRIGGERED+1))
 
 
 #ifdef __cplusplus
@@ -517,14 +508,14 @@ extern "C" {
 #define ble_HijackBothCmd_init_default           {0}
 #define ble_SetEncryptionCmd_init_default        {0, {0}, {0}}
 #define ble_ReactiveJamCmd_init_default          {0, {0, {0}}, 0}
-#define ble_PrepareSequenceCmd_init_default      {false, ble_PrepareSequenceCmd_Trigger_init_default, _ble_BleDirection_MIN, 0, {ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default}}
+#define ble_PrepareSequenceCmd_init_default      {false, ble_PrepareSequenceCmd_Trigger_init_default, 0, _ble_BleDirection_MIN, 0, {ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default}}
 #define ble_PrepareSequenceCmd_ReceptionTrigger_init_default {{0, {0}}, {0, {0}}, 0}
 #define ble_PrepareSequenceCmd_ConnectionEventTrigger_init_default {0}
 #define ble_PrepareSequenceCmd_ManualTrigger_init_default {0}
 #define ble_PrepareSequenceCmd_Trigger_init_default {0, {ble_PrepareSequenceCmd_ReceptionTrigger_init_default}}
 #define ble_PrepareSequenceCmd_PendingPacket_init_default {{0, {0}}}
 #define ble_TriggerSequenceCmd_init_default      {0}
-#define ble_TriggerChange_init_default           {0, _ble_TriggerState_MIN}
+#define ble_Triggered_init_default               {0}
 #define ble_AccessAddressDiscovered_init_default {0, false, 0, false, 0}
 #define ble_AdvPduReceived_init_default          {_ble_BleAdvType_MIN, 0, {0}, {0, {0}}, _ble_BleAddrType_MIN}
 #define ble_Connected_init_default               {{0}, {0}, 0, 0, _ble_BleAddrType_MIN, _ble_BleAddrType_MIN}
@@ -560,14 +551,14 @@ extern "C" {
 #define ble_HijackBothCmd_init_zero              {0}
 #define ble_SetEncryptionCmd_init_zero           {0, {0}, {0}}
 #define ble_ReactiveJamCmd_init_zero             {0, {0, {0}}, 0}
-#define ble_PrepareSequenceCmd_init_zero         {false, ble_PrepareSequenceCmd_Trigger_init_zero, _ble_BleDirection_MIN, 0, {ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero}}
+#define ble_PrepareSequenceCmd_init_zero         {false, ble_PrepareSequenceCmd_Trigger_init_zero, 0, _ble_BleDirection_MIN, 0, {ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero}}
 #define ble_PrepareSequenceCmd_ReceptionTrigger_init_zero {{0, {0}}, {0, {0}}, 0}
 #define ble_PrepareSequenceCmd_ConnectionEventTrigger_init_zero {0}
 #define ble_PrepareSequenceCmd_ManualTrigger_init_zero {0}
 #define ble_PrepareSequenceCmd_Trigger_init_zero {0, {ble_PrepareSequenceCmd_ReceptionTrigger_init_zero}}
 #define ble_PrepareSequenceCmd_PendingPacket_init_zero {{0, {0}}}
 #define ble_TriggerSequenceCmd_init_zero         {0}
-#define ble_TriggerChange_init_zero              {0, _ble_TriggerState_MIN}
+#define ble_Triggered_init_zero                  {0}
 #define ble_AccessAddressDiscovered_init_zero    {0, false, 0, false, 0}
 #define ble_AdvPduReceived_init_zero             {_ble_BleAdvType_MIN, 0, {0}, {0, {0}}, _ble_BleAddrType_MIN}
 #define ble_Connected_init_zero                  {{0}, {0}, 0, 0, _ble_BleAddrType_MIN, _ble_BleAddrType_MIN}
@@ -677,15 +668,15 @@ extern "C" {
 #define ble_Synchronized_hop_interval_tag        3
 #define ble_Synchronized_hop_increment_tag       4
 #define ble_Synchronized_channel_map_tag         5
-#define ble_TriggerChange_id_tag                 1
-#define ble_TriggerChange_state_tag              2
 #define ble_TriggerSequenceCmd_id_tag            1
+#define ble_Triggered_id_tag                     1
 #define ble_PrepareSequenceCmd_Trigger_reception_tag 1
 #define ble_PrepareSequenceCmd_Trigger_connection_event_tag 2
 #define ble_PrepareSequenceCmd_Trigger_manual_tag 3
 #define ble_PrepareSequenceCmd_trigger_tag       1
-#define ble_PrepareSequenceCmd_direction_tag     2
-#define ble_PrepareSequenceCmd_sequence_tag      3
+#define ble_PrepareSequenceCmd_id_tag            2
+#define ble_PrepareSequenceCmd_direction_tag     3
+#define ble_PrepareSequenceCmd_sequence_tag      4
 #define ble_Message_set_bd_addr_tag              1
 #define ble_Message_sniff_adv_tag                2
 #define ble_Message_jam_adv_tag                  3
@@ -722,7 +713,7 @@ extern "C" {
 #define ble_Message_reactive_jam_tag             34
 #define ble_Message_prepare_tag                  35
 #define ble_Message_trigger_tag                  36
-#define ble_Message_trigger_change_tag           37
+#define ble_Message_triggered_tag                37
 
 /* Struct field encoding specification for nanopb */
 #define ble_SetBdAddressCmd_FIELDLIST(X, a) \
@@ -874,8 +865,9 @@ X(a, STATIC,   SINGULAR, UINT32,   position,          3)
 
 #define ble_PrepareSequenceCmd_FIELDLIST(X, a) \
 X(a, STATIC,   OPTIONAL, MESSAGE,  trigger,           1) \
-X(a, STATIC,   SINGULAR, UENUM,    direction,         2) \
-X(a, STATIC,   REPEATED, MESSAGE,  sequence,          3)
+X(a, STATIC,   SINGULAR, UINT32,   id,                2) \
+X(a, STATIC,   SINGULAR, UENUM,    direction,         3) \
+X(a, STATIC,   REPEATED, MESSAGE,  sequence,          4)
 #define ble_PrepareSequenceCmd_CALLBACK NULL
 #define ble_PrepareSequenceCmd_DEFAULT NULL
 #define ble_PrepareSequenceCmd_trigger_MSGTYPE ble_PrepareSequenceCmd_Trigger
@@ -918,11 +910,10 @@ X(a, STATIC,   SINGULAR, UINT32,   id,                1)
 #define ble_TriggerSequenceCmd_CALLBACK NULL
 #define ble_TriggerSequenceCmd_DEFAULT NULL
 
-#define ble_TriggerChange_FIELDLIST(X, a) \
-X(a, STATIC,   SINGULAR, UINT32,   id,                1) \
-X(a, STATIC,   SINGULAR, UENUM,    state,             2)
-#define ble_TriggerChange_CALLBACK NULL
-#define ble_TriggerChange_DEFAULT NULL
+#define ble_Triggered_FIELDLIST(X, a) \
+X(a, STATIC,   SINGULAR, UINT32,   id,                1)
+#define ble_Triggered_CALLBACK NULL
+#define ble_Triggered_DEFAULT NULL
 
 #define ble_AccessAddressDiscovered_FIELDLIST(X, a) \
 X(a, STATIC,   SINGULAR, UINT32,   access_address,    1) \
@@ -1045,7 +1036,7 @@ X(a, STATIC,   ONEOF,    MESSAGE,  (msg,encryption,msg.encryption),  33) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (msg,reactive_jam,msg.reactive_jam),  34) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (msg,prepare,msg.prepare),  35) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (msg,trigger,msg.trigger),  36) \
-X(a, STATIC,   ONEOF,    MESSAGE,  (msg,trigger_change,msg.trigger_change),  37)
+X(a, STATIC,   ONEOF,    MESSAGE,  (msg,triggered,msg.triggered),  37)
 #define ble_Message_CALLBACK NULL
 #define ble_Message_DEFAULT NULL
 #define ble_Message_msg_set_bd_addr_MSGTYPE ble_SetBdAddressCmd
@@ -1084,7 +1075,7 @@ X(a, STATIC,   ONEOF,    MESSAGE,  (msg,trigger_change,msg.trigger_change),  37)
 #define ble_Message_msg_reactive_jam_MSGTYPE ble_ReactiveJamCmd
 #define ble_Message_msg_prepare_MSGTYPE ble_PrepareSequenceCmd
 #define ble_Message_msg_trigger_MSGTYPE ble_TriggerSequenceCmd
-#define ble_Message_msg_trigger_change_MSGTYPE ble_TriggerChange
+#define ble_Message_msg_triggered_MSGTYPE ble_Triggered
 
 extern const pb_msgdesc_t ble_SetBdAddressCmd_msg;
 extern const pb_msgdesc_t ble_SniffAdvCmd_msg;
@@ -1117,7 +1108,7 @@ extern const pb_msgdesc_t ble_PrepareSequenceCmd_ManualTrigger_msg;
 extern const pb_msgdesc_t ble_PrepareSequenceCmd_Trigger_msg;
 extern const pb_msgdesc_t ble_PrepareSequenceCmd_PendingPacket_msg;
 extern const pb_msgdesc_t ble_TriggerSequenceCmd_msg;
-extern const pb_msgdesc_t ble_TriggerChange_msg;
+extern const pb_msgdesc_t ble_Triggered_msg;
 extern const pb_msgdesc_t ble_AccessAddressDiscovered_msg;
 extern const pb_msgdesc_t ble_AdvPduReceived_msg;
 extern const pb_msgdesc_t ble_Connected_msg;
@@ -1162,7 +1153,7 @@ extern const pb_msgdesc_t ble_Message_msg;
 #define ble_PrepareSequenceCmd_Trigger_fields &ble_PrepareSequenceCmd_Trigger_msg
 #define ble_PrepareSequenceCmd_PendingPacket_fields &ble_PrepareSequenceCmd_PendingPacket_msg
 #define ble_TriggerSequenceCmd_fields &ble_TriggerSequenceCmd_msg
-#define ble_TriggerChange_fields &ble_TriggerChange_msg
+#define ble_Triggered_fields &ble_Triggered_msg
 #define ble_AccessAddressDiscovered_fields &ble_AccessAddressDiscovered_msg
 #define ble_AdvPduReceived_fields &ble_AdvPduReceived_msg
 #define ble_Connected_fields &ble_Connected_msg
@@ -1202,7 +1193,7 @@ extern const pb_msgdesc_t ble_Message_msg;
 #define ble_PrepareSequenceCmd_PendingPacket_size 258
 #define ble_PrepareSequenceCmd_ReceptionTrigger_size 522
 #define ble_PrepareSequenceCmd_Trigger_size      525
-#define ble_PrepareSequenceCmd_size              7055
+#define ble_PrepareSequenceCmd_size              7061
 #define ble_RawPduReceived_size                  313
 #define ble_ReactiveJamCmd_size                  34
 #define ble_ScanModeCmd_size                     2
@@ -1217,8 +1208,8 @@ extern const pb_msgdesc_t ble_Message_msg;
 #define ble_StartCmd_size                        0
 #define ble_StopCmd_size                         0
 #define ble_Synchronized_size                    31
-#define ble_TriggerChange_size                   8
 #define ble_TriggerSequenceCmd_size              6
+#define ble_Triggered_size                       6
 
 #ifdef __cplusplus
 } /* extern "C" */

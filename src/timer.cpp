@@ -36,20 +36,21 @@ TimerModule::TimerModule() {
 	NVIC_SetPriority(TIMER3_IRQn, 1);
 	NVIC_SetPriority(TIMER4_IRQn, 1);
 
+	// Configure PPI to synchronize timers
+
+	NRF_PPI->CHEN = (1 << 2) | (1 << 1) | 1;
+
 	NRF_TIMER3->TASKS_CLEAR = 1;
 	NRF_TIMER4->TASKS_CLEAR = 1;
-
-	//NRF_TIMER3->CC[0] = 1000000;
-	NRF_TIMER3->INTENSET = (1 << 16);
-
-	//NRF_TIMER3->TASKS_START = 1;
+	NRF_TIMER3->TASKS_START = 1;
 	NRF_TIMER4->TASKS_START = 1;
 
-  for (int i=0;i<NUMBER_OF_TIMERS;i++) {
-    this->timers[i] = new Timer(i);
+  for (int i=0;i<NUMBER_OF_TIMERS_4;i++) {
+    this->timers[i] = new Timer(i, 4);
   }
-
-	this->hardwareTimer = new HardwareControlledTimer();
+	for (int i=0;i<NUMBER_OF_TIMERS_3;i++) {
+		this->timers[NUMBER_OF_TIMERS_4+i] = new Timer(NUMBER_OF_TIMERS_4+i, 3);
+	}
 }
 
 uint32_t TimerModule::getTimestamp() {
@@ -60,7 +61,7 @@ uint32_t TimerModule::getTimestamp() {
 
 
 Timer* TimerModule::getTimer() {
-  for (int i=0;i<NUMBER_OF_TIMERS;i++) {
+  for (int i=0;i<NUMBER_OF_TIMERS_4 + NUMBER_OF_TIMERS_3;i++) {
     if (!this->timers[i]->isUsed()) {
       // We found a free timer
       this->timers[i]->setUsed(true);
@@ -71,7 +72,7 @@ Timer* TimerModule::getTimer() {
 }
 
 void TimerModule::releaseTimer(Timer* timer) {
-    for (int i=0;i<NUMBER_OF_TIMERS;i++) {
+    for (int i=0;i<NUMBER_OF_TIMERS_4+NUMBER_OF_TIMERS_3;i++) {
       if (timer == this->timers[i]) {
         if (this->timers[i]->isStarted()) {
           this->timers[i]->stop();
@@ -82,18 +83,9 @@ void TimerModule::releaseTimer(Timer* timer) {
     }
 }
 
-HardwareControlledTimer* TimerModule::getHardwareControlledTimer() {
-	if (this->hardwareTimer->isUsed()) {
-		return NULL;
-	}
-	else {
-		this->hardwareTimer->setUsed(true);
-		return this->hardwareTimer;
-	}
-}
-
-Timer::Timer(int id) {
+Timer::Timer(int id, int base) {
   this->id = id;
+	this->base = base;
   this->mode = SINGLE_SHOT;
   this->started = false;
   this->callback = NULL;
@@ -121,8 +113,14 @@ void Timer::update(int duration, int timestamp) {
   this->duration = duration;
   if (this->isStarted()) {
     	//NVIC_DisableIRQ(TIMER4_IRQn);
-      NRF_TIMER4->CC[this->id] = timestamp + duration;
-			NRF_TIMER4->INTENSET |= 1 << (16+this->id);
+			if (this->base == 4) {
+	      NRF_TIMER4->CC[this->id] = timestamp + duration;
+				NRF_TIMER4->INTENSET |= 1 << (16+this->id);
+			}
+			else if (this->base == 3) {
+	      NRF_TIMER3->CC[this->id] = timestamp + duration;
+				NRF_TIMER3->INTENSET |= 1 << (16+this->id);
+			}
     	//NVIC_ClearPendingIRQ(TIMER4_IRQn);
     	//NVIC_EnableIRQ(TIMER4_IRQn);
   }
@@ -147,18 +145,33 @@ void Timer::setCallback(ControllerCallback callback, Controller* controller) {
 
 void Timer::start() {
     this->started = true;
-    NVIC_DisableIRQ(TIMER4_IRQn);
-    NRF_TIMER4->CC[this->id] = TimerModule::instance->getTimestamp() + this->duration;
-    NRF_TIMER4->INTENSET |= 1 << (16+this->id);
-    NVIC_ClearPendingIRQ(TIMER4_IRQn);
-    NVIC_EnableIRQ(TIMER4_IRQn);
+		if (this->base == 4) {
+	    NVIC_DisableIRQ(TIMER4_IRQn);
+	    NRF_TIMER4->CC[this->id] = TimerModule::instance->getTimestamp() + this->duration;
+	    NRF_TIMER4->INTENSET |= 1 << (16+this->id);
+	    NVIC_ClearPendingIRQ(TIMER4_IRQn);
+	    NVIC_EnableIRQ(TIMER4_IRQn);
+		}
+		else if (this->base == 3) {
+			NVIC_DisableIRQ(TIMER3_IRQn);
+	    NRF_TIMER3->CC[this->id] = TimerModule::instance->getTimestamp() + this->duration;
+	    NRF_TIMER3->INTENSET |= 1 << (16+this->id);
+	    NVIC_ClearPendingIRQ(TIMER3_IRQn);
+	    NVIC_EnableIRQ(TIMER3_IRQn);
+		}
 }
 
 void Timer::stop() {
     this->started = false;
     //NVIC_DisableIRQ(TIMER4_IRQn);
-    NRF_TIMER4->CC[this->id] = 0;
-    NRF_TIMER4->INTENCLR |= 1 << (16+this->id);
+		if (this->base == 4) {
+	    NRF_TIMER4->CC[this->id] = 0;
+	    NRF_TIMER4->INTENCLR |= 1 << (16+this->id);
+		}
+		else if (this->base == 3) {
+			NRF_TIMER3->CC[this->id] = 0;
+	    NRF_TIMER3->INTENCLR |= 1 << (16+this->id);
+		}
     //NVIC_ClearPendingIRQ(TIMER4_IRQn);
     //NVIC_EnableIRQ(TIMER4_IRQn);
 }
@@ -183,92 +196,29 @@ TimerMode Timer::getMode() {
 int Timer::getDuration() {
   return this->duration;
 }
-HardwareControlledTimer::HardwareControlledTimer() {
-	this->callback = NULL;
-  this->controller = NULL;
-  this->duration = 1000000;
-  this->used = false;
-}
-
-void HardwareControlledTimer::enable(volatile void* event) {
-		NVIC_DisableIRQ(TIMER3_IRQn);
-		NRF_TIMER3->CC[0] = this->duration;
-		NRF_TIMER3->INTENSET = (1 << 16);
-
-	  NRF_PPI->CH[0].EEP = (uint32_t)event;
-	  NRF_PPI->CH[0].TEP = (uint32_t)&(NRF_TIMER3->TASKS_START);
-
-		NRF_PPI->CH[1].EEP = (uint32_t)event;
-		NRF_PPI->CH[1].TEP = (uint32_t)&(NRF_TIMER3->TASKS_CLEAR);
-
-	  NRF_PPI->CHEN = 3;
-		NVIC_ClearPendingIRQ(TIMER3_IRQn);
-		NVIC_EnableIRQ(TIMER3_IRQn);
-}
-
-void HardwareControlledTimer::disable() {
-	NVIC_DisableIRQ(TIMER3_IRQn);
-
-	NRF_TIMER3->TASKS_STOP = 1;
-	NRF_TIMER3->TASKS_CLEAR = 1;
-
-	NRF_PPI->CH[0].EEP = 0;
-	NRF_PPI->CH[0].TEP = 0;
-
-	NRF_PPI->CH[1].EEP = 0;
-	NRF_PPI->CH[1].TEP = 0;
-
-	NRF_PPI->CHEN = 0;
-	NVIC_ClearPendingIRQ(TIMER3_IRQn);
-	NVIC_EnableIRQ(TIMER3_IRQn);
-
-
-}
-
-void HardwareControlledTimer::setCallback(ControllerCallback callback, Controller* controller) {
-  this->callback = callback;
-  this->controller = controller;
-}
-
-bool HardwareControlledTimer::isUsed() {
-	return this->used;
-}
-
-ControllerCallback HardwareControlledTimer::getCallback() {
-	return this->callback;
-}
-Controller* HardwareControlledTimer::getController() {
-	return this->controller;
-}
-
-int HardwareControlledTimer::getDuration() {
-	return this->duration;
-}
-void HardwareControlledTimer::setDuration(int duration) {
-	this->duration = duration;
-}
-
-void HardwareControlledTimer::setUsed(bool used) {
-	this->used = used;
-}
-
-void HardwareControlledTimer::release() {
-	// disable PPI
-	this->disable();
-	this->used = false;
-}
 
 extern "C" void TIMER3_IRQHandler(void) {
-	if (NRF_TIMER3->EVENTS_COMPARE[0]) {
-		NRF_TIMER3->EVENTS_COMPARE[0] = 0UL;
-		HardwareControlledTimer* timer = TimerModule::instance->hardwareTimer;
-		(timer->getController() ->* timer->getCallback())();
-		NRF_TIMER3->CC[0] = 0;
-	}
+	  for (int i=0;i<NUMBER_OF_TIMERS_3;i++) {
+		 if (NRF_TIMER3->EVENTS_COMPARE[i]) {
+			 NRF_TIMER3->EVENTS_COMPARE[i] = 0UL;
+			 uint32_t now = TimerModule::instance->getTimestamp();
+	      if (TimerModule::instance->timers[NUMBER_OF_TIMERS_4+i]->isStarted()) {
+	        Timer* timer = TimerModule::instance->timers[NUMBER_OF_TIMERS_4+i];
+					timer->setLastTimestamp(now);
+	  		  bool repeat = (timer->getController() ->* timer->getCallback())();
+	        if (!repeat || timer->getMode() == SINGLE_SHOT) {
+	          NRF_TIMER3->CC[i] = 0;
+	        }
+	        else {
+	    			NRF_TIMER3->CC[i] = now + timer->getDuration() - 11;
+	        }
+	      }
+	   }
+	  }
 }
 extern "C" void TIMER4_IRQHandler(void) {
 
-  for (int i=0;i<NUMBER_OF_TIMERS;i++) {
+  for (int i=0;i<NUMBER_OF_TIMERS_4;i++) {
 	 if (NRF_TIMER4->EVENTS_COMPARE[i]) {
 		 NRF_TIMER4->EVENTS_COMPARE[i] = 0UL;
 		 uint32_t now = TimerModule::instance->getTimestamp();
@@ -278,11 +228,9 @@ extern "C" void TIMER4_IRQHandler(void) {
   		  bool repeat = (timer->getController() ->* timer->getCallback())();
         if (!repeat || timer->getMode() == SINGLE_SHOT) {
           NRF_TIMER4->CC[i] = 0;
-          //NRF_TIMER4->INTENCLR |= 1 << (16+i);
         }
         else {
     			NRF_TIMER4->CC[i] = now + timer->getDuration() - 11;
-    			//NRF_TIMER4->INTENSET |= 1 << (16+i);
         }
       }
    }
