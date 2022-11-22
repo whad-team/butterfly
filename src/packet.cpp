@@ -111,13 +111,13 @@ void BLEPacket::forgeAdvInd(uint8_t **payload,size_t *size, uint8_t *advertiser,
 	memcpy(&((*payload)[2]), advertiser, 6);
 	memcpy(&((*payload)[8]), data, dataSize);
 }
-void BLEPacket::forgeScanResponse(uint8_t **payload,size_t *size, uint8_t *advertiser, bool advertiserRandom,  uint8_t *data, size_t dataSize) {
+void BLEPacket::forgeScanResponse(uint8_t **payload,size_t *size, uint8_t *advertiser, bool advertiserRandom,  uint8_t *data, size_t dataSize, bool targetRandom) {
 	*size=8 + dataSize;
 	*payload = (uint8_t *)malloc(sizeof(uint8_t)*(*size));
 	// Header
 
 	// RxAdd | TxAdd | ChSel | PDU_type = 0
-	(*payload)[0] = 0x04 | ((advertiserRandom) << 6) | ((advertiserRandom) << 7);
+	(*payload)[0] = 0x04 | ((advertiserRandom) << 6) | ((targetRandom) << 7);
 	// Length
 	(*payload)[1] = 6+dataSize;
 	memcpy(&((*payload)[2]), advertiser, 6);

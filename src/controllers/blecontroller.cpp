@@ -1113,8 +1113,9 @@ bool BLEController::newAdvertisingTransmission() {
 	}
 	this->advertisingTimer->setMode(REPEATED);
 	this->advertisingTimer->setCallback((ControllerCallback)&BLEController::newAdvertisingTransmission, this);
-	this->advertisingTimer->update((this->advertisingData.advertisingInterval * 625) / 3);
-	this->advertisingTimer->start();
+	this->advertisingTimer->update(this->channel != 39 ? 5000 : (this->advertisingData.advertisingInterval * 625) - 5000*2);
+
+	if (!this->advertisingTimer->isStarted()) this->advertisingTimer->start();
 
 	if (this->channel == 37) {
 		this->setChannel(38);
@@ -1128,9 +1129,10 @@ bool BLEController::newAdvertisingTransmission() {
 	else {
 		this->setChannel(37);
 	}
-	this->radio->enableAutoTXafterRX();
-	this->radio->setFastRampUpTime(false);
-	this->radio->setInterFrameSpacing(145);
+
+	this->setFilter(false, this->own.bytes[5], this->own.bytes[4], this->own.bytes[3], this->own.bytes[2], this->own.bytes[1],  this->own.bytes[0]);
+
+		// Reload Radio configuration (to take into account radio custom parameters)
 	this->radio->reload();
 	this->advertisingData.lastAdvertisingEvent = this->timerModule->getTimestamp();
 	uint8_t *adv_ind;
@@ -2009,8 +2011,7 @@ void BLEController::connectionSynchronizationProcessing(BLEPacket *pkt) {
 
 		// Process the packet as a master's packet
 		this->masterPacketProcessing(pkt);
-
-
+		
 		// Update the anchor point
 		this->setAnchorPoint(pkt->getTimestamp());
 	}
@@ -2193,14 +2194,33 @@ void BLEController::advertisementPacketProcessing(BLEPacket *pkt) {
 	}
 
 	else if (this->controllerState == ADVERTISING) {
-		if (pkt->getTimestamp() - this->advertisingData.lastAdvertisingEvent < 1000) {
+		if (pkt->extractAdvertisementType() == SCAN_REQ) {
+			nrf_delay_us(60);
 			uint8_t *scan_rsp;
 			size_t scan_rsp_size;
-			BLEPacket::forgeScanResponse(&scan_rsp, &scan_rsp_size, this->own.bytes, this->ownRandom, this->advertisingData.scanData, this->advertisingData.scanDataSize);
-			this->radio->updateTXBuffer(scan_rsp, scan_rsp_size);
+			BLEPacket::forgeScanResponse(&scan_rsp, &scan_rsp_size, this->own.bytes, this->ownRandom, this->advertisingData.scanData, this->advertisingData.scanDataSize, (pkt->getPacketBuffer()[4] & 0x80) >> 7);
+			this->radio->send(scan_rsp, scan_rsp_size, BLEController::channelToFrequency(this->channel), this->channel);
+			nrf_delay_us(8*(scan_rsp_size+4+3));
+			bsp_board_led_invert(1);
 			free(scan_rsp);
 		}
-		else this->radio->updateTXBuffer(NULL, 0);
+		else if (pkt->extractAdvertisementType() == CONNECT_REQ) {
+			if (pkt->extractAdvertisementType() == CONNECT_REQ && this->follow) {
+				// Start following the connection
+				this->followConnection(
+					pkt->extractHopInterval(),
+					pkt->extractHopIncrement(),
+					pkt->extractChannelMap(),
+					pkt->extractAccessAddress(),
+					pkt->extractCrcInit(),
+					pkt->extractSCA(),
+					pkt->extractLatency()
+				);
+			}
+			this->controllerState = SIMULATING_SLAVE;
+		}
+		pkt->updateSource(DIRECTION_UNKNOWN);
+		this->addPacket(pkt);
 	}
 
 	else if (this->controllerState == SNIFFING_ADVERTISEMENTS) {
