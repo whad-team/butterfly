@@ -149,6 +149,16 @@ typedef struct _ble_AdvPduReceived {
 typedef struct _ble_ConnectToCmd { 
     pb_byte_t bd_address[6];
     ble_BleAddrType addr_type;
+    bool has_access_address;
+    uint32_t access_address;
+    bool has_channel_map;
+    pb_byte_t channel_map[5];
+    bool has_hop_interval;
+    uint32_t hop_interval;
+    bool has_hop_increment;
+    uint32_t hop_increment;
+    bool has_crc_init;
+    uint32_t crc_init;
 } ble_ConnectToCmd;
 
 /* *
@@ -496,7 +506,7 @@ extern "C" {
 #define ble_AdvModeCmd_init_default              {{0, {0}}, {0, {0}}}
 #define ble_SetAdvDataCmd_init_default           {{{NULL}, NULL}, {{NULL}, NULL}}
 #define ble_CentralModeCmd_init_default          {0}
-#define ble_ConnectToCmd_init_default            {{0}, _ble_BleAddrType_MIN}
+#define ble_ConnectToCmd_init_default            {{0}, _ble_BleAddrType_MIN, false, 0, false, {0}, false, 0, false, 0, false, 0}
 #define ble_SendRawPDUCmd_init_default           {_ble_BleDirection_MIN, 0, 0, {0, {0}}, 0, 0}
 #define ble_SendPDUCmd_init_default              {_ble_BleDirection_MIN, 0, {0, {0}}, 0}
 #define ble_DisconnectCmd_init_default           {0}
@@ -539,7 +549,7 @@ extern "C" {
 #define ble_AdvModeCmd_init_zero                 {{0, {0}}, {0, {0}}}
 #define ble_SetAdvDataCmd_init_zero              {{{NULL}, NULL}, {{NULL}, NULL}}
 #define ble_CentralModeCmd_init_zero             {0}
-#define ble_ConnectToCmd_init_zero               {{0}, _ble_BleAddrType_MIN}
+#define ble_ConnectToCmd_init_zero               {{0}, _ble_BleAddrType_MIN, false, 0, false, {0}, false, 0, false, 0, false, 0}
 #define ble_SendRawPDUCmd_init_zero              {_ble_BleDirection_MIN, 0, 0, {0, {0}}, 0, 0}
 #define ble_SendPDUCmd_init_zero                 {_ble_BleDirection_MIN, 0, {0, {0}}, 0}
 #define ble_DisconnectCmd_init_zero              {0}
@@ -586,6 +596,11 @@ extern "C" {
 #define ble_AdvPduReceived_addr_type_tag         5
 #define ble_ConnectToCmd_bd_address_tag          1
 #define ble_ConnectToCmd_addr_type_tag           2
+#define ble_ConnectToCmd_access_address_tag      3
+#define ble_ConnectToCmd_channel_map_tag         4
+#define ble_ConnectToCmd_hop_interval_tag        5
+#define ble_ConnectToCmd_hop_increment_tag       6
+#define ble_ConnectToCmd_crc_init_tag            7
 #define ble_Connected_initiator_tag              1
 #define ble_Connected_advertiser_tag             2
 #define ble_Connected_access_address_tag         3
@@ -791,7 +806,12 @@ X(a, CALLBACK, SINGULAR, BYTES,    scanrsp_data,      2)
 
 #define ble_ConnectToCmd_FIELDLIST(X, a) \
 X(a, STATIC,   SINGULAR, FIXED_LENGTH_BYTES, bd_address,        1) \
-X(a, STATIC,   SINGULAR, UENUM,    addr_type,         2)
+X(a, STATIC,   SINGULAR, UENUM,    addr_type,         2) \
+X(a, STATIC,   OPTIONAL, UINT32,   access_address,    3) \
+X(a, STATIC,   OPTIONAL, FIXED_LENGTH_BYTES, channel_map,       4) \
+X(a, STATIC,   OPTIONAL, UINT32,   hop_interval,      5) \
+X(a, STATIC,   OPTIONAL, UINT32,   hop_increment,     6) \
+X(a, STATIC,   OPTIONAL, UINT32,   crc_init,          7)
 #define ble_ConnectToCmd_CALLBACK NULL
 #define ble_ConnectToCmd_DEFAULT NULL
 
@@ -1173,7 +1193,7 @@ extern const pb_msgdesc_t ble_Message_msg;
 #define ble_AdvModeCmd_size                      66
 #define ble_AdvPduReceived_size                  56
 #define ble_CentralModeCmd_size                  0
-#define ble_ConnectToCmd_size                    10
+#define ble_ConnectToCmd_size                    41
 #define ble_Connected_size                       32
 #define ble_Desynchronized_size                  6
 #define ble_DisconnectCmd_size                   11

@@ -102,6 +102,7 @@ void BLEController::executeSequences() {
 						bool updateHeader; // ignored for now
 						this->sequenceModule->sequences[i]->processPacket(&packet, &packetSize, &updateHeader);
 						this->setMasterPayload(packet, packetSize);
+						free(packet);
 					}
 					else if (
 						this->sequenceModule->sequences[i]->getDirection() == BLE_TO_MASTER &&
@@ -112,6 +113,7 @@ void BLEController::executeSequences() {
 						bool updateHeader;
 						this->sequenceModule->sequences[i]->processPacket(&packet, &packetSize, &updateHeader);
 						this->setSlavePayload(packet, packetSize);
+						free(packet);
 					}
 					else if (
 						this->sequenceModule->sequences[i]->getDirection() == BLE_TO_MASTER &&
@@ -123,6 +125,7 @@ void BLEController::executeSequences() {
 						this->sequenceModule->sequences[i]->processPacket(&packet, &packetSize, &updateHeader);
 						this->setAttackPayload(packet, packetSize);
 						this->startAttack(BLE_ATTACK_FRAME_INJECTION_TO_MASTER);
+						free(packet);
 					}
 					else if (
 						this->sequenceModule->sequences[i]->getDirection() == BLE_TO_SLAVE &&
@@ -133,6 +136,7 @@ void BLEController::executeSequences() {
 						bool updateHeader;
 						this->sequenceModule->sequences[i]->processPacket(&packet, &packetSize, &updateHeader);
 						this->setAttackPayload(packet, packetSize);
+						free(packet);
 						this->startAttack(BLE_ATTACK_FRAME_INJECTION_TO_SLAVE);
 					}
 
@@ -2011,7 +2015,7 @@ void BLEController::connectionSynchronizationProcessing(BLEPacket *pkt) {
 
 		// Process the packet as a master's packet
 		this->masterPacketProcessing(pkt);
-		
+
 		// Update the anchor point
 		this->setAnchorPoint(pkt->getTimestamp());
 	}
@@ -2091,12 +2095,12 @@ void BLEController::masterSimulationControlFlowProcessing(BLEPacket *pkt) {
 	}
 	if (this->mdSequence && this->mdCount > 0) {
 			nrf_delay_us(60);
-			uint8_t data1[2];
-			data1[0] = (0x01 & 0xF3) | (this->simulatedMasterSequenceNumbers.nesn  << 2) | (this->simulatedMasterSequenceNumbers.sn << 3) | (1 << 4);
-			data1[1] = 0x00;
+			this->temporaryPayload.payload[0] = (0x01 & 0xF3) | (this->simulatedMasterSequenceNumbers.nesn  << 2) | (this->simulatedMasterSequenceNumbers.sn << 3) | (1 << 4);
+			this->temporaryPayload.payload[1] = 0x00;
+			this->temporaryPayload.size = 2;
 			this->simulatedMasterSequenceNumbers.sn = (this->simulatedMasterSequenceNumbers.sn + 1) % 2;
 			this->simulatedMasterSequenceNumbers.nesn = (this->simulatedMasterSequenceNumbers.nesn + 1) % 2;
-			this->radio->send(data1, 2, BLEController::channelToFrequency(this->channel), this->channel);
+			this->radio->send(this->temporaryPayload.payload, this->temporaryPayload.size, BLEController::channelToFrequency(this->channel), this->channel);
 			this->mdCount--;
 	}
 }
@@ -2137,7 +2141,7 @@ void BLEController::roleSimulationProcessing(BLEPacket* pkt) {
 		else {
 			lastTransmittedPacketDuration = 8 * (this->masterPayload.size + BLE_1MBPS_PREAMBLE_SIZE + ACCESS_ADDRESS_SIZE + CRC_SIZE);
 		}
-		if (!this->mdSequence) {
+		if (this->packetCount == 1) {
 			// Update the anchor point according to our own packet size
 			this->setAnchorPoint(pkt->getTimestamp() - BLE_IFS - lastTransmittedPacketDuration);
 		}

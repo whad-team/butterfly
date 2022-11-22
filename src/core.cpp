@@ -389,9 +389,48 @@ void Core::processBLEInputMessage(ble_Message msg) {
     address[4] = msg.msg.connect.bd_address[1];
     address[5] = msg.msg.connect.bd_address[0];
 
+    uint32_t accessAddress = 0x23a3d487;
+    uint32_t crcInit = 0x049095;
+    uint16_t hopInterval = 56;
+    uint8_t hopIncrement = 8;
+    uint8_t channelMap[5] = {
+      0xFF,
+      0xFF,
+      0xFF,
+      0xFF,
+      0x1F
+    };
+    if (msg.msg.connect.has_access_address) {
+      accessAddress = msg.msg.connect.access_address;
+    }
+    if (msg.msg.connect.has_channel_map) {
+      memcpy(channelMap, msg.msg.connect.channel_map, 5);
+    }
+
+    if (msg.msg.connect.has_crc_init) {
+      crcInit = msg.msg.connect.crc_init;
+    }
+
+    if (msg.msg.connect.has_hop_interval) {
+      hopInterval = msg.msg.connect.hop_interval;
+    }
+
+    if (msg.msg.connect.has_hop_increment) {
+      hopIncrement = msg.msg.connect.hop_increment;
+    }
     this->bleController->connect(
         address,
-        msg.msg.connect.addr_type == ble_BleAddrType_RANDOM
+        msg.msg.connect.addr_type == ble_BleAddrType_RANDOM,
+        accessAddress,
+        crcInit,
+        3,
+        9,
+        hopInterval,
+        0,
+        42,
+        1,
+        hopIncrement,
+        channelMap
     );
 
     response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);

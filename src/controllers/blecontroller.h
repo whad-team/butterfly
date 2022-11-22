@@ -248,6 +248,7 @@ class BLEController : public Controller {
 
 		BLEPayload slavePayload;
 		BLEPayload masterPayload;
+		BLEPayload temporaryPayload;
 
 		// Advertising interval related
 		uint32_t timestampsFirstChannel[ADV_REPORT_SIZE];

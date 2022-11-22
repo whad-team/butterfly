@@ -1053,7 +1053,6 @@ bool Radio::send(uint8_t *data,int size,int frequency, uint8_t channel) {
 	NRF_RADIO->EVENTS_END = 0;
 	NRF_RADIO->TASKS_TXEN = 1;
 
-
 	return false;
 }
 
