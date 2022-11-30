@@ -24,7 +24,8 @@ typedef enum ConnectionStatus {
 	CONNECTION_LOST = 0x01,
 	ATTACK_STARTED = 0x02,
 	ATTACK_SUCCESS = 0x03,
-	ATTACK_FAILURE = 0x04
+	ATTACK_FAILURE = 0x04,
+	DISCONNECTED = 0x05
 } ConnectionStatus;
 
 typedef enum BLEControllerState {
@@ -420,7 +421,8 @@ class BLEController : public Controller {
 		void sendConnectedReport();
 		void connect(uint8_t *address, bool random);
 		void connect(uint8_t *address, bool random,  uint32_t accessAddress,  uint32_t crcInit, uint8_t windowSize, uint16_t windowOffset, uint16_t hopInterval, uint16_t slaveLatency, uint16_t timeout, uint8_t sca, uint8_t hopIncrement, uint8_t *channelMap);
-
+		void disconnect();
+		
 		bool sendFirstConnectionPacket();
 		void initializeConnection();
 

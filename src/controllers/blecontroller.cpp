@@ -503,6 +503,9 @@ bool BLEController::stopConnection() {
 
 bool BLEController::connectionLost() {
 	//We are sending a notification to Host
+	bsp_board_led_off(0);
+
+	this->sendConnectionReport(DISCONNECTED);
 	this->sendConnectionReport(CONNECTION_LOST);
 	return this->stopConnection();
 }
@@ -539,6 +542,8 @@ bool BLEController::goToNextChannel() {
 			this->executeSequences();
 
 			this->executeAttack();
+			bsp_board_led_invert(0);
+
 		}
 		return this->desyncCounter <= 5;
 	}
@@ -1627,6 +1632,11 @@ void BLEController::sendConnectionReport(ConnectionStatus status) {
 			Message* msg = Whad::buildBLESynchronizedMessage(this->accessAddress, this->crcInit, this->hopInterval, this->hopIncrement, this->channelMap);
 			Core::instance->pushMessageToQueue(msg);
 	}
+	else if (status == DISCONNECTED) {
+		Message* msg = Whad::buildBLEDisconnectedMessage(0x16);
+		Core::instance->pushMessageToQueue(msg);
+
+	}
 	else if (status == CONNECTION_LOST) {
 		Message* msg = Whad::buildBLEDesynchronizedMessage(this->accessAddress);
 		Core::instance->pushMessageToQueue(msg);
@@ -1640,6 +1650,7 @@ void BLEController::sendConnectionReport(ConnectionStatus status) {
 		Core::instance->pushMessageToQueue(msg);
 	}
 }
+
 
 void BLEController::releaseTimers() {
 	if (this->connectionTimer != NULL) {
@@ -1988,6 +1999,16 @@ void BLEController::connectionManagementProcessing(BLEPacket *pkt) {
 	}
 }
 
+
+void BLEController::disconnect() {
+	if (this->controllerState == SIMULATING_MASTER) {
+		uint8_t *terminate_ind;
+		size_t terminate_ind_size;
+		BLEPacket::forgeTerminateInd(&terminate_ind, &terminate_ind_size,0x13);
+		this->setMasterPayload(terminate_ind,terminate_ind_size);
+		this->connectionLost();
+	}
+}
 void BLEController::masterPacketProcessing(BLEPacket *pkt) {
 	// Update master's last timestamp and control flow counters
 	this->lastMasterTimestamp = pkt->getTimestamp();
@@ -2149,6 +2170,7 @@ void BLEController::roleSimulationProcessing(BLEPacket* pkt) {
 		this->masterSimulationControlFlowProcessing(pkt);
 	}
 }
+
 
 void BLEController::connectionPacketProcessing(BLEPacket *pkt) {
 	// Increment the packet counter

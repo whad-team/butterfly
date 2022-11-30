@@ -281,6 +281,7 @@ Message* Whad::buildBLEDesynchronizedMessage(uint32_t accessAddress) {
   msg->msg.ble.msg.desynchronized.access_address = accessAddress;
   return msg;
 }
+
 Message* Whad::buildBLETriggeredMessage(uint8_t identifier) {
   Message* msg = Whad::buildMessage();
   msg->which_msg = Message_ble_tag;
@@ -345,5 +346,15 @@ Message* Whad::buildBLEConnectedMessage(uint8_t *initiator, bool initiatorRandom
   msg->msg.ble.msg.connected.conn_handle = 0;
   msg->msg.ble.msg.connected.adv_addr_type = advertiserRandom ? ble_BleAddrType_RANDOM : ble_BleAddrType_PUBLIC;
   msg->msg.ble.msg.connected.init_addr_type = initiatorRandom ? ble_BleAddrType_RANDOM : ble_BleAddrType_PUBLIC;
+  return msg;
+}
+
+
+Message* Whad::buildBLEDisconnectedMessage(uint32_t reason) {
+  Message* msg = Whad::buildMessage();
+  msg->which_msg = Message_ble_tag;
+  msg->msg.ble.which_msg = ble_Message_disconnected_tag;
+  msg->msg.ble.msg.disconnected.reason = reason;
+  msg->msg.ble.msg.disconnected.conn_handle = 0;
   return msg;
 }
