@@ -490,8 +490,11 @@ bool BLEController::stopConnection() {
 	this->clearConnectionUpdate();
 	// If we were simulating slave, exit slave mode
 	if (this->controllerState == SIMULATING_SLAVE || this->controllerState == PERFORMING_MITM) this->exitSlaveMode();
+	this->masterPayload.transmitted = true;
+	this->slavePayload.transmitted = true;
 	// Reconfigure radio to receive advertisements
 	this->setHardwareConfiguration(0x8e89bed6,0x555555);
+
 	// Reset the channel
 	this->setChannel(this->lastAdvertisingChannel);
 
@@ -1847,7 +1850,7 @@ void BLEController::initializeConnection() {
 
 	if (this->timeoutTimer == NULL) {
 		this->timeoutTimer = this->timerModule->getTimer();
-		this->timeoutTimer->setMode(SINGLE_SHOT);
+		this->timeoutTimer->setMode(REPEATED);
 		this->timeoutTimer->setCallback((ControllerCallback)&BLEController::checkSynchronization, this);
 		this->timeoutTimer->update(this->hopInterval * 1250UL);
 		this->timeoutTimer->start();
