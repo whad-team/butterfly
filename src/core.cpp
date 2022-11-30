@@ -418,6 +418,7 @@ void Core::processBLEInputMessage(ble_Message msg) {
     if (msg.msg.connect.has_hop_increment) {
       hopIncrement = msg.msg.connect.hop_increment;
     }
+    this->bleController->setEmptyTransmitIndicator(true);
     this->bleController->connect(
         address,
         msg.msg.connect.addr_type == ble_BleAddrType_RANDOM,
