@@ -326,24 +326,46 @@ void Core::processBLEInputMessage(ble_Message msg) {
     //uint32_t crc = msg.msg.send_pdu.crc;
 
     if (msg.msg.send_raw_pdu.direction == ble_BleDirection_INJECTION_TO_SLAVE) {
-      this->bleController->setAttackPayload(msg.msg.send_raw_pdu.pdu.bytes, msg.msg.send_raw_pdu.pdu.size);
-			this->bleController->startAttack(BLE_ATTACK_FRAME_INJECTION_TO_SLAVE);
-      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      if (this->bleController->getState() == SNIFFING_CONNECTION) {
+
+        this->bleController->setAttackPayload(msg.msg.send_raw_pdu.pdu.bytes, msg.msg.send_raw_pdu.pdu.size);
+  			this->bleController->startAttack(BLE_ATTACK_FRAME_INJECTION_TO_SLAVE);
+        response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      }
+      else {
+        response = Whad::buildResultMessage(generic_ResultCode_WRONG_MODE);
+      }
     }
     else if (msg.msg.send_raw_pdu.direction == ble_BleDirection_INJECTION_TO_MASTER) {
-      this->bleController->setAttackPayload(msg.msg.send_raw_pdu.pdu.bytes, msg.msg.send_raw_pdu.pdu.size);
-			this->bleController->startAttack(BLE_ATTACK_FRAME_INJECTION_TO_MASTER);
-      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      if (this->bleController->getState() == SNIFFING_CONNECTION) {
+        this->bleController->setAttackPayload(msg.msg.send_raw_pdu.pdu.bytes, msg.msg.send_raw_pdu.pdu.size);
+  			this->bleController->startAttack(BLE_ATTACK_FRAME_INJECTION_TO_MASTER);
+        response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      }
+      else {
+        response = Whad::buildResultMessage(generic_ResultCode_WRONG_MODE);
+      }
     }
     else if (msg.msg.send_raw_pdu.direction == ble_BleDirection_MASTER_TO_SLAVE) {
-      this->bleController->setMasterPayload(msg.msg.send_raw_pdu.pdu.bytes, msg.msg.send_raw_pdu.pdu.size);
-      while (!this->bleController->isMasterPayloadTransmitted()) {}
-      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      if (this->bleController->getState() == SIMULATING_MASTER || this->bleController->getState() == PERFORMING_MITM) {
+        this->bleController->setMasterPayload(msg.msg.send_raw_pdu.pdu.bytes, msg.msg.send_raw_pdu.pdu.size);
+        while (!this->bleController->isMasterPayloadTransmitted()) {}
+        response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      }
+      else {
+        response = Whad::buildResultMessage(generic_ResultCode_WRONG_MODE);
+      }
     }
     else if (msg.msg.send_raw_pdu.direction == ble_BleDirection_SLAVE_TO_MASTER) {
-      this->bleController->setSlavePayload(msg.msg.send_raw_pdu.pdu.bytes, msg.msg.send_raw_pdu.pdu.size);
-      while (!this->bleController->isSlavePayloadTransmitted()) {}
-      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      if (this->bleController->getState() == SIMULATING_SLAVE || this->bleController->getState() == PERFORMING_MITM) {
+
+        this->bleController->setSlavePayload(msg.msg.send_raw_pdu.pdu.bytes, msg.msg.send_raw_pdu.pdu.size);
+        while (!this->bleController->isSlavePayloadTransmitted()) {}
+        response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      }
+      else {
+        response = Whad::buildResultMessage(generic_ResultCode_WRONG_MODE);
+      }
     }
   }
   else if (msg.which_msg == ble_Message_hijack_master_tag) {
