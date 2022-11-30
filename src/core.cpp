@@ -583,6 +583,7 @@ void Core::processESBInputMessage(esb_Message msg) {
   }
   else if (msg.which_msg == esb_Message_ptx_tag) {
     this->esbController->setChannel(msg.msg.ptx.channel);
+    this->esbController->enableAcknowledgementsSniffing();
     this->esbController->disableAcknowledgementsTransmission();
     response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
   }
@@ -648,16 +649,19 @@ void Core::processUnifyingInputMessage(unifying_Message msg) {
   }
   else if (msg.which_msg == unifying_Message_dongle_tag) {
     this->esbController->setChannel(msg.msg.dongle.channel);
+    this->esbController->disableAcknowledgementsSniffing();
     this->esbController->enableAcknowledgementsTransmission();
     response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
   }
   else if (msg.which_msg == unifying_Message_mouse_tag) {
     this->esbController->setChannel(msg.msg.mouse.channel);
+    this->esbController->enableAcknowledgementsSniffing();
     this->esbController->disableAcknowledgementsTransmission();
     response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
   }
   else if (msg.which_msg == unifying_Message_keyboard_tag) {
     this->esbController->setChannel(msg.msg.keyboard.channel);
+    this->esbController->enableAcknowledgementsSniffing();
     this->esbController->disableAcknowledgementsTransmission();
     response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
   }
