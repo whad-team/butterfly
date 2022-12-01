@@ -1720,6 +1720,37 @@ void BLEController::connect(uint8_t *address, bool random) {
 	this->connect(address, random, 0x23a3d487, 0x049095, 3,9,56,0,42,1,9,channelMap);
 }
 
+bool BLEController::goToNextInitiationChannel() {
+	if (this->sync) {
+		return false;
+	}
+	else {
+		if (this->channel == 37) {
+			this->setChannel(38);
+		}
+		else if (this->channel == 38){
+			this->setChannel(39);
+		}
+		else {
+			this->setChannel(37);
+		}
+		this->connect(
+			this->connectionInitiationData.responder.bytes,
+			this->connectionInitiationData.responderRandom,
+			this->connectionInitiationData.accessAddress,
+			this->connectionInitiationData.crcInit,
+			this->connectionInitiationData.windowSize,
+			this->connectionInitiationData.windowOffset,
+			this->connectionInitiationData.hopInterval,
+			this->connectionInitiationData.slaveLatency,
+			this->connectionInitiationData.timeout,
+			this->connectionInitiationData.sca,
+			this->connectionInitiationData.hopIncrement,
+			this->connectionInitiationData.channelMap
+		);
+		return true;
+	}
+}
 
 void BLEController::connect(uint8_t *address, bool random,  uint32_t accessAddress,  uint32_t crcInit, uint8_t windowSize, uint16_t windowOffset, uint16_t hopInterval, uint16_t slaveLatency, uint16_t timeout, uint8_t sca, uint8_t hopIncrement, uint8_t *channelMap) {
 	// Configure connection parameters according to provided arguments
@@ -1735,6 +1766,14 @@ void BLEController::connect(uint8_t *address, bool random,  uint32_t accessAddre
 	this->connectionInitiationData.sca = sca;
 	this->connectionInitiationData.hopIncrement = hopIncrement;
 	memcpy(this->connectionInitiationData.channelMap, channelMap, 5);
+
+	if (this->scanningTimer == NULL) {
+		this->scanningTimer = this->timerModule->getTimer();
+	}
+	this->scanningTimer->setMode(REPEATED);
+	this->scanningTimer->setCallback((ControllerCallback)&BLEController::goToNextInitiationChannel, this);
+	this->scanningTimer->update(500000);
+	this->scanningTimer->start();
 
 	// Enter Connection Initiation mode
 	this->controllerState = CONNECTION_INITIATION;
@@ -1781,6 +1820,7 @@ void BLEController::connect(uint8_t *address, bool random,  uint32_t accessAddre
 	// Reload Radio configuration (to take into account radio custom parameters)
 	this->radio->reload();
 }
+
 
 
 void BLEController::initializeConnection() {

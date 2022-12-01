@@ -418,11 +418,12 @@ class BLEController : public Controller {
 		// Connection initiation methods
 		void setOwnAddress(uint8_t *address, bool random);
 
+		bool goToNextInitiationChannel();
 		void sendConnectedReport();
 		void connect(uint8_t *address, bool random);
 		void connect(uint8_t *address, bool random,  uint32_t accessAddress,  uint32_t crcInit, uint8_t windowSize, uint16_t windowOffset, uint16_t hopInterval, uint16_t slaveLatency, uint16_t timeout, uint8_t sca, uint8_t hopIncrement, uint8_t *channelMap);
 		void disconnect();
-		
+
 		bool sendFirstConnectionPacket();
 		void initializeConnection();
 
