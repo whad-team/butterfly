@@ -440,7 +440,7 @@ void Core::processBLEInputMessage(ble_Message msg) {
     if (msg.msg.connect.has_hop_increment) {
       hopIncrement = msg.msg.connect.hop_increment;
     }
-    this->bleController->setEmptyTransmitIndicator(true);
+    //this->bleController->setEmptyTransmitIndicator(true);
     this->bleController->connect(
         address,
         msg.msg.connect.addr_type == ble_BleAddrType_RANDOM,
@@ -523,6 +523,10 @@ void Core::processBLEInputMessage(ble_Message msg) {
       else {
         response = Whad::buildResultMessage(generic_ResultCode_ERROR);
       }
+  }
+  else if (msg.which_msg == ble_Message_set_bd_addr_tag) {
+    this->bleController->setOwnAddress(msg.msg.set_bd_addr.bd_address, false);
+    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
   }
   /*
   else if (msg.which_msg == ble_Message_jam_adv_chan_tag) {
