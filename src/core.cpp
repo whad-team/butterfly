@@ -525,7 +525,15 @@ void Core::processBLEInputMessage(ble_Message msg) {
       }
   }
   else if (msg.which_msg == ble_Message_set_bd_addr_tag) {
-    this->bleController->setOwnAddress(msg.msg.set_bd_addr.bd_address, false);
+    uint8_t address[6] = {
+      msg.msg.set_bd_addr.bd_address[5],
+      msg.msg.set_bd_addr.bd_address[4],
+      msg.msg.set_bd_addr.bd_address[3],
+      msg.msg.set_bd_addr.bd_address[2],
+      msg.msg.set_bd_addr.bd_address[1],
+      msg.msg.set_bd_addr.bd_address[0]
+    };
+    this->bleController->setOwnAddress(address, false);
     response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
   }
   /*
