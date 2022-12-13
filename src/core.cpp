@@ -536,6 +536,15 @@ void Core::processBLEInputMessage(ble_Message msg) {
     this->bleController->setOwnAddress(address, false);
     response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
   }
+  else if (msg.which_msg == ble_Message_delete_seq_tag) {
+    uint8_t id = msg.msg.delete_seq.id;
+    if (this->bleController->deleteSequence(id)) {
+      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    }
+    else {
+      response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+    }
+  }
   /*
   else if (msg.which_msg == ble_Message_jam_adv_chan_tag) {
     int channel = msg.msg.jam_adv_chan.channel;

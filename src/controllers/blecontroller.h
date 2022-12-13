@@ -385,6 +385,8 @@ class BLEController : public Controller {
 		void checkSequenceReceptionTriggers(uint8_t *packet, size_t size);
 		void checkSequenceConnectionEventTriggers(uint16_t connectionEvent);
 		void executeSequences();
+		bool deleteSequence(uint8_t id);
+
 		void sendTriggeredReport(uint8_t id);
 
 		void checkAttackSuccess();

@@ -99,6 +99,9 @@ PB_BIND(ble_PrepareSequenceCmd_PendingPacket, ble_PrepareSequenceCmd_PendingPack
 PB_BIND(ble_TriggerSequenceCmd, ble_TriggerSequenceCmd, AUTO)
 
 
+PB_BIND(ble_DeleteSequenceCmd, ble_DeleteSequenceCmd, AUTO)
+
+
 PB_BIND(ble_Triggered, ble_Triggered, AUTO)
 
 

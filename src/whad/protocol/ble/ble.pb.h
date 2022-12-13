@@ -53,7 +53,8 @@ typedef enum _ble_BleCommand { /* *
     ble_BleCommand_ReactiveJam = 22, 
     /* Sequence mode */
     ble_BleCommand_PrepareSequence = 23, 
-    ble_BleCommand_TriggerSequence = 24 
+    ble_BleCommand_TriggerSequence = 24, 
+    ble_BleCommand_DeleteSequence = 25 
 } ble_BleCommand;
 
 typedef enum _ble_BleAdvType { 
@@ -91,6 +92,11 @@ typedef struct _ble_JamAdvCmd {
     char dummy_field;
 } ble_JamAdvCmd;
 
+/* ******************************************
+******************************************
+ Ble Notification messages
+******************************************
+***************************************** */
 typedef struct _ble_PrepareSequenceCmd_ManualTrigger { 
     char dummy_field;
 } ble_PrepareSequenceCmd_ManualTrigger;
@@ -171,6 +177,12 @@ typedef struct _ble_Connected {
     ble_BleAddrType adv_addr_type;
     ble_BleAddrType init_addr_type;
 } ble_Connected;
+
+/* *
+ Disconnected */
+typedef struct _ble_DeleteSequenceCmd { 
+    uint32_t id;
+} ble_DeleteSequenceCmd;
 
 typedef struct _ble_Desynchronized { 
     /* Messages */
@@ -253,11 +265,6 @@ typedef struct _ble_PeripheralModeCmd {
     ble_PeripheralModeCmd_scanrsp_data_t scanrsp_data;
 } ble_PeripheralModeCmd;
 
-/* ******************************************
-******************************************
- Ble Notification messages
-******************************************
-***************************************** */
 typedef struct _ble_PrepareSequenceCmd_ConnectionEventTrigger { 
     uint32_t connection_event;
 } ble_PrepareSequenceCmd_ConnectionEventTrigger;
@@ -399,8 +406,6 @@ typedef struct _ble_Synchronized {
     pb_byte_t channel_map[5];
 } ble_Synchronized;
 
-/* *
- Disconnected */
 typedef struct _ble_TriggerSequenceCmd { 
     uint32_t id;
 } ble_TriggerSequenceCmd;
@@ -467,14 +472,15 @@ typedef struct _ble_Message {
         ble_PrepareSequenceCmd prepare;
         ble_TriggerSequenceCmd trigger;
         ble_Triggered triggered;
+        ble_DeleteSequenceCmd delete_seq;
     } msg;
 } ble_Message;
 
 
 /* Helper constants for enums */
 #define _ble_BleCommand_MIN ble_BleCommand_SetBdAddress
-#define _ble_BleCommand_MAX ble_BleCommand_TriggerSequence
-#define _ble_BleCommand_ARRAYSIZE ((ble_BleCommand)(ble_BleCommand_TriggerSequence+1))
+#define _ble_BleCommand_MAX ble_BleCommand_DeleteSequence
+#define _ble_BleCommand_ARRAYSIZE ((ble_BleCommand)(ble_BleCommand_DeleteSequence+1))
 
 #define _ble_BleAdvType_MIN ble_BleAdvType_ADV_UNKNOWN
 #define _ble_BleAdvType_MAX ble_BleAdvType_ADV_SCAN_RSP
@@ -525,6 +531,7 @@ extern "C" {
 #define ble_PrepareSequenceCmd_Trigger_init_default {0, {ble_PrepareSequenceCmd_ReceptionTrigger_init_default}}
 #define ble_PrepareSequenceCmd_PendingPacket_init_default {{0, {0}}}
 #define ble_TriggerSequenceCmd_init_default      {0}
+#define ble_DeleteSequenceCmd_init_default       {0}
 #define ble_Triggered_init_default               {0}
 #define ble_AccessAddressDiscovered_init_default {0, false, 0, false, 0}
 #define ble_AdvPduReceived_init_default          {_ble_BleAdvType_MIN, 0, {0}, {0, {0}}, _ble_BleAddrType_MIN}
@@ -568,6 +575,7 @@ extern "C" {
 #define ble_PrepareSequenceCmd_Trigger_init_zero {0, {ble_PrepareSequenceCmd_ReceptionTrigger_init_zero}}
 #define ble_PrepareSequenceCmd_PendingPacket_init_zero {{0, {0}}}
 #define ble_TriggerSequenceCmd_init_zero         {0}
+#define ble_DeleteSequenceCmd_init_zero          {0}
 #define ble_Triggered_init_zero                  {0}
 #define ble_AccessAddressDiscovered_init_zero    {0, false, 0, false, 0}
 #define ble_AdvPduReceived_init_zero             {_ble_BleAdvType_MIN, 0, {0}, {0, {0}}, _ble_BleAddrType_MIN}
@@ -607,6 +615,7 @@ extern "C" {
 #define ble_Connected_conn_handle_tag            8
 #define ble_Connected_adv_addr_type_tag          9
 #define ble_Connected_init_addr_type_tag         10
+#define ble_DeleteSequenceCmd_id_tag             1
 #define ble_Desynchronized_access_address_tag    1
 #define ble_DisconnectCmd_conn_handle_tag        1
 #define ble_Disconnected_reason_tag              1
@@ -729,6 +738,7 @@ extern "C" {
 #define ble_Message_prepare_tag                  35
 #define ble_Message_trigger_tag                  36
 #define ble_Message_triggered_tag                37
+#define ble_Message_delete_seq_tag               38
 
 /* Struct field encoding specification for nanopb */
 #define ble_SetBdAddressCmd_FIELDLIST(X, a) \
@@ -930,6 +940,11 @@ X(a, STATIC,   SINGULAR, UINT32,   id,                1)
 #define ble_TriggerSequenceCmd_CALLBACK NULL
 #define ble_TriggerSequenceCmd_DEFAULT NULL
 
+#define ble_DeleteSequenceCmd_FIELDLIST(X, a) \
+X(a, STATIC,   SINGULAR, UINT32,   id,                1)
+#define ble_DeleteSequenceCmd_CALLBACK NULL
+#define ble_DeleteSequenceCmd_DEFAULT NULL
+
 #define ble_Triggered_FIELDLIST(X, a) \
 X(a, STATIC,   SINGULAR, UINT32,   id,                1)
 #define ble_Triggered_CALLBACK NULL
@@ -1056,7 +1071,8 @@ X(a, STATIC,   ONEOF,    MESSAGE,  (msg,encryption,msg.encryption),  33) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (msg,reactive_jam,msg.reactive_jam),  34) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (msg,prepare,msg.prepare),  35) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (msg,trigger,msg.trigger),  36) \
-X(a, STATIC,   ONEOF,    MESSAGE,  (msg,triggered,msg.triggered),  37)
+X(a, STATIC,   ONEOF,    MESSAGE,  (msg,triggered,msg.triggered),  37) \
+X(a, STATIC,   ONEOF,    MESSAGE,  (msg,delete_seq,msg.delete_seq),  38)
 #define ble_Message_CALLBACK NULL
 #define ble_Message_DEFAULT NULL
 #define ble_Message_msg_set_bd_addr_MSGTYPE ble_SetBdAddressCmd
@@ -1096,6 +1112,7 @@ X(a, STATIC,   ONEOF,    MESSAGE,  (msg,triggered,msg.triggered),  37)
 #define ble_Message_msg_prepare_MSGTYPE ble_PrepareSequenceCmd
 #define ble_Message_msg_trigger_MSGTYPE ble_TriggerSequenceCmd
 #define ble_Message_msg_triggered_MSGTYPE ble_Triggered
+#define ble_Message_msg_delete_seq_MSGTYPE ble_DeleteSequenceCmd
 
 extern const pb_msgdesc_t ble_SetBdAddressCmd_msg;
 extern const pb_msgdesc_t ble_SniffAdvCmd_msg;
@@ -1128,6 +1145,7 @@ extern const pb_msgdesc_t ble_PrepareSequenceCmd_ManualTrigger_msg;
 extern const pb_msgdesc_t ble_PrepareSequenceCmd_Trigger_msg;
 extern const pb_msgdesc_t ble_PrepareSequenceCmd_PendingPacket_msg;
 extern const pb_msgdesc_t ble_TriggerSequenceCmd_msg;
+extern const pb_msgdesc_t ble_DeleteSequenceCmd_msg;
 extern const pb_msgdesc_t ble_Triggered_msg;
 extern const pb_msgdesc_t ble_AccessAddressDiscovered_msg;
 extern const pb_msgdesc_t ble_AdvPduReceived_msg;
@@ -1173,6 +1191,7 @@ extern const pb_msgdesc_t ble_Message_msg;
 #define ble_PrepareSequenceCmd_Trigger_fields &ble_PrepareSequenceCmd_Trigger_msg
 #define ble_PrepareSequenceCmd_PendingPacket_fields &ble_PrepareSequenceCmd_PendingPacket_msg
 #define ble_TriggerSequenceCmd_fields &ble_TriggerSequenceCmd_msg
+#define ble_DeleteSequenceCmd_fields &ble_DeleteSequenceCmd_msg
 #define ble_Triggered_fields &ble_Triggered_msg
 #define ble_AccessAddressDiscovered_fields &ble_AccessAddressDiscovered_msg
 #define ble_AdvPduReceived_fields &ble_AdvPduReceived_msg
@@ -1195,6 +1214,7 @@ extern const pb_msgdesc_t ble_Message_msg;
 #define ble_CentralModeCmd_size                  0
 #define ble_ConnectToCmd_size                    41
 #define ble_Connected_size                       32
+#define ble_DeleteSequenceCmd_size               6
 #define ble_Desynchronized_size                  6
 #define ble_DisconnectCmd_size                   11
 #define ble_Disconnected_size                    12
