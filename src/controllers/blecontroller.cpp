@@ -33,6 +33,19 @@ BLEController::BLEController(Radio *radio) : Controller(radio) {
 
 }
 
+bool BLEController::deleteSequence(uint8_t id) {
+	for (int i=0;i<MAX_SEQUENCES;i++) {
+		if (
+			this->sequenceModule->sequences[i] != NULL &&
+			this->sequenceModule->sequences[i]->getIdentifier() == id
+		) {
+			this->sequenceModule->deleteSequence(this->sequenceModule->sequences[i]);
+			return true;
+		}
+	}
+	return false;
+}
+
 bool BLEController::checkManualTriggers(uint8_t id) {
 	for (int i=0;i<MAX_SEQUENCES;i++) {
 		if (

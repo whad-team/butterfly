@@ -37,6 +37,7 @@ const DeviceCapability CAPABILITIES[] = {
       CMD(ble_BleCommand_Disconnect) |
       CMD(ble_BleCommand_PrepareSequence) |
       CMD(ble_BleCommand_TriggerSequence) |
+      CMD(ble_BleCommand_DeleteSequence) |
       CMD(ble_BleCommand_ScanMode)
       )
   },
