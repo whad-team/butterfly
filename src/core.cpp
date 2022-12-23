@@ -694,10 +694,15 @@ void Core::processUnifyingInputMessage(unifying_Message msg) {
     response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
   }
   else if (msg.which_msg == unifying_Message_mouse_tag) {
-    this->esbController->setChannel(msg.msg.mouse.channel);
-    this->esbController->enableAcknowledgementsSniffing();
-    this->esbController->disableAcknowledgementsTransmission();
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    if (msg.msg.mouse.channel == 0xFF || (msg.msg.mouse.channel >= 0 && msg.msg.mouse.channel <= 100)) {
+      this->esbController->setChannel(msg.msg.mouse.channel);
+      this->esbController->enableAcknowledgementsSniffing();
+      this->esbController->disableAcknowledgementsTransmission();
+      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    }
+    else {
+      response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+    }
   }
   else if (msg.which_msg == unifying_Message_keyboard_tag) {
     this->esbController->setChannel(msg.msg.keyboard.channel);

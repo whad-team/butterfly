@@ -428,7 +428,8 @@ void ESBController::send(uint8_t *data, size_t size) {
           this->lastTransmissionAcknowledged = false;
           this->lastTransmissionTimestamp = TimerModule::instance->getTimestamp();
           this->radio->send(buffer,payload_size+2,this->channel, 0x00);
-          nrf_delay_us(100);
+          bsp_board_led_invert(0);
+          nrf_delay_us(350);
       }
     }
 }
