@@ -427,9 +427,14 @@ void ESBController::send(uint8_t *data, size_t size) {
           //Core::instance->sendDebug(buffer,payload_size+2);
           this->lastTransmissionAcknowledged = false;
           this->lastTransmissionTimestamp = TimerModule::instance->getTimestamp();
-          this->radio->send(buffer,payload_size+2,this->channel, 0x00);
-          bsp_board_led_invert(0);
-          nrf_delay_us(350);
+          for (int i=0;i<6;i++) {
+            this->radio->send(buffer,payload_size+2,this->channel, 0x00);
+            nrf_delay_us(400);
+            if (this->lastTransmissionAcknowledged) {
+              break;
+            }
+          }
+
       }
     }
 }
