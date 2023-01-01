@@ -123,12 +123,14 @@ typedef PB_BYTES_ARRAY_T(255) unifying_SendCmd_pdu_t;
  Transmit Logitech Unifying packets on a single channel. */
 typedef struct _unifying_SendCmd { 
     uint32_t channel;
+    uint32_t retransmission_count;
     unifying_SendCmd_pdu_t pdu;
 } unifying_SendCmd;
 
 typedef PB_BYTES_ARRAY_T(255) unifying_SendRawCmd_pdu_t;
 typedef struct _unifying_SendRawCmd { 
     uint32_t channel;
+    uint32_t retransmission_count;
     unifying_SendRawCmd_pdu_t pdu;
 } unifying_SendRawCmd;
 
@@ -183,8 +185,8 @@ extern "C" {
 #define unifying_SetNodeAddressCmd_init_default  {{0, {0}}}
 #define unifying_SniffCmd_init_default           {0, {0, {0}}, 0}
 #define unifying_JamCmd_init_default             {0}
-#define unifying_SendCmd_init_default            {0, {0, {0}}}
-#define unifying_SendRawCmd_init_default         {0, {0, {0}}}
+#define unifying_SendCmd_init_default            {0, 0, {0, {0}}}
+#define unifying_SendRawCmd_init_default         {0, 0, {0, {0}}}
 #define unifying_LogitechDongleModeCmd_init_default {0}
 #define unifying_LogitechKeyboardModeCmd_init_default {0}
 #define unifying_LogitechMouseModeCmd_init_default {0}
@@ -198,8 +200,8 @@ extern "C" {
 #define unifying_SetNodeAddressCmd_init_zero     {{0, {0}}}
 #define unifying_SniffCmd_init_zero              {0, {0, {0}}, 0}
 #define unifying_JamCmd_init_zero                {0}
-#define unifying_SendCmd_init_zero               {0, {0, {0}}}
-#define unifying_SendRawCmd_init_zero            {0, {0, {0}}}
+#define unifying_SendCmd_init_zero               {0, 0, {0, {0}}}
+#define unifying_SendRawCmd_init_zero            {0, 0, {0, {0}}}
 #define unifying_LogitechDongleModeCmd_init_zero {0}
 #define unifying_LogitechKeyboardModeCmd_init_zero {0}
 #define unifying_LogitechMouseModeCmd_init_zero  {0}
@@ -230,9 +232,11 @@ extern "C" {
 #define unifying_RawPduReceived_address_tag      5
 #define unifying_RawPduReceived_pdu_tag          6
 #define unifying_SendCmd_channel_tag             1
-#define unifying_SendCmd_pdu_tag                 2
+#define unifying_SendCmd_retransmission_count_tag 2
+#define unifying_SendCmd_pdu_tag                 3
 #define unifying_SendRawCmd_channel_tag          1
-#define unifying_SendRawCmd_pdu_tag              2
+#define unifying_SendRawCmd_retransmission_count_tag 2
+#define unifying_SendRawCmd_pdu_tag              3
 #define unifying_SetNodeAddressCmd_address_tag   1
 #define unifying_SniffCmd_channel_tag            1
 #define unifying_SniffCmd_address_tag            2
@@ -272,13 +276,15 @@ X(a, STATIC,   SINGULAR, UINT32,   channel,           1)
 
 #define unifying_SendCmd_FIELDLIST(X, a) \
 X(a, STATIC,   SINGULAR, UINT32,   channel,           1) \
-X(a, STATIC,   SINGULAR, BYTES,    pdu,               2)
+X(a, STATIC,   SINGULAR, UINT32,   retransmission_count,   2) \
+X(a, STATIC,   SINGULAR, BYTES,    pdu,               3)
 #define unifying_SendCmd_CALLBACK NULL
 #define unifying_SendCmd_DEFAULT NULL
 
 #define unifying_SendRawCmd_FIELDLIST(X, a) \
 X(a, STATIC,   SINGULAR, UINT32,   channel,           1) \
-X(a, STATIC,   SINGULAR, BYTES,    pdu,               2)
+X(a, STATIC,   SINGULAR, UINT32,   retransmission_count,   2) \
+X(a, STATIC,   SINGULAR, BYTES,    pdu,               3)
 #define unifying_SendRawCmd_CALLBACK NULL
 #define unifying_SendRawCmd_DEFAULT NULL
 
@@ -411,8 +417,8 @@ extern const pb_msgdesc_t unifying_Message_msg;
 #define unifying_Message_size                    293
 #define unifying_PduReceived_size                290
 #define unifying_RawPduReceived_size             290
-#define unifying_SendCmd_size                    264
-#define unifying_SendRawCmd_size                 264
+#define unifying_SendCmd_size                    270
+#define unifying_SendRawCmd_size                 270
 #define unifying_SetNodeAddressCmd_size          7
 #define unifying_SniffCmd_size                   15
 #define unifying_SniffPairingCmd_size            0

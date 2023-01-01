@@ -603,8 +603,12 @@ void Core::processESBInputMessage(esb_Message msg) {
     if (channel >= 0 && channel <= 100) {
       this->esbController->setChannel(channel);
     }
-    this->esbController->send(msg.msg.send_raw.pdu.bytes, msg.msg.send_raw.pdu.size);
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    if (this->esbController->send(msg.msg.send_raw.pdu.bytes, msg.msg.send_raw.pdu.size, msg.msg.send_raw.retransmission_count)) {
+      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    }
+    else {
+      response = Whad::buildResultMessage(generic_ResultCode_ERROR);
+    }
   }
   else if (msg.which_msg == esb_Message_set_node_addr_tag) {
     this->esbController->setFilter(
@@ -674,8 +678,12 @@ void Core::processUnifyingInputMessage(unifying_Message msg) {
     if (channel >= 0 && channel <= 100) {
       this->esbController->setChannel(channel);
     }
-    this->esbController->send(msg.msg.send_raw.pdu.bytes, msg.msg.send_raw.pdu.size);
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    if (this->esbController->send(msg.msg.send_raw.pdu.bytes, msg.msg.send_raw.pdu.size, msg.msg.send_raw.retransmission_count)) {
+      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    }
+    else {
+      response = Whad::buildResultMessage(generic_ResultCode_ERROR);
+    }
   }
   else if (msg.which_msg == unifying_Message_set_node_addr_tag) {
     this->esbController->setFilter(

@@ -108,12 +108,14 @@ typedef PB_BYTES_ARRAY_T(255) esb_SendCmd_pdu_t;
  Transmit Enhanced ShockBurst packets on a single channel. */
 typedef struct _esb_SendCmd { 
     uint32_t channel;
+    uint32_t retransmission_count;
     esb_SendCmd_pdu_t pdu;
 } esb_SendCmd;
 
 typedef PB_BYTES_ARRAY_T(255) esb_SendRawCmd_pdu_t;
 typedef struct _esb_SendRawCmd { 
     uint32_t channel;
+    uint32_t retransmission_count;
     esb_SendRawCmd_pdu_t pdu;
 } esb_SendRawCmd;
 
@@ -166,8 +168,8 @@ extern "C" {
 #define esb_SetNodeAddressCmd_init_default       {{0, {0}}}
 #define esb_SniffCmd_init_default                {0, {0, {0}}, 0}
 #define esb_JamCmd_init_default                  {0}
-#define esb_SendCmd_init_default                 {0, {0, {0}}}
-#define esb_SendRawCmd_init_default              {0, {0, {0}}}
+#define esb_SendCmd_init_default                 {0, 0, {0, {0}}}
+#define esb_SendRawCmd_init_default              {0, 0, {0, {0}}}
 #define esb_PrimaryReceiverModeCmd_init_default  {0}
 #define esb_PrimaryTransmitterModeCmd_init_default {0}
 #define esb_StartCmd_init_default                {0}
@@ -179,8 +181,8 @@ extern "C" {
 #define esb_SetNodeAddressCmd_init_zero          {{0, {0}}}
 #define esb_SniffCmd_init_zero                   {0, {0, {0}}, 0}
 #define esb_JamCmd_init_zero                     {0}
-#define esb_SendCmd_init_zero                    {0, {0, {0}}}
-#define esb_SendRawCmd_init_zero                 {0, {0, {0}}}
+#define esb_SendCmd_init_zero                    {0, 0, {0, {0}}}
+#define esb_SendRawCmd_init_zero                 {0, 0, {0, {0}}}
 #define esb_PrimaryReceiverModeCmd_init_zero     {0}
 #define esb_PrimaryTransmitterModeCmd_init_zero  {0}
 #define esb_StartCmd_init_zero                   {0}
@@ -208,9 +210,11 @@ extern "C" {
 #define esb_RawPduReceived_address_tag           5
 #define esb_RawPduReceived_pdu_tag               6
 #define esb_SendCmd_channel_tag                  1
-#define esb_SendCmd_pdu_tag                      2
+#define esb_SendCmd_retransmission_count_tag     2
+#define esb_SendCmd_pdu_tag                      3
 #define esb_SendRawCmd_channel_tag               1
-#define esb_SendRawCmd_pdu_tag                   2
+#define esb_SendRawCmd_retransmission_count_tag  2
+#define esb_SendRawCmd_pdu_tag                   3
 #define esb_SetNodeAddressCmd_address_tag        1
 #define esb_SniffCmd_channel_tag                 1
 #define esb_SniffCmd_address_tag                 2
@@ -248,13 +252,15 @@ X(a, STATIC,   SINGULAR, UINT32,   channel,           1)
 
 #define esb_SendCmd_FIELDLIST(X, a) \
 X(a, STATIC,   SINGULAR, UINT32,   channel,           1) \
-X(a, STATIC,   SINGULAR, BYTES,    pdu,               2)
+X(a, STATIC,   SINGULAR, UINT32,   retransmission_count,   2) \
+X(a, STATIC,   SINGULAR, BYTES,    pdu,               3)
 #define esb_SendCmd_CALLBACK NULL
 #define esb_SendCmd_DEFAULT NULL
 
 #define esb_SendRawCmd_FIELDLIST(X, a) \
 X(a, STATIC,   SINGULAR, UINT32,   channel,           1) \
-X(a, STATIC,   SINGULAR, BYTES,    pdu,               2)
+X(a, STATIC,   SINGULAR, UINT32,   retransmission_count,   2) \
+X(a, STATIC,   SINGULAR, BYTES,    pdu,               3)
 #define esb_SendRawCmd_CALLBACK NULL
 #define esb_SendRawCmd_DEFAULT NULL
 
@@ -368,8 +374,8 @@ extern const pb_msgdesc_t esb_Message_msg;
 #define esb_PrimaryReceiverModeCmd_size          6
 #define esb_PrimaryTransmitterModeCmd_size       6
 #define esb_RawPduReceived_size                  290
-#define esb_SendCmd_size                         264
-#define esb_SendRawCmd_size                      264
+#define esb_SendCmd_size                         270
+#define esb_SendRawCmd_size                      270
 #define esb_SetNodeAddressCmd_size               7
 #define esb_SniffCmd_size                        15
 #define esb_StartCmd_size                        0

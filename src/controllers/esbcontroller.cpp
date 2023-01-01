@@ -399,7 +399,7 @@ void ESBController::setJammerConfiguration() {
   this->radio->reload();
 }
 
-void ESBController::send(uint8_t *data, size_t size) {
+bool ESBController::send(uint8_t *data, size_t size, int retransmission_count) {
     if (this->sendAcknowledgements) {
       size_t payload_size = (data[6] >> 2);
       this->preparedAck.size = payload_size + 2;
@@ -409,12 +409,15 @@ void ESBController::send(uint8_t *data, size_t size) {
         this->preparedAck.buffer[2+i] = (data[7+i] << 1) | (data[7+i+1] >> 7);
       }
       this->preparedAck.available = true;
-
+      return true;
     }
     else {
       if (this->mode == ESB_PROMISCUOUS) {
-  			this->radio->send(data,size,this->channel, 0x00);
-        nrf_delay_us(100);
+        for (int i=0;i<retransmission_count;i++) {
+  			     this->radio->send(data,size,this->channel, 0x00);
+             nrf_delay_us(700);
+        }
+        return true;
       }
       else if (this->mode == ESB_FOLLOW) {
           size_t payload_size = (data[6] >> 2);
@@ -426,17 +429,19 @@ void ESBController::send(uint8_t *data, size_t size) {
           }
           //Core::instance->sendDebug(buffer,payload_size+2);
           this->lastTransmissionAcknowledged = false;
-          this->lastTransmissionTimestamp = TimerModule::instance->getTimestamp();
-          for (int i=0;i<6;i++) {
+          for (int i=0;i<retransmission_count;i++) {
+            this->lastTransmissionTimestamp = TimerModule::instance->getTimestamp();
             this->radio->send(buffer,payload_size+2,this->channel, 0x00);
-            nrf_delay_us(400);
+            nrf_delay_us(700);
             if (this->lastTransmissionAcknowledged) {
-              break;
+              return true;
             }
           }
+          return false;
 
       }
     }
+    return false;
 }
 
 ESBPacket* ESBController::buildPseudoPacketFromPayload(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
@@ -525,7 +530,7 @@ void ESBController::onPRXPacketProcessing(uint32_t timestamp, uint8_t size, uint
     ownAck = true;
   }
   if (this->showAcknowledgements || (ownAck && this->filter.bytes[0] != 0xBB && this->filter.bytes[1] != 0x0A && this->filter.bytes[2] != 0xDC && this->filter.bytes[3] !=  0xA5 && this->filter.bytes[4] != 0x75)) {
-    ESBPacket *pkt = this->buildPseudoPacketFromPayload(0, size,buffer,crcValue, rssi);
+    ESBPacket *pkt = this->buildPseudoPacketFromPayload(timestamp, size,buffer,crcValue, rssi);
     this->addPacket(pkt);
     delete pkt;
   }
@@ -556,7 +561,7 @@ void ESBController::onPTXPacketProcessing(uint32_t timestamp, uint8_t size, uint
       }
     }
   }
-
+  retransmission=false;
   // If the packet is not a retransmission, we update lastReceivedPacket and transmit pkt to the host
   if (!retransmission) {
     ESBPacket *pkt = this->buildPseudoPacketFromPayload(timestamp, size,buffer,crcValue, rssi);
