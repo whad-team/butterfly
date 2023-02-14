@@ -561,7 +561,7 @@ void ESBController::onPTXPacketProcessing(uint32_t timestamp, uint8_t size, uint
       }
     }
   }
-  retransmission=false;
+  //retransmission=false;
   // If the packet is not a retransmission, we update lastReceivedPacket and transmit pkt to the host
   if (!retransmission) {
     ESBPacket *pkt = this->buildPseudoPacketFromPayload(timestamp, size,buffer,crcValue, rssi);
