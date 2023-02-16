@@ -545,18 +545,23 @@ void ESBController::onPTXPacketProcessing(uint32_t timestamp, uint8_t size, uint
   this->stopTransmitting = true;
 
   bool retransmission = false;
+  if (timestamp - this->lastReceivedPacket.timestamp > 1000) {
+    retransmission = false;
+  }
+  else {
   // Check if the packet has been acknowledged to know if it is a retransmission
-  if (!this->lastReceivedPacket.acked) {
-    if (size != this->lastReceivedPacket.size) {
-      retransmission = false;
-    }
-    else {
-      // Check if similar payload has been received before
-      retransmission = true;
-      for (int i=2;i<size;i++) {
-        if (buffer[i] != this->lastReceivedPacket.buffer[i]) {
-          retransmission = false;
-          break;
+    if (!this->lastReceivedPacket.acked) {
+      if (size != this->lastReceivedPacket.size) {
+        retransmission = false;
+      }
+      else {
+        // Check if similar payload has been received before
+        retransmission = true;
+        for (int i=2;i<size;i++) {
+          if (buffer[i] != this->lastReceivedPacket.buffer[i]) {
+            retransmission = false;
+            break;
+          }
         }
       }
     }
