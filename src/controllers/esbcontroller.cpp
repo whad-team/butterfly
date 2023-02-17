@@ -309,7 +309,7 @@ void ESBController::setPromiscuousConfiguration() {
   this->mode = ESB_PROMISCUOUS;
   uint8_t preamble[] = {0xaa, 0xaa};
   this->radio->setPreamble(preamble,2);
-  this->radio->setPrefixes(0xaa,0x1f,0x9f);
+  this->radio->setPrefixes(0xa8,0x1f,0x9f,0xaf, 0xa9,0x00,0xFF);
   this->radio->setMode(MODE_NORMAL);
   this->radio->setFastRampUpTime(true);
   this->radio->setEndianness(BIG);
@@ -480,21 +480,24 @@ void ESBController::sendAck(uint8_t pid) {
     nrf_delay_us(50);
   }
 }
+
 void ESBController::onPromiscuousPacketProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
     int channel = this->channel;
     int i=0;
-    while (buffer[0] == 0xAA && i < 55*8) {
-      shift_buffer(buffer, 1);
-      i++;
+    ESBPacket *pkt = NULL;
+    for (uint8_t bitshift=0; bitshift<8; bitshift++) {
+        shift_buffer(buffer, 60);
+        for (uint8_t byteshift=0; byteshift<60-32; byteshift++) {
+          pkt = new ESBPacket(buffer+byteshift,60,timestamp,0x00,channel,rssi,crcValue, this->unifying);
+          if (pkt->getSize() < 32 && pkt->checkCrc()) {
+            crcValue.validity = VALID_CRC;
+            ESBPacket *croppedPkt = new ESBPacket(buffer+byteshift,pkt->getSize()+5+2+2,timestamp,0x00,channel,rssi,crcValue, this->unifying);
+            this->addPacket(croppedPkt);
+            delete croppedPkt;
+          }
+          delete pkt;
+        }
     }
-    ESBPacket *pkt = new ESBPacket(buffer,size,timestamp,0x00,channel,rssi,crcValue, this->unifying);
-
-    if (pkt != NULL && pkt->checkCrc()) {
-      ESBPacket *croppedPkt = new ESBPacket(buffer,pkt->getSize()+5+2+2,timestamp,0x00,channel,rssi,crcValue, this->unifying);
-      this->addPacket(croppedPkt);
-      delete croppedPkt;
-    }
-    delete pkt;
 }
 
 void ESBController::onFollowPacketProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {

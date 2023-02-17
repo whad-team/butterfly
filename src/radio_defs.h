@@ -107,7 +107,7 @@ typedef struct MosartAddress {
 
 
 typedef struct Prefixes {
-	uint8_t prefixes[3];
+	uint8_t prefixes[7];
 	size_t number;
 } Prefixes;
 
