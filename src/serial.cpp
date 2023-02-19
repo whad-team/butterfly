@@ -16,10 +16,11 @@ void SerialComm::cdcAcmHandler(app_usbd_class_inst_t const * p_inst,app_usbd_cdc
 			break;
 		}
 		case APP_USBD_CDC_ACM_USER_EVT_PORT_CLOSE:
+			NVIC_SystemReset();
 			break;
 
 		case APP_USBD_CDC_ACM_USER_EVT_TX_DONE:
-			//SerialComm::instance->txState.done = true;
+			SerialComm::instance->txState.done = true;
 			break;
 
 		case APP_USBD_CDC_ACM_USER_EVT_RX_DONE:
@@ -153,6 +154,7 @@ bool SerialComm::send(uint8_t *buffer, size_t size) {
 	this->txBuffer[3] = (uint8_t)((message_size & 0xFF00) >> 8);
   memcpy(this->txBuffer+4,buffer, size);
   this->txState.size = size+4;
+	this->txState.done = false;
   ret_code_t ret = app_usbd_cdc_acm_write(&m_app_cdc_acm,&this->txBuffer,this->txState.size);
 	return ret == NRF_SUCCESS;
 }
