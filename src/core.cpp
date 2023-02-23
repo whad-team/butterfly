@@ -564,11 +564,11 @@ void Core::processESBInputMessage(esb_Message msg) {
 
   if (this->currentController != this->esbController) {
     this->selectController(ESB_PROTOCOL);
-    this->esbController->disableUnifying();
+    this->esbController->setApplicativeLayer(RAW_ESB_APPLICATIVE_LAYER);
   }
 
   if (msg.which_msg == esb_Message_sniff_tag) {
-    if (msg.msg.sniff.channel == 0xFF || (msg.msg.sniff.channel >= 0 && msg.msg.sniff.channel <= 100)) {
+    if (msg.msg.sniff.channel >= 0 && msg.msg.sniff.channel <= 100) {
       this->esbController->setFilter(
                 msg.msg.sniff.address.bytes[0],
                 msg.msg.sniff.address.bytes[1],
@@ -583,7 +583,19 @@ void Core::processESBInputMessage(esb_Message msg) {
       else {
         this->esbController->disableAcknowledgementsSniffing();
       }
+      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    }
+    else {
+      response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+    }
+  }
 
+  if (msg.which_msg == esb_Message_sniff_promiscuous_tag) {
+    if (msg.msg.sniff_promiscuous.channel >= 0 && msg.msg.sniff_promiscuous.channel <= 100) {
+      this->esbController->setFilter(0xFF,0xFF,0xFF,0xFF,0xFF);
+      this->esbController->setChannel(msg.msg.sniff_promiscuous.channel);
+      this->esbController->enableAcknowledgementsSniffing();
+      this->esbController->disableAcknowledgementsTransmission();
       response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
     }
     else {
@@ -621,22 +633,30 @@ void Core::processESBInputMessage(esb_Message msg) {
     response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
   }
   else if (msg.which_msg == esb_Message_prx_tag) {
-    this->esbController->setChannel(msg.msg.prx.channel);
+    int channel = msg.msg.prx.channel;
+    if (channel >= 0 && channel <= 100) {
+      this->esbController->setChannel(channel);
+    }
+    this->esbController->disableAcknowledgementsSniffing();
     this->esbController->enableAcknowledgementsTransmission();
     response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
   }
   else if (msg.which_msg == esb_Message_ptx_tag) {
-    this->esbController->setChannel(msg.msg.ptx.channel);
+    int channel = msg.msg.ptx.channel;
+    if (channel >= 0 && channel <= 100) {
+      this->esbController->setChannel(channel);
+    }
     this->esbController->enableAcknowledgementsSniffing();
     this->esbController->disableAcknowledgementsTransmission();
     response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
   }
+  //response = Whad::buildResultMessage(generic_ResultCode_ERROR);
   this->pushMessageToQueue(response);
 }
 
 void Core::processUnifyingInputMessage(unifying_Message msg) {
   Message *response = NULL;
-
+  /*
   if (this->currentController != this->esbController) {
     this->selectController(ESB_PROTOCOL);
     this->esbController->enableUnifying();
@@ -723,8 +743,8 @@ void Core::processUnifyingInputMessage(unifying_Message msg) {
     this->esbController->setFilter(0xBB, 0x0A, 0xDC, 0xA5, 0x75);
     this->esbController->setChannel(5);
 
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
-  }
+  }*/
+  response = Whad::buildResultMessage(generic_ResultCode_ERROR);
   this->pushMessageToQueue(response);
 }
 

@@ -65,13 +65,13 @@ const DeviceCapability CAPABILITIES[] = {
     (discovery_Capability)(discovery_Capability_Sniff | discovery_Capability_Inject | discovery_Capability_Jam | discovery_Capability_SimulateRole),
     (
       CMD(esb_ESBCommand_Sniff) |
-      CMD(esb_ESBCommand_Send) |
       CMD(esb_ESBCommand_Start) |
-      CMD(esb_ESBCommand_Stop) |
+      CMD(esb_ESBCommand_Stop)  |
+      CMD(esb_ESBCommand_Send) |
+      CMD(esb_ESBCommand_SniffPromiscuous) |
       CMD(esb_ESBCommand_SetNodeAddress) |
       CMD(esb_ESBCommand_PrimaryReceiverMode) |
       CMD(esb_ESBCommand_PrimaryTransmitterMode)
-
       )
   },
   {

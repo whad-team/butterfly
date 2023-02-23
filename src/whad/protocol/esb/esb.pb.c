@@ -12,6 +12,12 @@ PB_BIND(esb_SetNodeAddressCmd, esb_SetNodeAddressCmd, AUTO)
 PB_BIND(esb_SniffCmd, esb_SniffCmd, AUTO)
 
 
+PB_BIND(esb_SniffPromiscuousCmd, esb_SniffPromiscuousCmd, AUTO)
+
+
+PB_BIND(esb_FollowCmd, esb_FollowCmd, AUTO)
+
+
 PB_BIND(esb_JamCmd, esb_JamCmd, AUTO)
 
 

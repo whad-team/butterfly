@@ -16,18 +16,20 @@ typedef enum _esb_ESBCommand { /* *
     esb_ESBCommand_SetNodeAddress = 0, 
     /* Sniff packets. */
     esb_ESBCommand_Sniff = 1, 
+    esb_ESBCommand_SniffPromiscuous = 2, 
+    esb_ESBCommand_Follow = 3, 
     /* Jam packets. */
-    esb_ESBCommand_Jam = 2, 
+    esb_ESBCommand_Jam = 4, 
     /* Send packets. */
-    esb_ESBCommand_Send = 3, 
-    esb_ESBCommand_SendRaw = 4, 
+    esb_ESBCommand_Send = 5, 
+    esb_ESBCommand_SendRaw = 6, 
     /* Primary Receiver (PRX) mode. */
-    esb_ESBCommand_PrimaryReceiverMode = 5, 
+    esb_ESBCommand_PrimaryReceiverMode = 7, 
     /* Primary Transmitter (PTX) mode. */
-    esb_ESBCommand_PrimaryTransmitterMode = 6, 
+    esb_ESBCommand_PrimaryTransmitterMode = 8, 
     /* Start and Stop commands shared with node-related mode. */
-    esb_ESBCommand_Start = 7, 
-    esb_ESBCommand_Stop = 8 
+    esb_ESBCommand_Start = 9, 
+    esb_ESBCommand_Stop = 10 
 } esb_ESBCommand;
 
 /* Struct definitions */
@@ -46,6 +48,15 @@ typedef struct _esb_StartCmd {
 typedef struct _esb_StopCmd { 
     char dummy_field;
 } esb_StopCmd;
+
+typedef PB_BYTES_ARRAY_T(100) esb_FollowCmd_monitored_channels_t;
+typedef struct _esb_FollowCmd { 
+    pb_callback_t address;
+    bool show_acknowledgements;
+    uint32_t interval;
+    uint32_t timeout;
+    esb_FollowCmd_monitored_channels_t monitored_channels;
+} esb_FollowCmd;
 
 typedef struct _esb_JamCmd { 
     uint32_t channel;
@@ -128,10 +139,16 @@ typedef PB_BYTES_ARRAY_T(5) esb_SniffCmd_address_t;
 typedef struct _esb_SniffCmd { 
     /* Channel can be specified, the device will only
 listen on this specific channel. */
-    uint32_t channel; /* special value: 0xFF (autofind) */
     esb_SniffCmd_address_t address;
     bool show_acknowledgements;
+    uint32_t channel;
 } esb_SniffCmd;
+
+typedef struct _esb_SniffPromiscuousCmd { 
+    /* Channel can be specified, the device will only
+listen on this specific channel. */
+    uint32_t channel;
+} esb_SniffPromiscuousCmd;
 
 typedef struct _esb_Message { 
     pb_size_t which_msg;
@@ -139,6 +156,8 @@ typedef struct _esb_Message {
         /* Messages */
         esb_SetNodeAddressCmd set_node_addr;
         esb_SniffCmd sniff;
+        esb_SniffPromiscuousCmd sniff_promiscuous;
+        esb_FollowCmd follow;
         esb_JamCmd jam;
         esb_SendCmd send;
         esb_SendRawCmd send_raw;
@@ -166,7 +185,9 @@ extern "C" {
 
 /* Initializer values for message structs */
 #define esb_SetNodeAddressCmd_init_default       {{0, {0}}}
-#define esb_SniffCmd_init_default                {0, {0, {0}}, 0}
+#define esb_SniffCmd_init_default                {{0, {0}}, 0, 0}
+#define esb_SniffPromiscuousCmd_init_default     {0}
+#define esb_FollowCmd_init_default               {{{NULL}, NULL}, 0, 0, 0, {0, {0}}}
 #define esb_JamCmd_init_default                  {0}
 #define esb_SendCmd_init_default                 {0, 0, {0, {0}}}
 #define esb_SendRawCmd_init_default              {0, 0, {0, {0}}}
@@ -179,7 +200,9 @@ extern "C" {
 #define esb_PduReceived_init_default             {0, false, 0, false, 0, false, 0, false, {0, {0}}, {0, {0}}}
 #define esb_Message_init_default                 {0, {esb_SetNodeAddressCmd_init_default}}
 #define esb_SetNodeAddressCmd_init_zero          {{0, {0}}}
-#define esb_SniffCmd_init_zero                   {0, {0, {0}}, 0}
+#define esb_SniffCmd_init_zero                   {{0, {0}}, 0, 0}
+#define esb_SniffPromiscuousCmd_init_zero        {0}
+#define esb_FollowCmd_init_zero                  {{{NULL}, NULL}, 0, 0, 0, {0, {0}}}
 #define esb_JamCmd_init_zero                     {0}
 #define esb_SendCmd_init_zero                    {0, 0, {0, {0}}}
 #define esb_SendRawCmd_init_zero                 {0, 0, {0, {0}}}
@@ -193,6 +216,11 @@ extern "C" {
 #define esb_Message_init_zero                    {0, {esb_SetNodeAddressCmd_init_zero}}
 
 /* Field tags (for use in manual encoding/decoding) */
+#define esb_FollowCmd_address_tag                1
+#define esb_FollowCmd_show_acknowledgements_tag  2
+#define esb_FollowCmd_interval_tag               3
+#define esb_FollowCmd_timeout_tag                4
+#define esb_FollowCmd_monitored_channels_tag     5
 #define esb_JamCmd_channel_tag                   1
 #define esb_Jammed_timestamp_tag                 1
 #define esb_PduReceived_channel_tag              1
@@ -216,21 +244,24 @@ extern "C" {
 #define esb_SendRawCmd_retransmission_count_tag  2
 #define esb_SendRawCmd_pdu_tag                   3
 #define esb_SetNodeAddressCmd_address_tag        1
-#define esb_SniffCmd_channel_tag                 1
-#define esb_SniffCmd_address_tag                 2
-#define esb_SniffCmd_show_acknowledgements_tag   3
+#define esb_SniffCmd_address_tag                 1
+#define esb_SniffCmd_show_acknowledgements_tag   2
+#define esb_SniffCmd_channel_tag                 3
+#define esb_SniffPromiscuousCmd_channel_tag      1
 #define esb_Message_set_node_addr_tag            1
 #define esb_Message_sniff_tag                    2
-#define esb_Message_jam_tag                      3
-#define esb_Message_send_tag                     4
-#define esb_Message_send_raw_tag                 5
-#define esb_Message_prx_tag                      6
-#define esb_Message_ptx_tag                      7
-#define esb_Message_start_tag                    8
-#define esb_Message_stop_tag                     9
-#define esb_Message_jammed_tag                   10
-#define esb_Message_raw_pdu_tag                  11
-#define esb_Message_pdu_tag                      12
+#define esb_Message_sniff_promiscuous_tag        3
+#define esb_Message_follow_tag                   4
+#define esb_Message_jam_tag                      5
+#define esb_Message_send_tag                     6
+#define esb_Message_send_raw_tag                 7
+#define esb_Message_prx_tag                      8
+#define esb_Message_ptx_tag                      9
+#define esb_Message_start_tag                    10
+#define esb_Message_stop_tag                     11
+#define esb_Message_jammed_tag                   12
+#define esb_Message_raw_pdu_tag                  13
+#define esb_Message_pdu_tag                      14
 
 /* Struct field encoding specification for nanopb */
 #define esb_SetNodeAddressCmd_FIELDLIST(X, a) \
@@ -239,11 +270,25 @@ X(a, STATIC,   SINGULAR, BYTES,    address,           1)
 #define esb_SetNodeAddressCmd_DEFAULT NULL
 
 #define esb_SniffCmd_FIELDLIST(X, a) \
-X(a, STATIC,   SINGULAR, UINT32,   channel,           1) \
-X(a, STATIC,   SINGULAR, BYTES,    address,           2) \
-X(a, STATIC,   SINGULAR, BOOL,     show_acknowledgements,   3)
+X(a, STATIC,   SINGULAR, BYTES,    address,           1) \
+X(a, STATIC,   SINGULAR, BOOL,     show_acknowledgements,   2) \
+X(a, STATIC,   SINGULAR, UINT32,   channel,           3)
 #define esb_SniffCmd_CALLBACK NULL
 #define esb_SniffCmd_DEFAULT NULL
+
+#define esb_SniffPromiscuousCmd_FIELDLIST(X, a) \
+X(a, STATIC,   SINGULAR, UINT32,   channel,           1)
+#define esb_SniffPromiscuousCmd_CALLBACK NULL
+#define esb_SniffPromiscuousCmd_DEFAULT NULL
+
+#define esb_FollowCmd_FIELDLIST(X, a) \
+X(a, CALLBACK, SINGULAR, BYTES,    address,           1) \
+X(a, STATIC,   SINGULAR, BOOL,     show_acknowledgements,   2) \
+X(a, STATIC,   SINGULAR, UINT32,   interval,          3) \
+X(a, STATIC,   SINGULAR, UINT32,   timeout,           4) \
+X(a, STATIC,   SINGULAR, BYTES,    monitored_channels,   5)
+#define esb_FollowCmd_CALLBACK pb_default_field_callback
+#define esb_FollowCmd_DEFAULT NULL
 
 #define esb_JamCmd_FIELDLIST(X, a) \
 X(a, STATIC,   SINGULAR, UINT32,   channel,           1)
@@ -312,20 +357,24 @@ X(a, STATIC,   SINGULAR, BYTES,    pdu,               6)
 #define esb_Message_FIELDLIST(X, a) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (msg,set_node_addr,msg.set_node_addr),   1) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (msg,sniff,msg.sniff),   2) \
-X(a, STATIC,   ONEOF,    MESSAGE,  (msg,jam,msg.jam),   3) \
-X(a, STATIC,   ONEOF,    MESSAGE,  (msg,send,msg.send),   4) \
-X(a, STATIC,   ONEOF,    MESSAGE,  (msg,send_raw,msg.send_raw),   5) \
-X(a, STATIC,   ONEOF,    MESSAGE,  (msg,prx,msg.prx),   6) \
-X(a, STATIC,   ONEOF,    MESSAGE,  (msg,ptx,msg.ptx),   7) \
-X(a, STATIC,   ONEOF,    MESSAGE,  (msg,start,msg.start),   8) \
-X(a, STATIC,   ONEOF,    MESSAGE,  (msg,stop,msg.stop),   9) \
-X(a, STATIC,   ONEOF,    MESSAGE,  (msg,jammed,msg.jammed),  10) \
-X(a, STATIC,   ONEOF,    MESSAGE,  (msg,raw_pdu,msg.raw_pdu),  11) \
-X(a, STATIC,   ONEOF,    MESSAGE,  (msg,pdu,msg.pdu),  12)
+X(a, STATIC,   ONEOF,    MESSAGE,  (msg,sniff_promiscuous,msg.sniff_promiscuous),   3) \
+X(a, STATIC,   ONEOF,    MESSAGE,  (msg,follow,msg.follow),   4) \
+X(a, STATIC,   ONEOF,    MESSAGE,  (msg,jam,msg.jam),   5) \
+X(a, STATIC,   ONEOF,    MESSAGE,  (msg,send,msg.send),   6) \
+X(a, STATIC,   ONEOF,    MESSAGE,  (msg,send_raw,msg.send_raw),   7) \
+X(a, STATIC,   ONEOF,    MESSAGE,  (msg,prx,msg.prx),   8) \
+X(a, STATIC,   ONEOF,    MESSAGE,  (msg,ptx,msg.ptx),   9) \
+X(a, STATIC,   ONEOF,    MESSAGE,  (msg,start,msg.start),  10) \
+X(a, STATIC,   ONEOF,    MESSAGE,  (msg,stop,msg.stop),  11) \
+X(a, STATIC,   ONEOF,    MESSAGE,  (msg,jammed,msg.jammed),  12) \
+X(a, STATIC,   ONEOF,    MESSAGE,  (msg,raw_pdu,msg.raw_pdu),  13) \
+X(a, STATIC,   ONEOF,    MESSAGE,  (msg,pdu,msg.pdu),  14)
 #define esb_Message_CALLBACK NULL
 #define esb_Message_DEFAULT NULL
 #define esb_Message_msg_set_node_addr_MSGTYPE esb_SetNodeAddressCmd
 #define esb_Message_msg_sniff_MSGTYPE esb_SniffCmd
+#define esb_Message_msg_sniff_promiscuous_MSGTYPE esb_SniffPromiscuousCmd
+#define esb_Message_msg_follow_MSGTYPE esb_FollowCmd
 #define esb_Message_msg_jam_MSGTYPE esb_JamCmd
 #define esb_Message_msg_send_MSGTYPE esb_SendCmd
 #define esb_Message_msg_send_raw_MSGTYPE esb_SendRawCmd
@@ -339,6 +388,8 @@ X(a, STATIC,   ONEOF,    MESSAGE,  (msg,pdu,msg.pdu),  12)
 
 extern const pb_msgdesc_t esb_SetNodeAddressCmd_msg;
 extern const pb_msgdesc_t esb_SniffCmd_msg;
+extern const pb_msgdesc_t esb_SniffPromiscuousCmd_msg;
+extern const pb_msgdesc_t esb_FollowCmd_msg;
 extern const pb_msgdesc_t esb_JamCmd_msg;
 extern const pb_msgdesc_t esb_SendCmd_msg;
 extern const pb_msgdesc_t esb_SendRawCmd_msg;
@@ -354,6 +405,8 @@ extern const pb_msgdesc_t esb_Message_msg;
 /* Defines for backwards compatibility with code written before nanopb-0.4.0 */
 #define esb_SetNodeAddressCmd_fields &esb_SetNodeAddressCmd_msg
 #define esb_SniffCmd_fields &esb_SniffCmd_msg
+#define esb_SniffPromiscuousCmd_fields &esb_SniffPromiscuousCmd_msg
+#define esb_FollowCmd_fields &esb_FollowCmd_msg
 #define esb_JamCmd_fields &esb_JamCmd_msg
 #define esb_SendCmd_fields &esb_SendCmd_msg
 #define esb_SendRawCmd_fields &esb_SendRawCmd_msg
@@ -367,9 +420,10 @@ extern const pb_msgdesc_t esb_Message_msg;
 #define esb_Message_fields &esb_Message_msg
 
 /* Maximum encoded size of messages (where known) */
+/* esb_FollowCmd_size depends on runtime parameters */
+/* esb_Message_size depends on runtime parameters */
 #define esb_JamCmd_size                          6
 #define esb_Jammed_size                          6
-#define esb_Message_size                         293
 #define esb_PduReceived_size                     290
 #define esb_PrimaryReceiverModeCmd_size          6
 #define esb_PrimaryTransmitterModeCmd_size       6
@@ -378,6 +432,7 @@ extern const pb_msgdesc_t esb_Message_msg;
 #define esb_SendRawCmd_size                      270
 #define esb_SetNodeAddressCmd_size               7
 #define esb_SniffCmd_size                        15
+#define esb_SniffPromiscuousCmd_size             6
 #define esb_StartCmd_size                        0
 #define esb_StopCmd_size                         0
 

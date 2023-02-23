@@ -156,7 +156,7 @@ Message* Whad::buildPhyPacketMessage(GenericPacket* packet) {
 
 Message* Whad::buildESBRawPduMessage(ESBPacket* packet) {
   Message* msg = Whad::buildMessage();
-  if (packet->isUnifying()) {
+  if (packet->getApplicativeLayer() == UNIFYING_APPLICATIVE_LAYER) {
     msg->which_msg = Message_unifying_tag;
     msg->msg.unifying.which_msg = unifying_Message_raw_pdu_tag;
     msg->msg.unifying.msg.raw_pdu.has_rssi = true;
@@ -172,7 +172,6 @@ Message* Whad::buildESBRawPduMessage(ESBPacket* packet) {
 
     msg->msg.unifying.msg.raw_pdu.pdu.size = packet->getPacketSize();
     memcpy(msg->msg.unifying.msg.raw_pdu.pdu.bytes, packet->getPacketBuffer(), packet->getPacketSize());
-
   }
   else {
     msg->which_msg = Message_esb_tag;
