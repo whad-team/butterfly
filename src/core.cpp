@@ -622,6 +622,7 @@ void Core::processESBInputMessage(esb_Message msg) {
   }
   else if (msg.which_msg == esb_Message_prx_tag) {
     this->esbController->setChannel(msg.msg.prx.channel);
+    this->esbController->disableAcknowledgementsSniffing();
     this->esbController->enableAcknowledgementsTransmission();
     response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
   }
