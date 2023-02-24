@@ -259,7 +259,7 @@ bool ESBController::send(uint8_t *data, size_t size, int retransmission_count) {
           for (int i=0;i<retransmission_count;i++) {
             this->lastTransmission.timestamp = TimerModule::instance->getTimestamp();
             this->radio->send(transmission_buffer,payload_size+2,this->channel, 0x00);
-            nrf_delay_us(700);
+            nrf_delay_us(750);
             if (this->lastTransmission.acknowledged) {
               return true;
             }
@@ -272,15 +272,8 @@ bool ESBController::send(uint8_t *data, size_t size, int retransmission_count) {
 
 
 void ESBController::onPRXPacketProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
-  // Indicates if it is an ack for us
-  bool ownAck = false;
-  // Check if this packet acknowledges our last transmission
-  if ((timestamp - this->lastTransmission.timestamp) < 350) {
-    this->lastTransmission.acknowledged = true;
-    ownAck = true;
-  }
 
-  if (this->showAcknowledgements || ownAck) {
+  if (this->showAcknowledgements || this->lastTransmission.acknowledged) {
     ESBPacket *pkt = this->buildPseudoPacketFromPayload(timestamp, size,buffer,crcValue, rssi);
     this->addPacket(pkt);
     delete pkt;
@@ -288,7 +281,10 @@ void ESBController::onPRXPacketProcessing(uint32_t timestamp, uint8_t size, uint
 }
 
 void ESBController::onPTXPacketProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
-
+  // If we act as a PRX, reply with an acknowledgement
+  if (this->sendAcknowledgements) {
+    this->sendAcknowledgement(buffer[1] >> 1);
+  }
   // Check if received packet is a retransmission
   uint8_t pid = (buffer[1] >> 1) & 0x03;
   uint32_t crc = crcValue.value;
@@ -301,10 +297,7 @@ void ESBController::onPTXPacketProcessing(uint32_t timestamp, uint8_t size, uint
   this->lastPacket.crc = crc;
   this->lastPacket.timestamp = timestamp;
 
-  // If we act as a PRX, reply with an acknowledgement
-  if (this->sendAcknowledgements) {
-    this->sendAcknowledgement(buffer[1] >> 1);
-  }
+
   // Transmit the packet to Host
   ESBPacket *pkt = this->buildPseudoPacketFromPayload(timestamp, size,buffer,crcValue, rssi);
   this->addPacket(pkt);
@@ -313,7 +306,12 @@ void ESBController::onPTXPacketProcessing(uint32_t timestamp, uint8_t size, uint
 
 void ESBController::onSniffPacketProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
   if (crcValue.validity == VALID_CRC) {
-    if (size > 2) {
+    // Check if this packet acknowledges our last transmission
+    if ((timestamp - this->lastTransmission.timestamp) < 750) {
+      this->lastTransmission.acknowledged = true;
+      this->onPRXPacketProcessing(timestamp, size, buffer, crcValue, rssi);
+    }
+    else if (size > 2) {
       this->onPTXPacketProcessing(timestamp, size, buffer, crcValue, rssi);
     }
     else {
