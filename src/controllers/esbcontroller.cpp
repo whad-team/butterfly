@@ -285,14 +285,9 @@ void ESBController::disableAcknowledgementsSniffing() {
 
 void ESBController::enableAcknowledgementsTransmission() {
   this->sendAcknowledgements = true;
-
-  /*this->radio->enableAutoTXafterRX();
-  this->radio->reload();*/
 }
 void ESBController::disableAcknowledgementsTransmission() {
   this->sendAcknowledgements = false;
-  /*this->radio->disableAutoTXafterRX();
-  this->radio->reload();*/
 }
 
 void ESBController::stop() {
@@ -309,7 +304,7 @@ void ESBController::setPromiscuousConfiguration() {
   this->mode = ESB_PROMISCUOUS;
   uint8_t preamble[] = {0xaa, 0xaa};
   this->radio->setPreamble(preamble,2);
-  this->radio->setPrefixes(0xaa,0x1f,0x9f);
+  this->radio->setPrefixes(0xa8,0x1f,0x9f,0xaf, 0xa9,0x00,0xFF);
   this->radio->setMode(MODE_NORMAL);
   this->radio->setFastRampUpTime(true);
   this->radio->setEndianness(BIG);
@@ -480,21 +475,30 @@ void ESBController::sendAck(uint8_t pid) {
     nrf_delay_us(50);
   }
 }
-void ESBController::onPromiscuousPacketProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
-    int channel = this->channel;
-    int i=0;
-    while (buffer[0] == 0xAA && i < 55*8) {
-      shift_buffer(buffer, 1);
-      i++;
-    }
-    ESBPacket *pkt = new ESBPacket(buffer,size,timestamp,0x00,channel,rssi,crcValue, this->unifying);
 
-    if (pkt != NULL && pkt->checkCrc()) {
-      ESBPacket *croppedPkt = new ESBPacket(buffer,pkt->getSize()+5+2+2,timestamp,0x00,channel,rssi,crcValue, this->unifying);
-      this->addPacket(croppedPkt);
-      delete croppedPkt;
+void ESBController::onPromiscuousPacketProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
+    // Extract any valid ESB packet from bitstream
+    ESBPacket *pkt = NULL;
+    ESBPacket *croppedPkt = NULL;
+    for (uint8_t bitshift=0; bitshift<8; bitshift++) {
+      shift_buffer(buffer, 60);
+      for (uint8_t byteshift=1; byteshift < (60 - 32); byteshift++) {
+        uint8_t* candidate = buffer+byteshift;
+
+        uint8_t* check_ptr = (buffer+byteshift-1);
+        if (check_ptr[0] == 0xAA || check_ptr[0] == 0x55) {
+            pkt = new ESBPacket(candidate,size,timestamp,0x00,channel,rssi,crcValue, this->unifying);
+            if (pkt->getSize() < 32 && pkt->checkCrc()) {
+              croppedPkt = new ESBPacket(candidate,pkt->getSize()+5+2+2,timestamp,0x00,channel,rssi,crcValue,this->unifying);
+              this->addPacket(croppedPkt);
+              delete croppedPkt;
+              break;
+            }
+            delete pkt;
+          }
+      }
+      if (croppedPkt != NULL) break;
     }
-    delete pkt;
 }
 
 void ESBController::onFollowPacketProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {

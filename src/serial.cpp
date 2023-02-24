@@ -16,6 +16,7 @@ void SerialComm::cdcAcmHandler(app_usbd_class_inst_t const * p_inst,app_usbd_cdc
 			break;
 		}
 		case APP_USBD_CDC_ACM_USER_EVT_PORT_CLOSE:
+			NVIC_SystemReset();
 			break;
 
 		case APP_USBD_CDC_ACM_USER_EVT_TX_DONE:

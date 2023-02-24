@@ -450,6 +450,10 @@ bool Radio::setPrefixes() {
 	this->prefixes.prefixes[0] = 0x00;
 	this->prefixes.prefixes[1] = 0x00;
 	this->prefixes.prefixes[2] = 0x00;
+	this->prefixes.prefixes[3] = 0x00;
+	this->prefixes.prefixes[4] = 0x00;
+	this->prefixes.prefixes[5] = 0x00;
+	this->prefixes.prefixes[6] = 0x00;
 	return true;
 }
 bool Radio::setPrefixes(uint8_t a) {
@@ -457,6 +461,10 @@ bool Radio::setPrefixes(uint8_t a) {
 	this->prefixes.prefixes[0] = a;
 	this->prefixes.prefixes[1] = 0x00;
 	this->prefixes.prefixes[2] = 0x00;
+	this->prefixes.prefixes[3] = 0x00;
+	this->prefixes.prefixes[4] = 0x00;
+	this->prefixes.prefixes[5] = 0x00;
+	this->prefixes.prefixes[6] = 0x00;
 	return true;
 }
 bool Radio::setPrefixes(uint8_t a,uint8_t b) {
@@ -464,6 +472,10 @@ bool Radio::setPrefixes(uint8_t a,uint8_t b) {
 	this->prefixes.prefixes[0] = a;
 	this->prefixes.prefixes[1] = b;
 	this->prefixes.prefixes[2] = 0x00;
+	this->prefixes.prefixes[3] = 0x00;
+	this->prefixes.prefixes[4] = 0x00;
+	this->prefixes.prefixes[5] = 0x00;
+	this->prefixes.prefixes[6] = 0x00;
 	return true;
 }
 bool Radio::setPrefixes(uint8_t a,uint8_t b,uint8_t c) {
@@ -471,9 +483,57 @@ bool Radio::setPrefixes(uint8_t a,uint8_t b,uint8_t c) {
 	this->prefixes.prefixes[0] = a;
 	this->prefixes.prefixes[1] = b;
 	this->prefixes.prefixes[2] = c;
+	this->prefixes.prefixes[3] = 0x00;
+	this->prefixes.prefixes[4] = 0x00;
+	this->prefixes.prefixes[5] = 0x00;
+	this->prefixes.prefixes[6] = 0x00;
 	return true;
 }
 
+bool Radio::setPrefixes(uint8_t a,uint8_t b,uint8_t c, uint8_t d) {
+	this->prefixes.number = 4;
+	this->prefixes.prefixes[0] = a;
+	this->prefixes.prefixes[1] = b;
+	this->prefixes.prefixes[2] = c;
+	this->prefixes.prefixes[3] = d;
+	this->prefixes.prefixes[4] = 0x00;
+	this->prefixes.prefixes[5] = 0x00;
+	this->prefixes.prefixes[6] = 0x00;
+	return true;
+}
+bool Radio::setPrefixes(uint8_t a,uint8_t b,uint8_t c, uint8_t d, uint8_t e) {
+	this->prefixes.number = 5;
+	this->prefixes.prefixes[0] = a;
+	this->prefixes.prefixes[1] = b;
+	this->prefixes.prefixes[2] = c;
+	this->prefixes.prefixes[3] = d;
+	this->prefixes.prefixes[4] = e;
+	this->prefixes.prefixes[5] = 0x00;
+	this->prefixes.prefixes[6] = 0x00;
+	return true;
+}
+bool Radio::setPrefixes(uint8_t a,uint8_t b,uint8_t c, uint8_t d, uint8_t e, uint8_t f) {
+	this->prefixes.number = 6;
+	this->prefixes.prefixes[0] = a;
+	this->prefixes.prefixes[1] = b;
+	this->prefixes.prefixes[2] = c;
+	this->prefixes.prefixes[3] = d;
+	this->prefixes.prefixes[4] = e;
+	this->prefixes.prefixes[5] = f;
+	this->prefixes.prefixes[6] = 0x00;
+	return true;
+}
+bool Radio::setPrefixes(uint8_t a,uint8_t b,uint8_t c, uint8_t d, uint8_t e, uint8_t f, uint8_t g) {
+	this->prefixes.number = 7;
+	this->prefixes.prefixes[0] = a;
+	this->prefixes.prefixes[1] = b;
+	this->prefixes.prefixes[2] = c;
+	this->prefixes.prefixes[3] = d;
+	this->prefixes.prefixes[4] = e;
+	this->prefixes.prefixes[5] = f;
+	this->prefixes.prefixes[6] = g;
+	return true;
+}
 
 bool Radio::disable() {
 	bool success = false;
@@ -600,9 +660,15 @@ bool Radio::generateBaseAndPrefixRegisters() {
 					((uint32_t)(this->preamble).pattern[1])<<8
 				);
 				for (size_t i=0;i<this->prefixes.number;i++) {
-					NRF_RADIO->PREFIX0 |= ((bytewise_bit_swap((this->prefixes).prefixes[i]) & 0xFF) << (8*(i+1)));
+					if (this->prefixes.number < 3) {
+						NRF_RADIO->PREFIX0 |= ((bytewise_bit_swap((this->prefixes).prefixes[i]) & 0xFF) << (8*(i+1)));
+					}
+					else {
+						NRF_RADIO->PREFIX1 |= ((bytewise_bit_swap((this->prefixes).prefixes[i - 3]) & 0xFF) << (8*(i-3)));
+					}
 					NRF_RADIO->RXADDRESSES |= 1 << (i+1);
 				}
+
 			}
 			success = true;
 		}
@@ -625,9 +691,15 @@ bool Radio::generateBaseAndPrefixRegisters() {
 					((uint32_t)(this->preamble).pattern[0])<<8
 				);
 				for (size_t i=0;i<this->prefixes.number;i++) {
-					NRF_RADIO->PREFIX0 |= ((bytewise_bit_swap((this->prefixes).prefixes[i]) & 0xFF) << (8*(i+1)));
+					if (this->prefixes.number < 3) {
+						NRF_RADIO->PREFIX0 |= ((bytewise_bit_swap((this->prefixes).prefixes[i]) & 0xFF) << (8*(i+1)));
+					}
+					else {
+						NRF_RADIO->PREFIX1 |= ((bytewise_bit_swap((this->prefixes).prefixes[i - 3]) & 0xFF) << (8*(i-3)));
+					}
 					NRF_RADIO->RXADDRESSES |= 1 << (i+1);
 				}
+
 			}
 			success = true;
 		}
@@ -649,9 +721,15 @@ bool Radio::generateBaseAndPrefixRegisters() {
 					((uint32_t)0x00)<<8
 				);
 				for (size_t i=0;i<this->prefixes.number;i++) {
-					NRF_RADIO->PREFIX0 |= ((bytewise_bit_swap((this->prefixes).prefixes[i]) & 0xFF) << (8*(i+1)));
+					if (this->prefixes.number < 3) {
+						NRF_RADIO->PREFIX0 |= ((bytewise_bit_swap((this->prefixes).prefixes[i]) & 0xFF) << (8*(i+1)));
+					}
+					else {
+						NRF_RADIO->PREFIX1 |= ((bytewise_bit_swap((this->prefixes).prefixes[i - 3]) & 0xFF) << (8*(i-3)));
+					}
 					NRF_RADIO->RXADDRESSES |= 1 << (i+1);
 				}
+
 			}
 			success = true;
 		}
@@ -673,7 +751,12 @@ bool Radio::generateBaseAndPrefixRegisters() {
 					((uint32_t)0x00)<<8
 				);
 				for (size_t i=0;i<this->prefixes.number;i++) {
-					NRF_RADIO->PREFIX0 |= ((bytewise_bit_swap((this->prefixes).prefixes[i]) & 0xFF) << (8*(i+1)));
+					if (this->prefixes.number < 3) {
+						NRF_RADIO->PREFIX0 |= ((bytewise_bit_swap((this->prefixes).prefixes[i]) & 0xFF) << (8*(i+1)));
+					}
+					else {
+						NRF_RADIO->PREFIX1 |= ((bytewise_bit_swap((this->prefixes).prefixes[i - 3]) & 0xFF) << (8*(i-3)));
+					}
 					NRF_RADIO->RXADDRESSES |= 1 << (i+1);
 				}
 			}
@@ -697,9 +780,15 @@ bool Radio::generateBaseAndPrefixRegisters() {
 					((uint32_t)0x00)<<8
 				);
 				for (size_t i=0;i<this->prefixes.number;i++) {
-					NRF_RADIO->PREFIX0 |= ((bytewise_bit_swap((this->prefixes).prefixes[i]) & 0xFF) << (8*(i+1)));
+					if (this->prefixes.number < 3) {
+						NRF_RADIO->PREFIX0 |= ((bytewise_bit_swap((this->prefixes).prefixes[i]) & 0xFF) << (8*(i+1)));
+					}
+					else {
+						NRF_RADIO->PREFIX1 |= ((bytewise_bit_swap((this->prefixes).prefixes[i - 3]) & 0xFF) << (8*(i-3)));
+					}
 					NRF_RADIO->RXADDRESSES |= 1 << (i+1);
 				}
+
 			}
 			success = true;
 		}
@@ -711,9 +800,15 @@ bool Radio::generateBaseAndPrefixRegisters() {
 			if (this->prefixes.number > 0) {
 				NRF_RADIO->BASE1 = (this->preamble).pattern[0];
 				for (size_t i=0;i<this->prefixes.number;i++) {
-					NRF_RADIO->PREFIX0 |= ((((this->prefixes).prefixes[i]) & 0xFF) << (8*(i+1)));
+					if (this->prefixes.number < 3) {
+						NRF_RADIO->PREFIX0 |= ((((this->prefixes).prefixes[i]) & 0xFF) << (8*(i+1)));
+					}
+					else {
+						NRF_RADIO->PREFIX1 |= ((((this->prefixes).prefixes[i - 3]) & 0xFF) << (8*(i-3)));
+					}
 					NRF_RADIO->RXADDRESSES |= 1 << (i+1);
 				}
+
 			}
 			success = true;
 		}
@@ -733,9 +828,15 @@ bool Radio::generateBaseAndPrefixRegisters() {
 					(((uint32_t)0x00))
 				);
 				for (size_t i=0;i<this->prefixes.number;i++) {
-					NRF_RADIO->PREFIX0 |= ((((this->prefixes).prefixes[i]) & 0xFF) << (8*(i+1)));
+					if (this->prefixes.number < 3) {
+						NRF_RADIO->PREFIX0 |= ((((this->prefixes).prefixes[i]) & 0xFF) << (8*(i+1)));
+					}
+					else {
+						NRF_RADIO->PREFIX1 |= ((((this->prefixes).prefixes[i - 3]) & 0xFF) << (8*(i-3)));
+					}
 					NRF_RADIO->RXADDRESSES |= 1 << (i+1);
 				}
+
 			}
 			success = true;
 		}
@@ -755,7 +856,12 @@ bool Radio::generateBaseAndPrefixRegisters() {
 					(((uint32_t)0x00))
 				);
 				for (size_t i=0;i<this->prefixes.number;i++) {
-					NRF_RADIO->PREFIX0 |= ((((this->prefixes).prefixes[i]) & 0xFF) << (8*(i+1)));
+					if (this->prefixes.number < 3) {
+						NRF_RADIO->PREFIX0 |= ((((this->prefixes).prefixes[i]) & 0xFF) << (8*(i+1)));
+					}
+					else {
+						NRF_RADIO->PREFIX1 |= ((((this->prefixes).prefixes[i - 3]) & 0xFF) << (8*(i-3)));
+					}
 					NRF_RADIO->RXADDRESSES |= 1 << (i+1);
 				}
 			}
@@ -777,7 +883,12 @@ bool Radio::generateBaseAndPrefixRegisters() {
 					(((uint32_t)0x00))
 				);
 				for (size_t i=0;i<this->prefixes.number;i++) {
-					NRF_RADIO->PREFIX0 |= ((((this->prefixes).prefixes[i]) & 0xFF) << (8*(i+1)));
+					if (this->prefixes.number < 3) {
+						NRF_RADIO->PREFIX0 |= ((((this->prefixes).prefixes[i]) & 0xFF) << (8*(i+1)));
+					}
+					else {
+						NRF_RADIO->PREFIX1 |= ((((this->prefixes).prefixes[i - 3]) & 0xFF) << (8*(i-3)));
+					}
 					NRF_RADIO->RXADDRESSES |= 1 << (i+1);
 				}
 			}
@@ -800,9 +911,15 @@ bool Radio::generateBaseAndPrefixRegisters() {
 					(((uint32_t)(this->preamble).pattern[4]))
 				);
 				for (size_t i=0;i<this->prefixes.number;i++) {
-					NRF_RADIO->PREFIX0 |= ((((this->prefixes).prefixes[i]) & 0xFF) << (8*(i+1)));
+					if (this->prefixes.number < 3) {
+						NRF_RADIO->PREFIX0 |= ((((this->prefixes).prefixes[i]) & 0xFF) << (8*(i+1)));
+					}
+					else {
+						NRF_RADIO->PREFIX1 |= ((((this->prefixes).prefixes[i - 3]) & 0xFF) << (8*(i-3)));
+					}
 					NRF_RADIO->RXADDRESSES |= 1 << (i+1);
 				}
+
 			}
 			success = true;
 		}
