@@ -465,7 +465,7 @@ void ESBController::sendAck(uint8_t pid) {
 
   if (this->preparedAck.available) {
     this->radio->send(this->preparedAck.buffer, this->preparedAck.size, this->channel, 0x00);
-    nrf_delay_us(200);
+    nrf_delay_us(700);
     this->preparedAck.available = false;
   }
   else {
