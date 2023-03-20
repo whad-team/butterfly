@@ -307,9 +307,15 @@ bool BLEPacket::isAdvertisement() {
 	return ((this->packetPointer[0] == 0xd6) && (this->packetPointer[1] == 0xbe) && (this->packetPointer[2] == 0x89) && (this->packetPointer[3] == 0x8e));
 }
 
+uint8_t BLEPacket::extractLLID() {
+	if (this->extractPayloadLength() >= 5) {
+		return this->packetPointer[4] & 3;
+	}
+	return 0xFF;
+}
 bool BLEPacket::isReadRequest() {
 	if (this->extractPayloadLength() >= 6) {
-		return ((this->packetPointer[4] & 3) == 2) && ((this->packetPointer[8] | (this->packetPointer[9] << 8)) == 0x0004) && (this->packetPointer[10] == 0xa);
+		return (this->extractLLID() == LLID_START) && ((this->packetPointer[8] | (this->packetPointer[9] << 8)) == 0x0004) && (this->packetPointer[10] == 0xa);
 	}
 	else {
 		return false;
@@ -317,7 +323,7 @@ bool BLEPacket::isReadRequest() {
 }
 bool BLEPacket::isPairingRequest() {
 	if (this->extractPayloadLength() >= 6) {
-		return ((this->packetPointer[4] & 3) == 2) && ((this->packetPointer[8] | (this->packetPointer[9] << 8)) == 0x0006) && (this->packetPointer[10] == 0x1);
+		return (this->extractLLID() == LLID_START) && ((this->packetPointer[8] | (this->packetPointer[9] << 8)) == 0x0006) && (this->packetPointer[10] == 0x1);
 	}
 	else {
 		return false;
@@ -325,7 +331,7 @@ bool BLEPacket::isPairingRequest() {
 }
 bool BLEPacket::isEncryptionRequest() {
 	if (this->extractPayloadLength() >= 6) {
-		return ((this->packetPointer[4] & 3) == 3) && (this->packetPointer[6] == 0x3);
+		return (this->extractLLID() == LLID_CONTROL) && (this->packetPointer[6] == 0x3);
 	}
 	else {
 		return false;
@@ -333,15 +339,15 @@ bool BLEPacket::isEncryptionRequest() {
 }
 
 bool BLEPacket::isLinkLayerConnectionUpdateRequest() {
-	return (!this->isAdvertisement() && this->packetSize > 7 && this->packetPointer[6] == 0x00);
+	return (!this->isAdvertisement() && this->packetSize > 7 && (this->extractLLID() == LLID_CONTROL) && this->packetPointer[6] == 0x00);
 }
 
 bool BLEPacket::isLinkLayerTerminateInd() {
-	return (!this->isAdvertisement() && this->packetSize > 7 && this->packetPointer[6] == 0x02);
+	return (!this->isAdvertisement() && this->packetSize > 7 && (this->extractLLID() == LLID_CONTROL) && this->packetPointer[6] == 0x02);
 }
 
 bool BLEPacket::isLinkLayerChannelMapRequest() {
-	return (!this->isAdvertisement() && this->packetSize > 7 && this->packetPointer[5] == 0x08 && this->packetPointer[6] == 0x01);
+	return (!this->isAdvertisement() && this->packetSize > 7 && (this->extractLLID() == LLID_CONTROL) && this->packetPointer[5] == 0x08 && this->packetPointer[6] == 0x01);
 }
 
 uint32_t BLEPacket::extractAccessAddress() {

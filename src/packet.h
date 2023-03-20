@@ -6,6 +6,11 @@
 #include "stddef.h"
 #include "string.h"
 
+#define LLID_CONTINUE 1
+#define LLID_START 		2
+#define LLID_CONTROL 	3
+
+
 typedef enum PacketType {
 	BLE_PACKET_TYPE = 0x00,
 	DOT15D4_PACKET_TYPE = 0x01,
@@ -91,6 +96,7 @@ class BLEPacket : public Packet {
 		bool isLinkLayerConnectionUpdateRequest();
 		bool isLinkLayerChannelMapRequest();
 		bool isLinkLayerTerminateInd();
+		uint8_t extractLLID();
 		uint32_t extractAccessAddress();
 		uint32_t extractCrcInit();
 		uint16_t extractHopInterval();

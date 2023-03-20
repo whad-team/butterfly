@@ -32,7 +32,7 @@ ifeq ($(PLATFORM),BOARD_PCA10059)
 	CFLAGS += -DNRF52840_XXAA
 	CFLAGS += -mcpu=cortex-m4
 	CFLAGS += -mthumb -mabi=aapcs
-	CFLAGS += -Wall
+	CFLAGS += -Wall -g
 	CFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
 	# keep every function in a separate section, this allows linker to discard unused ones
 	CFLAGS += -ffunction-sections -fdata-sections -fno-strict-aliasing

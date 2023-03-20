@@ -531,9 +531,24 @@ bool BLEController::goToNextChannel() {
 	if (this->controllerState != SNIFFING_ADVERTISEMENTS && this->controllerState != SCANNING) {
 		// If we have not observed at least one packet, increase desyncCounter by one, otherwise resets this counter
 		this->desyncCounter = (this->packetCount == 0 ? this->desyncCounter + 1 : 0);
+
+
+		// if we observed a channel map request, let's consider it has been applied and our counter was wrong
+		if (this->controllerState != SIMULATING_MASTER && this->desyncCounter == 1 && this->connectionUpdate.type == UPDATE_TYPE_CHANNEL_MAP_REQUEST) {
+
+			bsp_board_led_on(1);
+			bsp_board_led_on(0);
+
+			this->connectionEventCount = this->connectionUpdate.instant;
+			this->updateChannelsInUse(this->connectionUpdate.channelMap);
+			this->clearConnectionUpdate();
+			int channel = this->nextChannel();
+			this->setChannel(channel);
+
+		}
+
 		// If the desyncCounter is greater than three, the connection is considered lost
 		if (this->desyncCounter > 5 && !this->attackStatus.running) {
-
 			return this->connectionLost();
 		}
 		// If we are still following the connection
@@ -1218,7 +1233,7 @@ void BLEController::followConnection(uint16_t hopInterval, uint8_t hopIncrement,
 		this->connectionTimer = this->timerModule->getTimer();
 		this->connectionTimer->setMode(REPEATED);
 		this->connectionTimer->setCallback((ControllerCallback)&BLEController::goToNextChannel, this);
-		this->connectionTimer->update(this->hopInterval * 1250UL - 250);
+		this->connectionTimer->update(this->hopInterval * 1250UL - 350);
 	}
 	this->masterSCA = masterSCA;
 	this->slaveSCA = 20;
@@ -1246,7 +1261,7 @@ bool BLEController::checkSynchronization() {
 		// We are not waiting for an update
 		this->clearConnectionUpdate();
 
-		if (this->controllerState == CONNECTION_INITIATION) {
+		if (this->controllerState == CONNECTION_INITIATION || this->controllerState == SIMULATING_MASTER) {
 			this->connect(
 				this->connectionInitiationData.responder.bytes,
 				this->connectionInitiationData.responderRandom,
@@ -1779,7 +1794,7 @@ void BLEController::connect(uint8_t *address, bool random,  uint32_t accessAddre
 	this->connectionInitiationData.sca = sca;
 	this->connectionInitiationData.hopIncrement = hopIncrement;
 	memcpy(this->connectionInitiationData.channelMap, channelMap, 5);
-
+	this->releaseTimers();
 	if (this->scanningTimer == NULL) {
 		this->scanningTimer = this->timerModule->getTimer();
 	}
@@ -1842,7 +1857,7 @@ void BLEController::initializeConnection() {
 	this->updateHopIncrement(this->connectionInitiationData.hopIncrement);
 	this->updateChannelsInUse(this->connectionInitiationData.channelMap);
 
-	//this->emptyTransmitIndicator = true;
+	this->emptyTransmitIndicator = true;
 
 	this->radio->disableFilter();
 	this->radio->disableAutoTXafterRX();
@@ -1893,7 +1908,7 @@ void BLEController::initializeConnection() {
 		this->masterTimer->start();
 	}
 
-	this->setAnchorPoint(TimerModule::instance->getTimestamp() + 200);
+	this->setAnchorPoint(TimerModule::instance->getTimestamp());
 
 	// Radio configuration
 	this->setHardwareConfiguration(this->connectionInitiationData.accessAddress, this->connectionInitiationData.crcInit);
