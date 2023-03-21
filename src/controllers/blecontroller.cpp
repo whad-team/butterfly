@@ -534,6 +534,7 @@ bool BLEController::goToNextChannel() {
 
 
 		// if we observed a channel map request, let's consider it has been applied and our counter was wrong
+		/*
 		if (this->controllerState != SIMULATING_MASTER && this->desyncCounter == 1 && this->connectionUpdate.type == UPDATE_TYPE_CHANNEL_MAP_REQUEST) {
 
 			bsp_board_led_on(1);
@@ -545,7 +546,7 @@ bool BLEController::goToNextChannel() {
 			int channel = this->nextChannel();
 			this->setChannel(channel);
 
-		}
+		}*/
 
 		// If the desyncCounter is greater than three, the connection is considered lost
 		if (this->desyncCounter > 5 && !this->attackStatus.running) {
