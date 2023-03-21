@@ -1448,11 +1448,10 @@ bool BLEController::masterRoleCallback(BLEPacket *pkt) {
 		this->radio->send(this->masterPayload.payload,this->masterPayload.size,BLEController::channelToFrequency(this->channel),this->channel);
 	}
 	else {
-		uint8_t data1[2];
-		data1[0] = (0x01 & 0xF3) | (this->simulatedMasterSequenceNumbers.nesn  << 2) | (this->simulatedMasterSequenceNumbers.sn << 3);
-		data1[1] = 0x00;
-		//}
-		this->radio->send(data1,2,BLEController::channelToFrequency(this->channel),this->channel);
+		this->temporaryPayload.payload[0] = (0x01 & 0xF3) | (this->simulatedMasterSequenceNumbers.nesn  << 2) | (this->simulatedMasterSequenceNumbers.sn << 3);
+		this->temporaryPayload.payload[1] = 0x00;
+		this->temporaryPayload.size = 2;
+		this->radio->send(this->temporaryPayload.payload, this->temporaryPayload.size, BLEController::channelToFrequency(this->channel), this->channel);
 	}
 
 	return true;
@@ -1929,11 +1928,11 @@ bool BLEController::sendFirstConnectionPacket() {
 	this->initializeConnection();
 	this->simulatedMasterSequenceNumbers.nesn = 0;
 	this->simulatedMasterSequenceNumbers.sn = 0;
-	uint8_t data1[2];
-	data1[0] = (0x01 & 0xF3) | (this->simulatedMasterSequenceNumbers.nesn  << 2) | (this->simulatedMasterSequenceNumbers.sn << 3);
-	data1[1] = 0x00;
 
-	this->radio->send(data1,2,BLEController::channelToFrequency(this->channel),this->channel);
+	this->temporaryPayload.payload[0] = (0x01 & 0xF3) | (this->simulatedMasterSequenceNumbers.nesn  << 2) | (this->simulatedMasterSequenceNumbers.sn << 3);
+	this->temporaryPayload.payload[1] = 0x00;
+	this->temporaryPayload.size = 2;
+	this->radio->send(this->temporaryPayload.payload, this->temporaryPayload.size, BLEController::channelToFrequency(this->channel), this->channel);
 	return false;
 }
 
