@@ -136,7 +136,7 @@ void Dot15d4Controller::setNativeConfiguration() {
 	this->radio->setPrefixes();
   this->radio->setMode(MODE_NORMAL);
   this->radio->setFastRampUpTime(true);
-  this->radio->setTxPower(POS0_DBM);
+  this->radio->setTxPower(POS8_DBM);
   this->radio->enableRssi();
 	this->radio->setEndianness(LITTLE);
   this->radio->setPhy(DOT15D4_NATIVE);
@@ -180,7 +180,7 @@ void Dot15d4Controller::setRawConfiguration() {
 	this->radio->setPrefixes();
   this->radio->setMode(MODE_NORMAL);
   this->radio->setFastRampUpTime(true);
-  this->radio->setTxPower(POS0_DBM);
+  this->radio->setTxPower(POS8_DBM);
   this->radio->disableRssi();
 	this->radio->setEndianness(LITTLE);
   this->radio->setPhy(DOT15D4_NATIVE);
