@@ -757,8 +757,11 @@ void Core::processPhyInputMessage(phy_Message msg) {
       response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
     }
   }
-
-  else if (msg.which_msg == phy_Message_freq_twodotfourghz_tag) {
+  else if (msg.which_msg == phy_Message_get_supported_freq_tag) {
+    response = Whad::buildPhySupportedFrequencyRangeMessage();
+  }
+  /*
+  else if (msg.which_msg == phy_PhyCommand_GetSupportedFrequencies) {
     int frequency_offset = msg.msg.freq_twodotfourghz.frequency_offset;
     if (frequency_offset >= 0 && frequency_offset <= 100) {
       this->genericController->setChannel(frequency_offset);
@@ -767,7 +770,7 @@ void Core::processPhyInputMessage(phy_Message msg) {
     else {
       response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
     }
-  }
+  }*/
 
   else if (msg.which_msg == phy_Message_datarate_tag) {
     if (msg.msg.datarate.rate == 1000000) {

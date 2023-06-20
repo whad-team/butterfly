@@ -48,3 +48,30 @@ bool whad_disc_enum_capabilities_cb(pb_ostream_t *ostream, const pb_field_t *fie
 
     return true;
 }
+
+
+bool whad_phy_frequency_range_encode_cb(pb_ostream_t *ostream, const pb_field_t *field, void * const *arg)
+{
+  phy_SupportedFrequencyRanges_FrequencyRange *frequency_range = *(phy_SupportedFrequencyRanges_FrequencyRange **)arg;
+  if (ostream != NULL && field->tag == phy_SupportedFrequencyRanges_frequency_ranges_tag)
+  {
+    while ((frequency_range->start != 0) && (frequency_range->end != 0))
+    {
+      if (!pb_encode_tag_for_field(ostream, field))
+      {
+          const char * error = PB_GET_ERROR(ostream);
+          PB_UNUSED(error);
+          return false;
+      }
+
+      if (!pb_encode_submessage(ostream, phy_SupportedFrequencyRanges_FrequencyRange_fields, frequency_range))
+      {
+          const char * error = PB_GET_ERROR(ostream);
+          PB_UNUSED(error);
+          return false;
+      }
+      frequency_range++;
+    }
+  }
+  return true;
+}

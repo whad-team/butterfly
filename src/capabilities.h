@@ -9,11 +9,7 @@ typedef struct {
     uint64_t supported_commands;
 } DeviceCapability;
 
-/*
-typedef struct {
-    discovery_Domain domain;
-} DomainCommands;
-*/
+
 const DeviceCapability CAPABILITIES[] = {
   {
     discovery_Domain_BtLE,
@@ -95,7 +91,8 @@ const DeviceCapability CAPABILITIES[] = {
   (discovery_Capability)(discovery_Capability_Sniff | discovery_Capability_Inject | discovery_Capability_Jam | discovery_Capability_NoRawData),
   (
     CMD(phy_PhyCommand_SetGFSKModulation) |
-    CMD(phy_PhyCommand_SetTwoDotFourGhzFrequency) |
+    CMD(phy_PhyCommand_GetSupportedFrequencies) |
+    CMD(phy_PhyCommand_SetFrequency) |
     CMD(phy_PhyCommand_SetDataRate) |
     CMD(phy_PhyCommand_SetEndianness) |
     CMD(phy_PhyCommand_SetTXPower) |
@@ -113,4 +110,8 @@ const DeviceCapability CAPABILITIES[] = {
   {discovery_Domain__DomainNone, discovery_Capability__CapNone, 0x00000000}
 };
 
+const phy_SupportedFrequencyRanges_FrequencyRange SUPPORTED_FREQUENCY_RANGES[]  = {
+    {2400000000, 2500000000},
+    {0, 0}
+};
 #endif

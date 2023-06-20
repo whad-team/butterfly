@@ -140,6 +140,19 @@ Message* Whad::buildMessageFromPacket(Packet* packet) {
   return msg;
 }
 
+
+Message* Whad::buildPhySupportedFrequencyRangeMessage() {
+  Message* msg = Whad::buildMessage();
+  /* Specify payload type. */
+  msg->which_msg = Message_phy_tag;
+
+  /* Fills verbose message data. */
+  msg->msg.phy.which_msg = phy_Message_supported_freq_tag;
+  msg->msg.phy.msg.supported_freq.frequency_ranges.arg = (phy_SupportedFrequencyRanges_FrequencyRange*)SUPPORTED_FREQUENCY_RANGES;
+  msg->msg.phy.msg.supported_freq.frequency_ranges.funcs.encode = whad_phy_frequency_range_encode_cb;
+  return msg;
+}
+
 Message* Whad::buildPhyPacketMessage(GenericPacket* packet) {
   Message *msg = Whad::buildMessage();
   msg->which_msg = Message_phy_tag;
