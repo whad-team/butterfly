@@ -18,6 +18,7 @@
 
 class Core;
 
+//#define RX_BUFFER_SIZE 1024
 #define RX_BUFFER_SIZE 1024
 #define TX_BUFFER_SIZE 1024
 
@@ -49,7 +50,7 @@ typedef struct txUartState {
 class SerialComm {
 public:
     CoreCallback inputCallback;
-		Core *coreInstance;
+	Core *coreInstance;
 
     rxUartState rxState;
     txUartState txState;
@@ -66,6 +67,7 @@ public:
 		SerialComm(CoreCallback inputCallback,Core *coreInstance);
 
     void readInputByte(uint8_t byte);
+    void readInputBytes(void);
     bool send(uint8_t *buffer, size_t size);
 		void init();
 		void process();
