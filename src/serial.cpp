@@ -57,6 +57,7 @@ void SerialComm::cdcAcmHandler(app_usbd_class_inst_t const * p_inst, app_usbd_cd
         &m_app_cdc_acm,&instance->rxBuffer[instance->rxState.index],
         RX_BUFFER_SIZE - instance->rxState.index
       );
+			UNUSED_VARIABLE(ret);
 
 			break;
 		}
@@ -113,7 +114,7 @@ SerialComm::SerialComm(CoreCallback inputCallback,Core *coreInstance) {
 
 /**
  * @brief Old input byte processing method.
- * 
+ *
  * @param byte Input byte
  */
 
