@@ -228,7 +228,7 @@ typedef struct _phy_SetGFSKModulationCmd {
  Configure the size of data received and transmitted (in number of bytes).
  May be limited depending on underlying hardware. */
 typedef struct _phy_SetPacketSizeCmd { 
-    uint32_t size;
+    uint32_t packet_size;
 } phy_SetPacketSizeCmd;
 
 /* *
@@ -398,7 +398,7 @@ extern "C" {
 #define phy_SetFSKModulationCmd_deviation_tag    1
 #define phy_SetFrequencyCmd_frequency_tag        1
 #define phy_SetGFSKModulationCmd_deviation_tag   1
-#define phy_SetPacketSizeCmd_size_tag            1
+#define phy_SetPacketSizeCmd_packet_size_tag     1
 #define phy_SetQPSKModulationCmd_offset_qpsk_tag 1
 #define phy_SetSyncWordCmd_sync_word_tag         1
 #define phy_SetTXPowerCmd_tx_power_tag           1
@@ -482,7 +482,7 @@ X(a, STATIC,   SINGULAR, UENUM,    tx_power,          1)
 #define phy_SetTXPowerCmd_DEFAULT NULL
 
 #define phy_SetPacketSizeCmd_FIELDLIST(X, a) \
-X(a, STATIC,   SINGULAR, UINT32,   size,              1)
+X(a, STATIC,   SINGULAR, UINT32,   packet_size,       1)
 #define phy_SetPacketSizeCmd_CALLBACK NULL
 #define phy_SetPacketSizeCmd_DEFAULT NULL
 

@@ -760,17 +760,17 @@ void Core::processPhyInputMessage(phy_Message msg) {
   else if (msg.which_msg == phy_Message_get_supported_freq_tag) {
     response = Whad::buildPhySupportedFrequencyRangeMessage();
   }
-  /*
-  else if (msg.which_msg == phy_PhyCommand_GetSupportedFrequencies) {
-    int frequency_offset = msg.msg.freq_twodotfourghz.frequency_offset;
-    if (frequency_offset >= 0 && frequency_offset <= 100) {
+  else if (msg.which_msg == phy_Message_set_freq_tag) {
+    uint64_t frequency = msg.msg.set_freq.frequency;
+    if (frequency >= 2400000000L && frequency <= 2500000000L) {
+      int frequency_offset = (frequency / 1000000) - 2400;
       this->genericController->setChannel(frequency_offset);
       response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
     }
     else {
       response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
     }
-  }*/
+  }
 
   else if (msg.which_msg == phy_Message_datarate_tag) {
     if (msg.msg.datarate.rate == 1000000) {
@@ -838,8 +838,13 @@ void Core::processPhyInputMessage(phy_Message msg) {
   }
 
   else if (msg.which_msg == phy_Message_packet_size_tag) {
-    this->genericController->setPacketSize(msg.msg.packet_size.size);
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    if (msg.msg.packet_size.packet_size <= 252) {
+      this->genericController->setPacketSize(msg.msg.packet_size.packet_size);
+      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    }
+    else {
+      response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+    }
   }
   else if (msg.which_msg == phy_Message_sync_word_tag) {
     this->genericController->setPreamble(msg.msg.sync_word.sync_word.bytes, msg.msg.sync_word.sync_word.size);
