@@ -275,7 +275,16 @@ void GenericController::send(uint8_t* data, size_t size) {
 
 // Reception callback
 void GenericController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
-  GenericPacket *pkt = new GenericPacket(buffer,size,timestamp,0x00,channel,rssi,crcValue, this->preamble, this->preambleSize);
+  uint8_t preamble[this->preambleSize];
+  if (this->endianness == GENERIC_ENDIANNESS_BIG) {
+    memcpy(preamble, this->preamble, this->preambleSize);
+  }
+  else {
+    for (int i=0;i<this->preambleSize;i++) {
+      preamble[i] = this->preamble[this->preambleSize - 1 - i];
+    }
+  }
+  GenericPacket *pkt = new GenericPacket(buffer,size,timestamp,0x00,channel,rssi,crcValue, preamble, this->preambleSize);
   this->addPacket(pkt);
   delete pkt;
 }
