@@ -757,6 +757,11 @@ void Core::processPhyInputMessage(phy_Message msg) {
       response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
     }
   }
+  else if (msg.which_msg == phy_Message_send_tag) {
+
+    this->genericController->send(msg.msg.send.packet.bytes, msg.msg.send.packet.size);
+    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+  }
   else if (msg.which_msg == phy_Message_get_supported_freq_tag) {
     response = Whad::buildPhySupportedFrequencyRangeMessage();
   }
