@@ -12,7 +12,13 @@ PB_BIND(phy_SetASKModulationCmd, phy_SetASKModulationCmd, AUTO)
 PB_BIND(phy_SetFSKModulationCmd, phy_SetFSKModulationCmd, AUTO)
 
 
+PB_BIND(phy_Set4FSKModulationCmd, phy_Set4FSKModulationCmd, AUTO)
+
+
 PB_BIND(phy_SetGFSKModulationCmd, phy_SetGFSKModulationCmd, AUTO)
+
+
+PB_BIND(phy_SetMSKModulationCmd, phy_SetMSKModulationCmd, AUTO)
 
 
 PB_BIND(phy_SetBPSKModulationCmd, phy_SetBPSKModulationCmd, AUTO)
