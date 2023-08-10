@@ -324,6 +324,7 @@ void Core::processBLEInputMessage(ble_Message msg) {
 
     //uint32_t access_address = msg.msg.send_pdu.access_address;
     //uint32_t crc = msg.msg.send_pdu.crc;
+    uint32_t max_retry = 1 << 24;
 
     if (msg.msg.send_raw_pdu.direction == ble_BleDirection_INJECTION_TO_SLAVE) {
       if (this->bleController->getState() == SNIFFING_CONNECTION) {
@@ -349,8 +350,12 @@ void Core::processBLEInputMessage(ble_Message msg) {
     else if (msg.msg.send_raw_pdu.direction == ble_BleDirection_MASTER_TO_SLAVE) {
       if (this->bleController->getState() == SIMULATING_MASTER || this->bleController->getState() == PERFORMING_MITM) {
         this->bleController->setMasterPayload(msg.msg.send_raw_pdu.pdu.bytes, msg.msg.send_raw_pdu.pdu.size);
-        while (!this->bleController->isMasterPayloadTransmitted()) {}
-        response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+        while (!max_retry && !this->bleController->isMasterPayloadTransmitted()) {--max_retry;}
+        if (max_retry != 0) {
+            response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+        } else {
+            response = Whad::buildResultMessage(generic_ResultCode_ERROR);
+        }
       }
       else {
         response = Whad::buildResultMessage(generic_ResultCode_WRONG_MODE);
