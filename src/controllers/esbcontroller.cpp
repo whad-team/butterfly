@@ -562,12 +562,13 @@ void ESBController::onPTXPacketProcessing(uint32_t timestamp, uint8_t size, uint
       else {
         // Check if similar payload has been received before
         retransmission = true;
+        /*
         for (int i=2;i<size;i++) {
           if (buffer[i] != this->lastReceivedPacket.buffer[i]) {
             retransmission = false;
             break;
           }
-        }
+        }*/
       }
     }
   }

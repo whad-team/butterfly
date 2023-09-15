@@ -19,32 +19,33 @@ typedef enum _phy_PhyCommand { /* *
     phy_PhyCommand_SetBPSKModulation = 3, 
     phy_PhyCommand_SetQPSKModulation = 4, 
     phy_PhyCommand_Set4FSKModulation = 5, 
+    phy_PhyCommand_SetMSKModulation = 6, 
     /* Set frequency */
-    phy_PhyCommand_GetSupportedFrequencies = 6, 
-    phy_PhyCommand_SetFrequency = 7, 
+    phy_PhyCommand_GetSupportedFrequencies = 7, 
+    phy_PhyCommand_SetFrequency = 8, 
     /* Set datarate */
-    phy_PhyCommand_SetDataRate = 8, 
+    phy_PhyCommand_SetDataRate = 9, 
     /* Set endianness */
-    phy_PhyCommand_SetEndianness = 9, 
+    phy_PhyCommand_SetEndianness = 10, 
     /* Set TX power */
-    phy_PhyCommand_SetTXPower = 10, 
+    phy_PhyCommand_SetTXPower = 11, 
     /* Set maximum packet size */
-    phy_PhyCommand_SetPacketSize = 11, 
+    phy_PhyCommand_SetPacketSize = 12, 
     /* Set Synchronization word */
-    phy_PhyCommand_SetSyncWord = 12, 
+    phy_PhyCommand_SetSyncWord = 13, 
     /* Sniff data */
-    phy_PhyCommand_Sniff = 13, 
+    phy_PhyCommand_Sniff = 14, 
     /* Send data */
-    phy_PhyCommand_Send = 14, 
-    phy_PhyCommand_SendRaw = 15, 
+    phy_PhyCommand_Send = 15, 
+    phy_PhyCommand_SendRaw = 16, 
     /* Jam data */
-    phy_PhyCommand_Jam = 16, 
+    phy_PhyCommand_Jam = 17, 
     /* Monitor channel */
-    phy_PhyCommand_Monitor = 17, 
+    phy_PhyCommand_Monitor = 18, 
     /* Start */
-    phy_PhyCommand_Start = 18, 
+    phy_PhyCommand_Start = 19, 
     /* Stop */
-    phy_PhyCommand_Stop = 19 
+    phy_PhyCommand_Stop = 20 
 } phy_PhyCommand;
 
 typedef enum _phy_Endianness { 
