@@ -2302,7 +2302,9 @@ void BLEController::advertisementPacketProcessing(BLEPacket *pkt) {
 			free(scan_rsp);
 		}
 		else if (pkt->extractAdvertisementType() == CONNECT_REQ) {
-			if (pkt->extractAdvertisementType() == CONNECT_REQ && this->follow) {
+			if (pkt->extractAdvertisementType() == CONNECT_REQ /*&& this->follow*/) {
+				this->emptyTransmitIndicator = true;
+				
 				// Start following the connection
 				this->followConnection(
 					pkt->extractHopInterval(),
@@ -2315,6 +2317,7 @@ void BLEController::advertisementPacketProcessing(BLEPacket *pkt) {
 				);
 			}
 			this->controllerState = SIMULATING_SLAVE;
+			this->enterSlaveMode();
 		}
 		pkt->updateSource(DIRECTION_UNKNOWN);
 		this->addPacket(pkt);

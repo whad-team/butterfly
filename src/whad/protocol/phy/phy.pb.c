@@ -27,6 +27,9 @@ PB_BIND(phy_SetBPSKModulationCmd, phy_SetBPSKModulationCmd, AUTO)
 PB_BIND(phy_SetQPSKModulationCmd, phy_SetQPSKModulationCmd, AUTO)
 
 
+PB_BIND(phy_SetLoRaModulationCmd, phy_SetLoRaModulationCmd, AUTO)
+
+
 PB_BIND(phy_GetSupportedFrequenciesCmd, phy_GetSupportedFrequenciesCmd, AUTO)
 
 
@@ -88,6 +91,9 @@ PB_BIND(phy_SupportedFrequencyRanges_FrequencyRange, phy_SupportedFrequencyRange
 
 
 PB_BIND(phy_Message, phy_Message, 2)
+
+
+
 
 
 

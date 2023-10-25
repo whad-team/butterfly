@@ -20,41 +20,40 @@ typedef enum _ble_BleCommand { /* *
     ble_BleCommand_JamAdv = 2, 
     /* Jam advertisements on a single channel. */
     ble_BleCommand_JamAdvOnChannel = 3, 
+    /* Jam a specific pattern on a single channel. */
+    ble_BleCommand_ReactiveJam = 4, 
     /* Sniff CONN_REQ PDUs and sync with connection. */
-    ble_BleCommand_SniffConnReq = 4, 
+    ble_BleCommand_SniffConnReq = 5, 
     /* Sniff active connection. */
-    ble_BleCommand_SniffAccessAddress = 5, 
-    ble_BleCommand_SniffActiveConn = 6, 
+    ble_BleCommand_SniffAccessAddress = 6, 
+    ble_BleCommand_SniffActiveConn = 7, 
     /* Connection jamming. */
-    ble_BleCommand_JamConn = 7, 
+    ble_BleCommand_JamConn = 8, 
     /* Scanner mode. */
-    ble_BleCommand_ScanMode = 8, 
+    ble_BleCommand_ScanMode = 9, 
     /* Advertiser mode. */
-    ble_BleCommand_AdvMode = 9, 
-    ble_BleCommand_SetAdvData = 10, /* SetAdvData shared with Peripheral mode. */
+    ble_BleCommand_AdvMode = 10, 
+    ble_BleCommand_SetAdvData = 11, /* SetAdvData shared with Peripheral mode. */
     /* Central mode. */
-    ble_BleCommand_CentralMode = 11, 
-    ble_BleCommand_ConnectTo = 12, 
-    ble_BleCommand_SendRawPDU = 13, 
-    ble_BleCommand_SendPDU = 14, 
-    ble_BleCommand_Disconnect = 15, 
+    ble_BleCommand_CentralMode = 12, 
+    ble_BleCommand_ConnectTo = 13, 
+    ble_BleCommand_SendRawPDU = 14, 
+    ble_BleCommand_SendPDU = 15, 
+    ble_BleCommand_Disconnect = 16, 
     /* Peripheral mode. */
-    ble_BleCommand_PeripheralMode = 16, /* SetAdvData and SetScanRspData are shared accross
- Peripheral and Advertiser modes
- SendPDU is shared with Central mode
- Disconnect is shared with Central mode */
+    ble_BleCommand_PeripheralMode = 17, 
     /* Common to multiple modes. */
-    ble_BleCommand_Start = 17, 
-    ble_BleCommand_Stop = 18, 
+    ble_BleCommand_Start = 18, 
+    ble_BleCommand_Stop = 19, 
+    ble_BleCommand_SetEncryption = 20, 
     /* Hijack mode. */
-    ble_BleCommand_HijackMaster = 19, 
-    ble_BleCommand_HijackSlave = 20, 
-    ble_BleCommand_HijackBoth = 21, 
-    ble_BleCommand_ReactiveJam = 22, 
+    ble_BleCommand_HijackMaster = 21, 
+    ble_BleCommand_HijackSlave = 22, 
+    ble_BleCommand_HijackBoth = 23, 
     /* Sequence mode */
-    ble_BleCommand_PrepareSequence = 23, 
-    ble_BleCommand_TriggerSequence = 24, 
-    ble_BleCommand_DeleteSequence = 25 
+    ble_BleCommand_PrepareSequence = 24, 
+    ble_BleCommand_TriggerSequence = 25, 
+    ble_BleCommand_DeleteSequence = 26 
 } ble_BleCommand;
 
 typedef enum _ble_BleAdvType { 
@@ -357,9 +356,13 @@ typedef struct _ble_SetBdAddressCmd {
 } ble_SetBdAddressCmd;
 
 typedef struct _ble_SetEncryptionCmd { 
+    int32_t conn_handle;
     bool enabled;
+    pb_byte_t ll_key[16];
+    pb_byte_t ll_iv[8];
     pb_byte_t key[16];
-    pb_byte_t iv[8];
+    pb_byte_t rand[8];
+    pb_byte_t ediv[2];
 } ble_SetEncryptionCmd;
 
 /* *
@@ -522,7 +525,7 @@ extern "C" {
 #define ble_HijackMasterCmd_init_default         {0}
 #define ble_HijackSlaveCmd_init_default          {0}
 #define ble_HijackBothCmd_init_default           {0}
-#define ble_SetEncryptionCmd_init_default        {0, {0}, {0}}
+#define ble_SetEncryptionCmd_init_default        {0, 0, {0}, {0}, {0}, {0}, {0}}
 #define ble_ReactiveJamCmd_init_default          {0, {0, {0}}, 0}
 #define ble_PrepareSequenceCmd_init_default      {false, ble_PrepareSequenceCmd_Trigger_init_default, 0, _ble_BleDirection_MIN, 0, {ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default, ble_PrepareSequenceCmd_PendingPacket_init_default}}
 #define ble_PrepareSequenceCmd_ReceptionTrigger_init_default {{0, {0}}, {0, {0}}, 0}
@@ -566,7 +569,7 @@ extern "C" {
 #define ble_HijackMasterCmd_init_zero            {0}
 #define ble_HijackSlaveCmd_init_zero             {0}
 #define ble_HijackBothCmd_init_zero              {0}
-#define ble_SetEncryptionCmd_init_zero           {0, {0}, {0}}
+#define ble_SetEncryptionCmd_init_zero           {0, 0, {0}, {0}, {0}, {0}, {0}}
 #define ble_ReactiveJamCmd_init_zero             {0, {0, {0}}, 0}
 #define ble_PrepareSequenceCmd_init_zero         {false, ble_PrepareSequenceCmd_Trigger_init_zero, 0, _ble_BleDirection_MIN, 0, {ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero, ble_PrepareSequenceCmd_PendingPacket_init_zero}}
 #define ble_PrepareSequenceCmd_ReceptionTrigger_init_zero {{0, {0}}, {0, {0}}, 0}
@@ -670,9 +673,13 @@ extern "C" {
 #define ble_SendRawPDUCmd_encrypt_tag            6
 #define ble_SetBdAddressCmd_bd_address_tag       1
 #define ble_SetBdAddressCmd_addr_type_tag        2
-#define ble_SetEncryptionCmd_enabled_tag         1
-#define ble_SetEncryptionCmd_key_tag             2
-#define ble_SetEncryptionCmd_iv_tag              3
+#define ble_SetEncryptionCmd_conn_handle_tag     1
+#define ble_SetEncryptionCmd_enabled_tag         2
+#define ble_SetEncryptionCmd_ll_key_tag          3
+#define ble_SetEncryptionCmd_ll_iv_tag           4
+#define ble_SetEncryptionCmd_key_tag             5
+#define ble_SetEncryptionCmd_rand_tag            6
+#define ble_SetEncryptionCmd_ediv_tag            7
 #define ble_SniffAccessAddressCmd_monitored_channels_tag 6
 #define ble_SniffActiveConnCmd_access_address_tag 1
 #define ble_SniffActiveConnCmd_crc_init_tag      2
@@ -880,9 +887,13 @@ X(a, STATIC,   SINGULAR, UINT32,   access_address,    1)
 #define ble_HijackBothCmd_DEFAULT NULL
 
 #define ble_SetEncryptionCmd_FIELDLIST(X, a) \
-X(a, STATIC,   SINGULAR, BOOL,     enabled,           1) \
-X(a, STATIC,   SINGULAR, FIXED_LENGTH_BYTES, key,               2) \
-X(a, STATIC,   SINGULAR, FIXED_LENGTH_BYTES, iv,                3)
+X(a, STATIC,   SINGULAR, INT32,    conn_handle,       1) \
+X(a, STATIC,   SINGULAR, BOOL,     enabled,           2) \
+X(a, STATIC,   SINGULAR, FIXED_LENGTH_BYTES, ll_key,            3) \
+X(a, STATIC,   SINGULAR, FIXED_LENGTH_BYTES, ll_iv,             4) \
+X(a, STATIC,   SINGULAR, FIXED_LENGTH_BYTES, key,               5) \
+X(a, STATIC,   SINGULAR, FIXED_LENGTH_BYTES, rand,              6) \
+X(a, STATIC,   SINGULAR, FIXED_LENGTH_BYTES, ediv,              7)
 #define ble_SetEncryptionCmd_CALLBACK NULL
 #define ble_SetEncryptionCmd_DEFAULT NULL
 
@@ -1240,7 +1251,7 @@ extern const pb_msgdesc_t ble_Message_msg;
 #define ble_SendPDUCmd_size                      313
 #define ble_SendRawPDUCmd_size                   325
 #define ble_SetBdAddressCmd_size                 10
-#define ble_SetEncryptionCmd_size                30
+#define ble_SetEncryptionCmd_size                73
 #define ble_SniffAccessAddressCmd_size           7
 #define ble_SniffActiveConnCmd_size              38
 #define ble_SniffAdvCmd_size                     16

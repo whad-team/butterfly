@@ -19,7 +19,7 @@ void sort_array(uint32_t tab[], size_t size) {
 	}
 }
 
-bool compareBuffers(uint8_t *buffer1, uint8_t *buffer2,size_t size) {
+bool compare_buffers(uint8_t *buffer1, uint8_t *buffer2,size_t size) {
 	for (size_t i=0;i<size;i++) {
 		if (buffer1[i] != buffer2[i]) return false;
 	}
