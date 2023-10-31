@@ -909,7 +909,6 @@ void core_send_bytes(uint8_t *p_bytes, int size)
     {
         Core::instance->getLedModule()->off(LED2);
         Core::instance->getSerialModule()->send_raw(p_bytes, size);
-        whad_transport_data_sent();
     }
     else
     {
@@ -927,7 +926,7 @@ Core::Core() {
 
     /* Initialize WHAD library. */
     memset(&this->transportConfig, 0, sizeof(whad_transport_cfg_t));
-    this->transportConfig.max_txbuf_size = 1024;
+    this->transportConfig.max_txbuf_size = 64;
     this->transportConfig.pfn_data_send_buffer = core_send_bytes;
     whad_init(&this->transportConfig);
 
@@ -993,8 +992,8 @@ void Core::init() {
 
 	this->currentController = NULL;
 	this->radio->setController(this->currentController);
-    Message* response = Whad::buildDiscoveryReadyResponseMessage();
-    this->pushMessageToQueue(response);
+    //Message* response = Whad::buildDiscoveryReadyResponseMessage();
+    //this->pushMessageToQueue(response);
 }
 
 bool Core::selectController(Protocol controller) {
@@ -1060,11 +1059,12 @@ void Core::sendDebug(uint8_t *buffer, uint8_t size) {
 
 
 void Core::pushMessageToQueue(Message *msg) {
-    if (whad_send_message(msg) ==WHAD_ERROR)
+    if (whad_send_message(msg) == WHAD_ERROR)
     {
         this->getLedModule()->on(LED1);
     }
     free(msg);
+
     #if 0
 	MessageQueueElement *element = (MessageQueueElement*)malloc(sizeof(MessageQueueElement));
 	element->message = msg;
@@ -1128,11 +1128,9 @@ void Core::loop() {
         if (whad_get_message(&msg) == WHAD_SUCCESS)
         {
             this->getLedModule()->off(LED1);
-            this->getLedModule()->on(LED2);
+            //this->getLedModule()->on(LED2);
             this->processInputMessage(msg);
         }
-
-        whad_transport_send_pending();
 
         // Even if we miss an event enabling USB, USB event would wake us up.
         __WFE();

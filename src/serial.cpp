@@ -34,10 +34,8 @@ void SerialComm::cdcAcmHandler(app_usbd_class_inst_t const * p_inst, app_usbd_cd
 			break;
 
 		case APP_USBD_CDC_ACM_USER_EVT_TX_DONE:
-            #if 0
             ret_code_t ret;
 			//SerialComm::instance->txState.done = true;
-            
             Core::instance->getLedModule()->off(LED2);
             SerialComm::instance->txInProgress = false;
             whad_transport_data_sent();
@@ -48,7 +46,6 @@ void SerialComm::cdcAcmHandler(app_usbd_class_inst_t const * p_inst, app_usbd_cd
                 instance->rxBuffer,
                 RX_BUFFER_SIZE
             );
-            #endif
 			break;
 
 		case APP_USBD_CDC_ACM_USER_EVT_RX_DONE:
@@ -64,11 +61,20 @@ void SerialComm::cdcAcmHandler(app_usbd_class_inst_t const * p_inst, app_usbd_cd
                 whad_transport_data_received(instance->rxBuffer, size);
             }
 
-            ret = app_usbd_cdc_acm_read_any(
-                &m_app_cdc_acm,
-                instance->rxBuffer,
-                RX_BUFFER_SIZE
-            );
+            /* Send pending data, if any. */
+            if (!SerialComm::instance->txInProgress)
+            {
+                whad_transport_send_pending();
+            }
+            
+            if (!SerialComm::instance->txInProgress)
+            {
+                ret = app_usbd_cdc_acm_read_any(
+                    &m_app_cdc_acm,
+                    instance->rxBuffer,
+                    RX_BUFFER_SIZE
+                );                
+            }
 
             UNUSED_VARIABLE(ret);
         }
@@ -305,23 +311,20 @@ bool SerialComm::send(uint8_t *buffer, size_t size) {
 bool SerialComm::send_raw(uint8_t *buffer, size_t size) {
     ret_code_t ret;
 
-    ret = app_usbd_cdc_acm_write(&m_app_cdc_acm, buffer, size);
-    if (ret == NRF_SUCCESS)
+    do
     {
-        Core::instance->getLedModule()->on(LED2);
-        return true;
-    }
-    else
-    {
-        return false;
-    }
+        ret = app_usbd_cdc_acm_write(&m_app_cdc_acm, buffer, size);
+    } while (ret != NRF_SUCCESS);
+
+    Core::instance->getLedModule()->on(LED2);
+    this->txInProgress = true;
+    return true;
 }
 
 void SerialComm::process() {
     int ret;
 
     /* Read awaiting data. */
-    #if 0
     if (!this->txInProgress)
     {
         ret = app_usbd_cdc_acm_read_any(
@@ -330,10 +333,12 @@ void SerialComm::process() {
             RX_BUFFER_SIZE
         );
     }
-    #endif
+
+    whad_transport_send_pending();
 
     /*  Process events. */
-	while (app_usbd_event_queue_process());
+    app_usbd_event_queue_process();
+	//while (app_usbd_event_queue_process());
     //app_usbd_event_queue_process();
   /*
   if (this->txState.waiting && this->txState.done) {
