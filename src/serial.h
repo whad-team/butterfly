@@ -69,6 +69,7 @@ public:
     void readInputByte(uint8_t byte);
     void readInputBytes(void);
     bool send(uint8_t *buffer, size_t size);
+    bool send_raw(uint8_t *buffer, size_t size);
 		void init();
 		void process();
 

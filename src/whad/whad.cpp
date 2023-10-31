@@ -161,7 +161,8 @@ Message* Whad::buildPhyPacketMessage(GenericPacket* packet) {
   msg->msg.phy.msg.packet.rssi = packet->getRssi();
   msg->msg.phy.msg.packet.frequency = 2400 + packet->getChannel();
   msg->msg.phy.msg.packet.has_timestamp = true;
-  msg->msg.phy.msg.packet.timestamp = packet->getTimestamp();
+  msg->msg.phy.msg.packet.timestamp.sec = packet->getTimestamp()/1000;
+  msg->msg.phy.msg.packet.timestamp.usec = (packet->getTimestamp()%1000)*1000;
   msg->msg.phy.msg.packet.packet.size = packet->getPacketSize();
   memcpy(msg->msg.phy.msg.packet.packet.bytes, packet->getPacketBuffer(), packet->getPacketSize());
   return msg;

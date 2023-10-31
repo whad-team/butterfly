@@ -1,5 +1,6 @@
 #include "serial.h"
 #include "bsp.h"
+#include <whad.h>
 
 uint8_t tmp_buf[64];
 
@@ -19,8 +20,9 @@ void SerialComm::cdcAcmHandler(app_usbd_class_inst_t const * p_inst, app_usbd_cd
         order to avoid an overflow :)
       */
       ret_code_t ret = app_usbd_cdc_acm_read_any(
-        &m_app_cdc_acm,&instance->rxBuffer[instance->rxState.index],
-        RX_BUFFER_SIZE - instance->rxState.index
+        &m_app_cdc_acm,
+        &instance->rxBuffer[instance->rxState.index],
+        RX_BUFFER_SIZE-instance->rxState.index
       );
 
 			UNUSED_VARIABLE(ret);
@@ -45,12 +47,17 @@ void SerialComm::cdcAcmHandler(app_usbd_class_inst_t const * p_inst, app_usbd_cd
       if (size == 0)
         break;
 
+      /* Forward read data to WHAD library. */
+      whad_transport_data_received(&instance->rxBuffer[instance->rxState.index], size);
+
+      #if 0
       /* Increment current index based on number of bytes received. */
       instance->rxState.index += size;
       if (instance->rxState.index > 0) {
         /* Process input bytes if we read something. */
         instance->readInputBytes();
       }
+      #endif
 
       /* Start another read operation. */
       ret = app_usbd_cdc_acm_read_any(
@@ -287,9 +294,17 @@ bool SerialComm::send(uint8_t *buffer, size_t size) {
 	return ret == NRF_SUCCESS;
 }
 
+bool SerialComm::send_raw(uint8_t *buffer, size_t size) {
+  ret_code_t ret = app_usbd_cdc_acm_write(&m_app_cdc_acm,buffer,size);
+	return ret == NRF_SUCCESS;
+}
+
 void SerialComm::process() {
-	while (app_usbd_event_queue_process());
-  /*if (this->txState.waiting && this->txState.done) {
+    
+	//while (app_usbd_event_queue_process());
+    app_usbd_event_queue_process();
+  /*
+  if (this->txState.waiting && this->txState.done) {
 		this->txState.done = false;
 
     this->txState.waiting = false;

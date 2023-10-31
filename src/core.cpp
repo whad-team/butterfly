@@ -1,8 +1,9 @@
 #include "core.h"
+#include <whad.h>
 
 // Global instance of Core
 Core* Core::instance = NULL;
-
+static Message msg;
 
 void Core::handleInputData(uint8_t *buffer, size_t size) {
 	// Commands are received from Host
@@ -901,6 +902,17 @@ void Core::configurePowerAmplifier(bool enabled) {
 }
 
 #endif
+
+void core_send_bytes(uint8_t *p_bytes, int size)
+{
+    if (Core::instance != NULL)
+    {
+        Core::instance->getLedModule()->off(LED2);
+        Core::instance->getSerialModule()->send_raw(p_bytes, size);
+    }
+    whad_transport_data_sent();
+}
+
 Core::Core() {
 	instance = this;
 	this->ledModule = new LedModule();
@@ -908,6 +920,12 @@ Core::Core() {
 	this->sequenceModule = new SequenceModule();
 	this->serialModule = new SerialComm((CoreCallback)&Core::handleInputData,this);
 	this->radio = new Radio();
+
+    /* Initialize WHAD library. */
+    memset(&this->transportConfig, 0, sizeof(whad_transport_cfg_t));
+    this->transportConfig.max_txbuf_size = 1024;
+    this->transportConfig.pfn_data_send_buffer = core_send_bytes;
+    whad_init(&this->transportConfig);
 
 	#ifdef PA_ENABLED
 	this->configurePowerAmplifier(true);
@@ -971,9 +989,8 @@ void Core::init() {
 
 	this->currentController = NULL;
 	this->radio->setController(this->currentController);
-  Message* response = Whad::buildDiscoveryReadyResponseMessage();
-  this->pushMessageToQueue(response);
-
+    Message* response = Whad::buildDiscoveryReadyResponseMessage();
+    this->pushMessageToQueue(response);
 }
 
 bool Core::selectController(Protocol controller) {
@@ -1039,6 +1056,8 @@ void Core::sendDebug(uint8_t *buffer, uint8_t size) {
 
 
 void Core::pushMessageToQueue(Message *msg) {
+    whad_send_message(msg);
+    #if 0
 	MessageQueueElement *element = (MessageQueueElement*)malloc(sizeof(MessageQueueElement));
 	element->message = msg;
 	element->nextElement = NULL;
@@ -1052,6 +1071,7 @@ void Core::pushMessageToQueue(Message *msg) {
 		this->messageQueue.lastElement = element;
 	}
 	this->messageQueue.size = this->messageQueue.size + 1;
+    #endif
 }
 
 Message* Core::popMessageFromQueue() {
@@ -1087,8 +1107,35 @@ void Core::sendVerbose(const char* data) {
 }
 
 void Core::loop() {
+
+    this->getLedModule()->off(LED1);
+    this->getLedModule()->off(LED2);
+    #if 1
+	while (true) {
+
+		this->serialModule->process();
+        this->getLedModule()->on(LED1);
+
+        /* Check if we receveived a WHAD message. */
+        if (whad_get_message(&msg) == WHAD_SUCCESS)
+        {
+            this->getLedModule()->off(LED1);
+            this->getLedModule()->on(LED2);
+            this->processInputMessage(msg);
+        }
+
+        whad_transport_send_pending();
+
+        // Even if we miss an event enabling USB, USB event would wake us up.
+        __WFE();
+        // Clear SEV flag if CPU was woken up by event
+        __SEV();
+	}
+
+  #else
   Message *msg = this->popMessageFromQueue();
 	while (true) {
+        this->getLedModule()->toggle(RED);
 		this->serialModule->process();
 
     if (msg != NULL) {
@@ -1105,6 +1152,7 @@ void Core::loop() {
     __SEV();
 
 	}
+  #endif
 }
 /*
 void Core::loop() {

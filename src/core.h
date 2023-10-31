@@ -2,10 +2,8 @@
 #define CORE_H
 
 #include <stdlib.h>
-
-#include "whad/nanopb/pb.h"
-#include "whad/protocol/whad.pb.h"
 #include "whad/whad.h"
+#include <whad.h>
 
 #include "version.h"
 #include "led.h"
@@ -26,8 +24,12 @@
 
 class SerialComm;
 
+
+extern "C" void core_send_bytes(uint8_t *p_bytes, int size);
+
 class Core {
 	private:
+        whad_transport_cfg_t transportConfig;
 		LedModule *ledModule;
 		SerialComm *serialModule;
 		TimerModule *timerModule;
