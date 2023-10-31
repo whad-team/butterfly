@@ -1,0 +1,3 @@
+[submodule "whad-lib"]
+	path = whad-lib
+	url = git@github.com:whad-team/whad-lib.git
