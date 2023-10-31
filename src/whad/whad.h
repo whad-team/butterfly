@@ -3,8 +3,6 @@
 
 #include <stdlib.h>
 #include "nrf.h"
-#include "whad/nanopb/pb_encode.h"
-#include "whad/nanopb/pb_decode.h"
 #include "whad/callbacks/callbacks.h"
 #include "version.h"
 #include "capabilities.h"

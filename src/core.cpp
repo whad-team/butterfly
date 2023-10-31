@@ -909,8 +909,12 @@ void core_send_bytes(uint8_t *p_bytes, int size)
     {
         Core::instance->getLedModule()->off(LED2);
         Core::instance->getSerialModule()->send_raw(p_bytes, size);
+        whad_transport_data_sent();
     }
-    whad_transport_data_sent();
+    else
+    {
+        whad_transport_data_sent();
+    }
 }
 
 Core::Core() {
@@ -1056,7 +1060,11 @@ void Core::sendDebug(uint8_t *buffer, uint8_t size) {
 
 
 void Core::pushMessageToQueue(Message *msg) {
-    whad_send_message(msg);
+    if (whad_send_message(msg) ==WHAD_ERROR)
+    {
+        this->getLedModule()->on(LED1);
+    }
+    free(msg);
     #if 0
 	MessageQueueElement *element = (MessageQueueElement*)malloc(sizeof(MessageQueueElement));
 	element->message = msg;

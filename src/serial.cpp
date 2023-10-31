@@ -12,65 +12,72 @@ void SerialComm::cdcAcmHandler(app_usbd_class_inst_t const * p_inst, app_usbd_cd
 	{
 		case APP_USBD_CDC_ACM_USER_EVT_PORT_OPEN:
 		{
-      /*
-        Start a read operation, if it succeeds then we will catch data in the
-        APP_USBD_CDC_ACM_USER_EVT_RX_DONE event.
+            /*
+                Start a read operation, if it succeeds then we will catch data in the
+                APP_USBD_CDC_ACM_USER_EVT_RX_DONE event.
 
-        We read at most (RX_BUFFER_SIZE - instance->rxState.index) bytes in
-        order to avoid an overflow :)
-      */
-      ret_code_t ret = app_usbd_cdc_acm_read_any(
-        &m_app_cdc_acm,
-        &instance->rxBuffer[instance->rxState.index],
-        RX_BUFFER_SIZE-instance->rxState.index
-      );
+                We read at most (RX_BUFFER_SIZE - instance->rxState.index) bytes in
+                order to avoid an overflow :)
+            */
+            ret_code_t ret = app_usbd_cdc_acm_read_any(
+                &m_app_cdc_acm,
+                instance->rxBuffer,
+                RX_BUFFER_SIZE
+            );
 
 			UNUSED_VARIABLE(ret);
 		}
-  	break;
+  	    break;
 
 		case APP_USBD_CDC_ACM_USER_EVT_PORT_CLOSE:
 			NVIC_SystemReset();
 			break;
 
 		case APP_USBD_CDC_ACM_USER_EVT_TX_DONE:
+            #if 0
+            ret_code_t ret;
 			//SerialComm::instance->txState.done = true;
+            
+            Core::instance->getLedModule()->off(LED2);
+            SerialComm::instance->txInProgress = false;
+            whad_transport_data_sent();
+
+            /* Fetch up to RX_BUFFER_SIZE bytes from the internal buffer */
+            ret = app_usbd_cdc_acm_read_any(
+                &m_app_cdc_acm,
+                instance->rxBuffer,
+                RX_BUFFER_SIZE
+            );
+            #endif
 			break;
 
 		case APP_USBD_CDC_ACM_USER_EVT_RX_DONE:
 		{
-      int size;
+            int size;
 			ret_code_t ret;
 
-      /* Exit if read operation did not read anything. */
-      size = app_usbd_cdc_acm_rx_size(&m_app_cdc_acm);
-      if (size == 0)
+            /* Exit if read operation did not read anything. */
+            size = app_usbd_cdc_acm_rx_size(&m_app_cdc_acm);
+            if (size > 0)
+            {
+                /* Forward read data to WHAD library. */
+                whad_transport_data_received(instance->rxBuffer, size);
+            }
+
+            ret = app_usbd_cdc_acm_read_any(
+                &m_app_cdc_acm,
+                instance->rxBuffer,
+                RX_BUFFER_SIZE
+            );
+
+            UNUSED_VARIABLE(ret);
+        }
         break;
 
-      /* Forward read data to WHAD library. */
-      whad_transport_data_received(&instance->rxBuffer[instance->rxState.index], size);
 
-      #if 0
-      /* Increment current index based on number of bytes received. */
-      instance->rxState.index += size;
-      if (instance->rxState.index > 0) {
-        /* Process input bytes if we read something. */
-        instance->readInputBytes();
-      }
-      #endif
-
-      /* Start another read operation. */
-      ret = app_usbd_cdc_acm_read_any(
-        &m_app_cdc_acm,&instance->rxBuffer[instance->rxState.index],
-        RX_BUFFER_SIZE - instance->rxState.index
-      );
-			UNUSED_VARIABLE(ret);
-
-			break;
-		}
-		default:
-			break;
-	}
+        default:
+            break;
+    }
 }
 
 void  SerialComm::usbdHandler(app_usbd_event_type_t event)
@@ -116,6 +123,7 @@ SerialComm::SerialComm(CoreCallback inputCallback,Core *coreInstance) {
   this->txState.waiting = false;
 	this->txState.done = true;
   this->currentByte = 0x00;
+  this->txInProgress = false;
 	this->init();
 }
 
@@ -295,14 +303,38 @@ bool SerialComm::send(uint8_t *buffer, size_t size) {
 }
 
 bool SerialComm::send_raw(uint8_t *buffer, size_t size) {
-  ret_code_t ret = app_usbd_cdc_acm_write(&m_app_cdc_acm,buffer,size);
-	return ret == NRF_SUCCESS;
+    ret_code_t ret;
+
+    ret = app_usbd_cdc_acm_write(&m_app_cdc_acm, buffer, size);
+    if (ret == NRF_SUCCESS)
+    {
+        Core::instance->getLedModule()->on(LED2);
+        return true;
+    }
+    else
+    {
+        return false;
+    }
 }
 
 void SerialComm::process() {
-    
-	//while (app_usbd_event_queue_process());
-    app_usbd_event_queue_process();
+    int ret;
+
+    /* Read awaiting data. */
+    #if 0
+    if (!this->txInProgress)
+    {
+        ret = app_usbd_cdc_acm_read_any(
+            &m_app_cdc_acm,
+            instance->rxBuffer,
+            RX_BUFFER_SIZE
+        );
+    }
+    #endif
+
+    /*  Process events. */
+	while (app_usbd_event_queue_process());
+    //app_usbd_event_queue_process();
   /*
   if (this->txState.waiting && this->txState.done) {
 		this->txState.done = false;

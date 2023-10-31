@@ -179,7 +179,8 @@ SRC_FILES += \
 	$(PROJ_DIR)/sequences/sequenceModule.cpp \
 	$(PROJ_DIR)/radio.cpp \
 	$(PROJ_DIR)/controller.cpp \
-	$(PROJ_DIR)/packet.cpp
+	$(PROJ_DIR)/packet.cpp \
+	$(PROJ_DIR)/whad/callbacks/callbacks.cpp
 
 #$(PROJ_DIR)/whad/protocol/device.pb.c \
 #$(PROJ_DIR)/whad/protocol/generic.pb.c \

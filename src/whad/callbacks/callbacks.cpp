@@ -9,7 +9,7 @@
  * @return true if everything went ok.
  * @return false if an error is encountered during encoding.
  */
-bool whad_verbose_msg_encode_cb(pb_ostream_t *ostream, const pb_field_t *field, void * const *arg)
+bool whad_verbose_msg_encode_cb_(pb_ostream_t *ostream, const pb_field_t *field, void * const *arg)
 {
     /* Take arg and encode it. */
     char *psz_message = *(char **)arg;
@@ -28,7 +28,7 @@ bool whad_verbose_msg_encode_cb(pb_ostream_t *ostream, const pb_field_t *field, 
     return true;
 }
 
-bool whad_disc_enum_capabilities_cb(pb_ostream_t *ostream, const pb_field_t *field, void * const *arg)
+bool whad_disc_enum_capabilities_cb_(pb_ostream_t *ostream, const pb_field_t *field, void * const *arg)
 {
     DeviceCapability *capabilities = *(DeviceCapability **)arg;
     if (ostream != NULL && field->tag == discovery_DeviceInfoResp_capabilities_tag)
@@ -50,7 +50,7 @@ bool whad_disc_enum_capabilities_cb(pb_ostream_t *ostream, const pb_field_t *fie
 }
 
 
-bool whad_phy_frequency_range_encode_cb(pb_ostream_t *ostream, const pb_field_t *field, void * const *arg)
+bool whad_phy_frequency_range_encode_cb_(pb_ostream_t *ostream, const pb_field_t *field, void * const *arg)
 {
   phy_SupportedFrequencyRanges_FrequencyRange *frequency_range = *(phy_SupportedFrequencyRanges_FrequencyRange **)arg;
   if (ostream != NULL && field->tag == phy_SupportedFrequencyRanges_frequency_ranges_tag)

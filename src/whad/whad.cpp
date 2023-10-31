@@ -55,7 +55,7 @@ Message* Whad::buildVerboseMessage(const char* data) {
   /* Fills verbose message data. */
   msg->msg.generic.which_msg = generic_Message_verbose_tag;
   msg->msg.generic.msg.verbose.data.arg = ndata;
-  msg->msg.generic.msg.verbose.data.funcs.encode = whad_verbose_msg_encode_cb;
+  msg->msg.generic.msg.verbose.data.funcs.encode = whad_verbose_msg_encode_cb_;
   return msg;
 }
 
@@ -108,7 +108,7 @@ Message* Whad::buildDiscoveryDeviceInfoMessage() {
   msg->msg.discovery.msg.info_resp.fw_version_rev = VERSION_REVISION;
   msg->msg.discovery.msg.info_resp.type = discovery_DeviceType_Butterfly;
   msg->msg.discovery.msg.info_resp.capabilities.arg = (DeviceCapability*)CAPABILITIES;
-  msg->msg.discovery.msg.info_resp.capabilities.funcs.encode = whad_disc_enum_capabilities_cb;
+  msg->msg.discovery.msg.info_resp.capabilities.funcs.encode = whad_disc_enum_capabilities_cb_;
   return msg;
 }
 
@@ -149,7 +149,7 @@ Message* Whad::buildPhySupportedFrequencyRangeMessage() {
   /* Fills verbose message data. */
   msg->msg.phy.which_msg = phy_Message_supported_freq_tag;
   msg->msg.phy.msg.supported_freq.frequency_ranges.arg = (phy_SupportedFrequencyRanges_FrequencyRange*)SUPPORTED_FREQUENCY_RANGES;
-  msg->msg.phy.msg.supported_freq.frequency_ranges.funcs.encode = whad_phy_frequency_range_encode_cb;
+  msg->msg.phy.msg.supported_freq.frequency_ranges.funcs.encode = whad_phy_frequency_range_encode_cb_;
   return msg;
 }
 

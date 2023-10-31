@@ -56,6 +56,7 @@ public:
     txUartState txState;
     uint8_t rxBuffer[RX_BUFFER_SIZE];
     uint8_t txBuffer[TX_BUFFER_SIZE];
+    bool txInProgress;
 
     uint8_t currentByte;
 		static SerialComm *instance;
