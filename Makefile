@@ -108,6 +108,7 @@ endif
 
 
 PROJ_DIR := src
+WHAD_DIR := whad-lib
 #CONF_DIR := config
 $(OUTPUT_DIRECTORY)/nrf52840_xxaa.out: \
   LINKER_SCRIPT  := $(LINKER_FILE)
@@ -178,19 +179,21 @@ SRC_FILES += \
 	$(PROJ_DIR)/sequences/sequenceModule.cpp \
 	$(PROJ_DIR)/radio.cpp \
 	$(PROJ_DIR)/controller.cpp \
-	$(PROJ_DIR)/packet.cpp \
-	$(PROJ_DIR)/whad/callbacks/callbacks.cpp \
-	$(PROJ_DIR)/whad/protocol/device.pb.c \
-	$(PROJ_DIR)/whad/protocol/generic.pb.c \
-	$(PROJ_DIR)/whad/protocol/whad.pb.c \
-	$(PROJ_DIR)/whad/protocol/ble/ble.pb.c \
-	$(PROJ_DIR)/whad/protocol/zigbee/zigbee.pb.c \
-	$(PROJ_DIR)/whad/protocol/esb/esb.pb.c \
-	$(PROJ_DIR)/whad/protocol/unifying/unifying.pb.c \
-	$(PROJ_DIR)/whad/protocol/phy/phy.pb.c \
-	$(PROJ_DIR)/whad/nanopb/pb_common.c \
-	$(PROJ_DIR)/whad/nanopb/pb_decode.c \
-	$(PROJ_DIR)/whad/nanopb/pb_encode.c \
+	$(PROJ_DIR)/packet.cpp
+
+#$(PROJ_DIR)/whad/protocol/device.pb.c \
+#$(PROJ_DIR)/whad/protocol/generic.pb.c \
+#$(PROJ_DIR)/whad/protocol/whad.pb.c \
+#$(PROJ_DIR)/whad/protocol/ble/ble.pb.c \
+#$(PROJ_DIR)/whad/protocol/zigbee/zigbee.pb.c \
+#$(PROJ_DIR)/whad/protocol/esb/esb.pb.c \
+#$(PROJ_DIR)/whad/protocol/unifying/unifying.pb.c \
+#$(PROJ_DIR)/whad/protocol/phy/phy.pb.c \
+#$(PROJ_DIR)/whad/nanopb/pb_common.c \
+#$(PROJ_DIR)/whad/nanopb/pb_decode.c \
+#$(PROJ_DIR)/whad/nanopb/pb_encode.c
+
+SRC_FILES += \
 	$(PROJ_DIR)/whad/whad.cpp \
 	$(PROJ_DIR)/controllers/dot15d4controller.cpp \
 	$(PROJ_DIR)/controllers/blecontroller.cpp \
@@ -200,6 +203,25 @@ SRC_FILES += \
 	$(PROJ_DIR)/controllers/genericcontroller.cpp \
 	$(PROJ_DIR)/core.cpp \
 	$(PROJ_DIR)/main.cpp \
+
+# WHAD Library
+SRC_FILES += \
+	$(WHAD_DIR)/nanopb/pb_common.c \
+	$(WHAD_DIR)/nanopb/pb_decode.c \
+	$(WHAD_DIR)/nanopb/pb_encode.c \
+	$(WHAD_DIR)/nanopb/pb_encode.c \
+	$(WHAD_DIR)/protocol/device.pb.c \
+	$(WHAD_DIR)/protocol/generic.pb.c \
+	$(WHAD_DIR)/protocol/whad.pb.c \
+	$(WHAD_DIR)/protocol/ble/ble.pb.c \
+	$(WHAD_DIR)/protocol/zigbee/zigbee.pb.c \
+	$(WHAD_DIR)/protocol/esb/esb.pb.c \
+	$(WHAD_DIR)/protocol/unifying/unifying.pb.c \
+	$(WHAD_DIR)/protocol/phy/phy.pb.c \
+	$(WHAD_DIR)/src/protocol.c \
+	$(WHAD_DIR)/src/ringbuf.c \
+	$(WHAD_DIR)/src/transport.c \
+	$(WHAD_DIR)/src/whad.c
 
 # Include folders common to all targets
 INC_FOLDERS += \
@@ -217,13 +239,7 @@ INC_FOLDERS += \
 	$(SDK_ROOT)/components/libraries/util \
 	$(SDK_ROOT)/components/libraries/bsp \
 	$(PROJ_DIR) \
-	$(PROJ_DIR)/whad \
 	$(PROJ_DIR)/whad/callbacks \
-	$(PROJ_DIR)/whad/nanopb \
-	$(PROJ_DIR)/whad/protocol/ble \
-	$(PROJ_DIR)/whad/protocol/zigbee \
-	$(PROJ_DIR)/whad/protocol \
-	$(PROJ_DIR)/whad/nanopb \
 	$(CONF_DIR) \
 	$(SDK_ROOT)/components/libraries/usbd/class/cdc \
 	$(SDK_ROOT)/components/libraries/balloc \
@@ -254,6 +270,18 @@ INC_FOLDERS += \
 	$(SDK_ROOT)/modules/nrfx/hal \
 	$(SDK_ROOT)/external/fprintf \
 	$(SDK_ROOT)/components/libraries/log/src \
+
+# WHAD Lib
+INC_FOLDERS += \
+	$(WHAD_DIR)/ \
+	$(WHAD_DIR)/inc \
+	$(WHAD_DIR)/nanopb \
+	$(WHAD_DIR)/protocol \
+	$(WHAD_DIR)/protocol/ble \
+	$(WHAD_DIR)/protocol/zigbee \
+	$(WHAD_DIR)/protocol/esb \
+	$(WHAD_DIR)/protocol/phy \
+
 
 # Libraries common to all targets
 LIB_FILES += -lstdc++\
