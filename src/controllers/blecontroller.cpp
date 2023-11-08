@@ -279,8 +279,9 @@ void BLEController::updateChannelsInUse(uint8_t* channelMap) {
 			}
 		}
 	}
-	if (this->remappingTable != NULL) free(this->remappingTable);
-	this->remappingTable = (int*)malloc(sizeof(int)* this->numUsedChannels);
+	//if (this->remappingTableAllocated) free(this->remappingTable);
+	//this->remappingTable = (int*)malloc(sizeof(int)* this->numUsedChannels);
+	/*this->remappingTableAllocated = true;*/
 	int j=0;
 	for (int i=0;i<37;i++) {;
 		if (this->channelsInUse[i]) {
@@ -600,7 +601,8 @@ bool BLEController::goToNextChannel() {
 void BLEController::start() {
 	if (this->controllerState == CONNECTION_INITIATION) return;
 
-	this->remappingTable = NULL;
+	//this->remappingTableAllocated = false;
+	//this->remappingTable = NULL;
 	this->lastAdvertisingChannel = 37;
 	this->follow = true;
 
@@ -1252,7 +1254,7 @@ void BLEController::followConnection(uint16_t hopInterval, uint8_t hopIncrement,
 
 bool BLEController::checkSynchronization() {
 	if (this->sync) {
-		this->sendConnectionReport(CONNECTION_STARTED);
+		// this->sendConnectionReport(CONNECTION_STARTED);
 	}
 	else {
 		this->releaseTimers();
@@ -2304,7 +2306,7 @@ void BLEController::advertisementPacketProcessing(BLEPacket *pkt) {
 		else if (pkt->extractAdvertisementType() == CONNECT_REQ) {
 			if (pkt->extractAdvertisementType() == CONNECT_REQ /*&& this->follow*/) {
 				this->emptyTransmitIndicator = true;
-				
+
 				// Start following the connection
 				this->followConnection(
 					pkt->extractHopInterval(),

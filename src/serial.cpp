@@ -36,7 +36,7 @@ void SerialComm::cdcAcmHandler(app_usbd_class_inst_t const * p_inst, app_usbd_cd
 		case APP_USBD_CDC_ACM_USER_EVT_TX_DONE:
             ret_code_t ret;
 			//SerialComm::instance->txState.done = true;
-            Core::instance->getLedModule()->off(LED2);
+            //Core::instance->getLedModule()->off(LED2);
             SerialComm::instance->txInProgress = false;
             whad_transport_data_sent();
 
@@ -66,14 +66,14 @@ void SerialComm::cdcAcmHandler(app_usbd_class_inst_t const * p_inst, app_usbd_cd
             {
                 whad_transport_send_pending();
             }
-            
+
             if (!SerialComm::instance->txInProgress)
             {
                 ret = app_usbd_cdc_acm_read_any(
                     &m_app_cdc_acm,
                     instance->rxBuffer,
                     RX_BUFFER_SIZE
-                );                
+                );
             }
 
             UNUSED_VARIABLE(ret);
@@ -190,14 +190,14 @@ void SerialComm::readInputBytes(void)
           Disable IRQ processing while extracting the received message from
           memory, to avoid issues.
         */
-        __disable_irq();
+        //__disable_irq();
 
         /* Allocate and copy message payload. */
         p_pkt = (uint8_t *)malloc(message_size);
         memcpy(p_pkt, this->rxBuffer+4, message_size);
 
         /* Re-enable IRQ processing. */
-        __enable_irq();
+        //__enable_irq();
 
         /* Call our message processing callback. */
 				(this->coreInstance ->* this->inputCallback)(p_pkt, message_size);
@@ -316,7 +316,7 @@ bool SerialComm::send_raw(uint8_t *buffer, size_t size) {
         ret = app_usbd_cdc_acm_write(&m_app_cdc_acm, buffer, size);
     } while (ret != NRF_SUCCESS);
 
-    Core::instance->getLedModule()->on(LED2);
+    //Core::instance->getLedModule()->on(LED2);
     this->txInProgress = true;
     return true;
 }

@@ -1061,7 +1061,7 @@ void Core::sendDebug(uint8_t *buffer, uint8_t size) {
 void Core::pushMessageToQueue(Message *msg) {
     if (whad_send_message(msg) == WHAD_ERROR)
     {
-        this->getLedModule()->on(LED1);
+        //this->getLedModule()->on(LED1);
     }
     free(msg);
 
@@ -1116,18 +1116,18 @@ void Core::sendVerbose(const char* data) {
 
 void Core::loop() {
 
-    this->getLedModule()->off(LED1);
-    this->getLedModule()->off(LED2);
+    //this->getLedModule()->off(LED1);
+    //this->getLedModule()->off(LED2);
     #if 1
 	while (true) {
 
 		this->serialModule->process();
-        this->getLedModule()->on(LED1);
+        //this->getLedModule()->on(LED1);
 
         /* Check if we receveived a WHAD message. */
         if (whad_get_message(&msg) == WHAD_SUCCESS)
         {
-            this->getLedModule()->off(LED1);
+            //this->getLedModule()->off(LED1);
             //this->getLedModule()->on(LED2);
             this->processInputMessage(msg);
         }

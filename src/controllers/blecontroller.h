@@ -218,7 +218,9 @@ class BLEController : public Controller {
 		uint8_t hopIncrement;
 		uint16_t hopInterval;
 		bool channelsInUse[37];
-		int *remappingTable;
+		/*bool remappingTableAllocated;
+		int *remappingTable;*/
+		int remappingTable[37];
 		BLEConnectionUpdate connectionUpdate;
 		bool sync;
 		uint8_t desyncCounter;
