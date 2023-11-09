@@ -52,6 +52,7 @@ typedef enum BLEControllerState {
 	REACTIVE_JAMMING,
 
 	CONNECTION_INITIATION,
+	CONNECTION_INITIATION_SLAVE,
 	SCANNING,
 	ADVERTISING
 } BLEControllerState;
@@ -422,6 +423,7 @@ class BLEController : public Controller {
 
 		bool goToNextInitiationChannel();
 		void sendConnectedReport();
+		void sendSlaveConnectedReport();
 		void connect(uint8_t *address, bool random);
 		void connect(uint8_t *address, bool random,  uint32_t accessAddress,  uint32_t crcInit, uint8_t windowSize, uint16_t windowOffset, uint16_t hopInterval, uint16_t slaveLatency, uint16_t timeout, uint8_t sca, uint8_t hopIncrement, uint8_t *channelMap);
 		void disconnect();
@@ -432,6 +434,7 @@ class BLEController : public Controller {
 		// Packets processing methods
 		void connectionInitiationAdvertisementProcessing(BLEPacket *pkt);
 		void connectionInitiationConnectedProcessing(BLEPacket *pkt);
+		void connectionInitiationConnectedSlaveProcessing(BLEPacket *pkt);
 
 		void accessAddressProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi);
 		void crcInitRecoveryProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi);

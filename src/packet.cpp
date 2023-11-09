@@ -264,7 +264,7 @@ uint32_t BLEPacket::getRelativeTimestamp() {
 	return this->timestampRelative;
 }
 bool BLEPacket::extractAdvertiserAddress(uint8_t *address, bool *random) {
-	if (this->extractAdvertisementType() == ADV_IND || this->extractAdvertisementType() == ADV_DIRECT_IND || this->extractAdvertisementType() == SCAN_RSP) {
+	if (this->extractAdvertisementType() == ADV_IND || this->extractAdvertisementType() == ADV_DIRECT_IND || this->extractAdvertisementType() == SCAN_RSP || this->extractAdvertisementType() == CONNECT_REQ) {
 		address[0] = this->packetPointer[11];
 		address[1] = this->packetPointer[10];
 		address[2] = this->packetPointer[9];

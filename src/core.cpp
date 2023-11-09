@@ -401,6 +401,8 @@ void Core::processBLEInputMessage(ble_Message msg) {
         response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
       }
       else {
+        this->bleController->setEmptyTransmitIndicator(true);
+        this->bleController->setFollowMode(true);
         this->bleController->advertise(msg.msg.periph_mode.scan_data.bytes, msg.msg.periph_mode.scan_data.size, msg.msg.periph_mode.scanrsp_data.bytes, msg.msg.periph_mode.scanrsp_data.size, true, 100);
         this->bleController->start();
         response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
@@ -907,8 +909,8 @@ void core_send_bytes(uint8_t *p_bytes, int size)
 {
     if (Core::instance != NULL)
     {
-        Core::instance->getLedModule()->off(LED2);
-        Core::instance->getSerialModule()->send_raw(p_bytes, size);
+        //Core::instance->getLedModule()->off(LED2);
+        Core::instance->getSerialModule()->send(p_bytes, size);
     }
     else
     {
@@ -997,7 +999,7 @@ void Core::init() {
 }
 
 bool Core::selectController(Protocol controller) {
-  this->getLedModule()->on(LED2);
+  //this->getLedModule()->on(LED2);
 	if (controller == BLE_PROTOCOL) {
     this->getLedModule()->setColor(BLUE);
 		this->radio->disable();
@@ -1041,7 +1043,7 @@ bool Core::selectController(Protocol controller) {
 		return true;
 	}
 	else {
-    this->getLedModule()->off(LED2);
+    //this->getLedModule()->off(LED2);
 		this->radio->disable();
 		this->currentController = NULL;
 		this->radio->setController(NULL);
@@ -1059,13 +1061,6 @@ void Core::sendDebug(uint8_t *buffer, uint8_t size) {
 
 
 void Core::pushMessageToQueue(Message *msg) {
-    if (whad_send_message(msg) == WHAD_ERROR)
-    {
-        //this->getLedModule()->on(LED1);
-    }
-    free(msg);
-
-    #if 0
 	MessageQueueElement *element = (MessageQueueElement*)malloc(sizeof(MessageQueueElement));
 	element->message = msg;
 	element->nextElement = NULL;
@@ -1079,7 +1074,6 @@ void Core::pushMessageToQueue(Message *msg) {
 		this->messageQueue.lastElement = element;
 	}
 	this->messageQueue.size = this->messageQueue.size + 1;
-    #endif
 }
 
 Message* Core::popMessageFromQueue() {
@@ -1119,6 +1113,8 @@ void Core::loop() {
     //this->getLedModule()->off(LED1);
     //this->getLedModule()->off(LED2);
     #if 1
+    Message *message = this->popMessageFromQueue();
+
 	while (true) {
 
 		this->serialModule->process();
@@ -1131,6 +1127,21 @@ void Core::loop() {
             //this->getLedModule()->on(LED2);
             this->processInputMessage(msg);
         }
+        if (message != NULL) {
+          if (whad_send_message(message) == WHAD_ERROR)
+          {
+              //this->getLedModule()->on(LED1);
+          }
+          free(message);
+          message = this->popMessageFromQueue();
+        }
+        else {
+          message = this->popMessageFromQueue();
+        }
+      }
+      #endif
+        #if 0
+
 
         // Even if we miss an event enabling USB, USB event would wake us up.
         __WFE();

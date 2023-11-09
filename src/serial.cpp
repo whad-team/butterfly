@@ -46,6 +46,8 @@ void SerialComm::cdcAcmHandler(app_usbd_class_inst_t const * p_inst, app_usbd_cd
                 instance->rxBuffer,
                 RX_BUFFER_SIZE
             );
+			UNUSED_VARIABLE(ret);
+
 			break;
 
 		case APP_USBD_CDC_ACM_USER_EVT_RX_DONE:
@@ -133,133 +135,6 @@ SerialComm::SerialComm(CoreCallback inputCallback,Core *coreInstance) {
 	this->init();
 }
 
-/**
- * @brief Old input byte processing method.
- *
- * @param byte Input byte
- */
-
-void SerialComm::readInputByte(uint8_t byte) {
-  uint8_t *p_pkt;
-  if (this->rxState.decoding) {
-    this->rxBuffer[this->rxState.index++] = byte;
-    if (this->rxState.index > 3) {
-      uint16_t message_size = (this->rxBuffer[2] | (this->rxBuffer[3] << 8));
-      if (this->rxState.index >= message_size+4) {
-        p_pkt = (uint8_t *)malloc(message_size);
-        memcpy(p_pkt, this->rxBuffer+4, message_size);
-				(this->coreInstance ->* this->inputCallback)(p_pkt, message_size);
-        free(p_pkt);
-        this->rxState.decoding = false;
-        this->rxState.index = 0;
-      }
-    }
-  }
-  else {
-    if (this->rxState.last_received_byte == PREAMBLE_WHAD_1 && byte == PREAMBLE_WHAD_2) {
-      this->rxState.decoding = true;
-      this->rxBuffer[0] = PREAMBLE_WHAD_1;
-      this->rxBuffer[1] = PREAMBLE_WHAD_2;
-      this->rxState.index = 2;
-    }
-  }
-  this->rxState.last_received_byte = byte;
-}
-
-/**
- * @brief Process input bytes from RX buffer.
- */
-
-void SerialComm::readInputBytes(void)
-{
-  int i, start = -1;
-  uint8_t *p_pkt;
-
-  if (this->rxState.decoding)
-  {
-    /*
-      If we already received our 2-byte magic value, then process the remaining
-      data if we have at least 4 bytes (2-byte magic + 2-byte length field)
-    */
-
-    if (this->rxState.index > 3) {
-      uint16_t message_size = (this->rxBuffer[2] | (this->rxBuffer[3] << 8));
-      if (this->rxState.index >= message_size+4) {
-
-        /*
-          Disable IRQ processing while extracting the received message from
-          memory, to avoid issues.
-        */
-        //__disable_irq();
-
-        /* Allocate and copy message payload. */
-        p_pkt = (uint8_t *)malloc(message_size);
-        memcpy(p_pkt, this->rxBuffer+4, message_size);
-
-        /* Re-enable IRQ processing. */
-        //__enable_irq();
-
-        /* Call our message processing callback. */
-				(this->coreInstance ->* this->inputCallback)(p_pkt, message_size);
-
-        /* Free previously allocated message. */
-        free(p_pkt);
-
-        /* Reset fields to decode a new message. */
-        this->rxState.decoding = false;
-        this->rxState.index = 0;
-      }
-    }
-  }
-  else
-  {
-    /* If we received at least two bytes, we search for our magic value. */
-    if (this->rxState.index >= 2)
-    {
-      /* Do we have a magic already in buffer ? */
-      for (i=0; i<(this->rxState.index - 1); i++)
-      {
-        if ((this->rxBuffer[i] == PREAMBLE_WHAD_1) && (this->rxBuffer[i+1] == PREAMBLE_WHAD_2) )
-        {
-          start = i;
-          break;
-        }
-      }
-
-      /* Magic value found ? */
-      if (start >= 0)
-      {
-        /* We found a header, let's put it at the start of our RX buffer if required. */
-        if (start > 0)
-        {
-          for (i=start; i<this->rxState.index; i++)
-          {
-            this->rxBuffer[i-start] = this->rxBuffer[i];
-          }
-          this->rxState.index -= start;
-        }
-
-        /* Start decoding. */
-        this->rxState.decoding = true;
-      }
-      else
-      {
-        /* No magic, keep only the last byte if it matches PREAMBLE_WHAD_1. */
-        if (this->rxBuffer[this->rxState.index-1] == PREAMBLE_WHAD_1)
-        {
-          this->rxBuffer[0] = PREAMBLE_WHAD_1;
-          this->rxState.index = 1;
-        }
-        else
-        {
-          /* Or simply ditch everything. */
-          this->rxState.index = 0;
-        }
-      }
-    }
-  }
-}
-
 void SerialComm::init() {
 
 	ret_code_t ret;
@@ -297,18 +172,6 @@ void SerialComm::init() {
 }
 
 bool SerialComm::send(uint8_t *buffer, size_t size) {
-	uint16_t message_size = size;
-	this->txBuffer[0] = PREAMBLE_WHAD_1;
-	this->txBuffer[1] = PREAMBLE_WHAD_2;
-	this->txBuffer[2] = (uint8_t)(message_size & 0x00FF);
-	this->txBuffer[3] = (uint8_t)((message_size & 0xFF00) >> 8);
-  memcpy(this->txBuffer+4,buffer, size);
-  this->txState.size = size+4;
-  ret_code_t ret = app_usbd_cdc_acm_write(&m_app_cdc_acm,&this->txBuffer,this->txState.size);
-	return ret == NRF_SUCCESS;
-}
-
-bool SerialComm::send_raw(uint8_t *buffer, size_t size) {
     ret_code_t ret;
 
     do
@@ -316,15 +179,14 @@ bool SerialComm::send_raw(uint8_t *buffer, size_t size) {
         ret = app_usbd_cdc_acm_write(&m_app_cdc_acm, buffer, size);
     } while (ret != NRF_SUCCESS);
 
-    //Core::instance->getLedModule()->on(LED2);
     this->txInProgress = true;
     return true;
 }
 
 void SerialComm::process() {
-    int ret;
+    ret_code_t ret;
+
     /* Read awaiting data. */
-		/*
     if (!this->txInProgress)
     {
         ret = app_usbd_cdc_acm_read_any(
@@ -332,19 +194,11 @@ void SerialComm::process() {
             instance->rxBuffer,
             RX_BUFFER_SIZE
         );
-    }*/
+    }
 
     whad_transport_send_pending();
 
     /*  Process events. */
     app_usbd_event_queue_process();
-	//while (app_usbd_event_queue_process());
-    //app_usbd_event_queue_process();
-  /*
-  if (this->txState.waiting && this->txState.done) {
-		this->txState.done = false;
-
-    this->txState.waiting = false;
-  }*/
-
+		UNUSED_VARIABLE(ret);
 }
