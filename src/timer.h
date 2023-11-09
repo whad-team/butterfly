@@ -3,7 +3,7 @@
 #include "controller.h"
 
 #define TIMER_PRESCALER 4
-#define NUMBER_OF_TIMERS_4 5
+#define NUMBER_OF_TIMERS_4 4
 #define NUMBER_OF_TIMERS_3 6
 
 typedef bool (Controller::*ControllerCallback) (void);

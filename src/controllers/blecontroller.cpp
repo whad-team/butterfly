@@ -24,6 +24,8 @@ BLEController::BLEController(Radio *radio) : Controller(radio) {
 	this->scanningTimer = NULL;
 	this->advertisingTimer = NULL;
 
+	this->remappingTable = NULL;
+
 	this->advertisementsTransmitIndicator = true;
 	this->softwareFilterEnabled = false;
 
@@ -279,9 +281,8 @@ void BLEController::updateChannelsInUse(uint8_t* channelMap) {
 			}
 		}
 	}
-	//if (this->remappingTableAllocated) free(this->remappingTable);
-	//this->remappingTable = (int*)malloc(sizeof(int)* this->numUsedChannels);
-	/*this->remappingTableAllocated = true;*/
+	if (this->remappingTable != NULL) free(this->remappingTable);
+	this->remappingTable = (int*)malloc(sizeof(int)* this->numUsedChannels);
 	int j=0;
 	for (int i=0;i<37;i++) {;
 		if (this->channelsInUse[i]) {
@@ -602,7 +603,7 @@ void BLEController::start() {
 	if (this->controllerState == CONNECTION_INITIATION) return;
 
 	//this->remappingTableAllocated = false;
-	//this->remappingTable = NULL;
+
 	this->lastAdvertisingChannel = 37;
 	this->follow = true;
 
@@ -1941,11 +1942,6 @@ bool BLEController::sendFirstConnectionPacket() {
 
 void BLEController::connectionInitiationAdvertisementProcessing(BLEPacket *pkt) {
 
-	// Update the packet direction
-	pkt->updateSource(DIRECTION_UNKNOWN);
-	// Transmit the packet to host
-	this->addPacket(pkt);
-
 	if (pkt->extractAdvertisementType() == ADV_IND) {
 		if (this->initTimer == NULL) {
 			this->initTimer = this->timerModule->getTimer();
@@ -1955,6 +1951,11 @@ void BLEController::connectionInitiationAdvertisementProcessing(BLEPacket *pkt) 
 			this->initTimer->start();
 		}
 	}
+
+	// Update the packet direction
+	pkt->updateSource(DIRECTION_UNKNOWN);
+	// Transmit the packet to host
+	this->addPacket(pkt);
 }
 
 void BLEController::connectionInitiationConnectedProcessing(BLEPacket *pkt) {
@@ -2304,7 +2305,7 @@ void BLEController::advertisementPacketProcessing(BLEPacket *pkt) {
 			free(scan_rsp);
 		}
 		else if (pkt->extractAdvertisementType() == CONNECT_REQ) {
-			if (pkt->extractAdvertisementType() == CONNECT_REQ /*&& this->follow*/) {
+			if (pkt->extractAdvertisementType() == CONNECT_REQ && this->follow) {
 				this->emptyTransmitIndicator = true;
 
 				// Start following the connection
@@ -2441,6 +2442,7 @@ void BLEController::hopIncrementRecoveryProcessing(uint32_t timestamp, uint8_t s
 }
 
 void BLEController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
+	int32_t relativeTimestamp = (this->accessAddress != 0x8e89bed6 ? (int32_t)(timestamp - this->lastAnchorPoint) : 0);
 	if (this->controllerState == SNIFFING_ACCESS_ADDRESS) {
 		this->accessAddressProcessing(timestamp, size , buffer, crcValue, rssi);
 	}
@@ -2457,7 +2459,7 @@ void BLEController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer,
 		this->hopIncrementRecoveryProcessing(timestamp, size, buffer ,crcValue, rssi);
 	}
 	else if (crcValue.validity == VALID_CRC) {
-		BLEPacket *pkt = new BLEPacket(this->accessAddress,buffer, size,timestamp, (this->accessAddress != 0x8e89bed6 ? (int32_t)(timestamp - this->lastAnchorPoint) : 0), 0, this->channel,rssi, crcValue);
+		BLEPacket *pkt = new BLEPacket(this->accessAddress,buffer, size,timestamp, relativeTimestamp, 0, this->channel,rssi, crcValue);
 		if (pkt->isAdvertisement()) {
 			// If the packet is an advertisement, call onAdvertisementPacket method
 			this->advertisementPacketProcessing(pkt);

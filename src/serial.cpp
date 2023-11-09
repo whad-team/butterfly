@@ -323,8 +323,8 @@ bool SerialComm::send_raw(uint8_t *buffer, size_t size) {
 
 void SerialComm::process() {
     int ret;
-
     /* Read awaiting data. */
+		/*
     if (!this->txInProgress)
     {
         ret = app_usbd_cdc_acm_read_any(
@@ -332,7 +332,7 @@ void SerialComm::process() {
             instance->rxBuffer,
             RX_BUFFER_SIZE
         );
-    }
+    }*/
 
     whad_transport_send_pending();
 
