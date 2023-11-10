@@ -26,6 +26,7 @@ BLEController::BLEController(Radio *radio) : Controller(radio) {
 
 	this->remappingTable = NULL;
 
+	this->controllerState = IDLE;
 	this->advertisementsTransmitIndicator = true;
 	this->softwareFilterEnabled = false;
 
@@ -602,7 +603,6 @@ bool BLEController::goToNextChannel() {
 void BLEController::start() {
 	if (this->controllerState == CONNECTION_INITIATION) return;
 
-	//this->remappingTableAllocated = false;
 
 	this->lastAdvertisingChannel = 37;
 	this->follow = true;
@@ -1150,6 +1150,8 @@ void BLEController::advertise(uint8_t *advertisingData, size_t advertisingDataSi
 	this->advertisingData.advertisingInterval = interval;
 	this->advertisingData.advertisingDelay = 0;
 	this->controllerState = ADVERTISING;
+
+
 }
 
 bool BLEController::newAdvertisingTransmission() {
@@ -1158,7 +1160,7 @@ bool BLEController::newAdvertisingTransmission() {
 	}
 	this->advertisingTimer->setMode(REPEATED);
 	this->advertisingTimer->setCallback((ControllerCallback)&BLEController::newAdvertisingTransmission, this);
-	this->advertisingTimer->update(this->channel != 39 ? 10000 : (this->advertisingData.advertisingInterval * 625) - 10000*2);
+	this->advertisingTimer->update(this->channel != 39 ? 5000 : (this->advertisingData.advertisingInterval * 625) - 5000*2);
 
 	if (!this->advertisingTimer->isStarted()) this->advertisingTimer->start();
 
@@ -1175,16 +1177,14 @@ bool BLEController::newAdvertisingTransmission() {
 		this->setChannel(37);
 	}
 
-	this->setFilter(true, this->own.bytes[5], this->own.bytes[4], this->own.bytes[3], this->own.bytes[2], this->own.bytes[1],  this->own.bytes[0]);
+	// Configure radio to monitor only advertisements from targeted device (hardware filter needed)
+	this->setFilter(false, this->own.bytes[5], this->own.bytes[4],this->own.bytes[3], this->own.bytes[2], this->own.bytes[1],this->own.bytes[0]);
 
-		// Reload Radio configuration (to take into account radio custom parameters)
-	this->radio->reload();
 	this->advertisingData.lastAdvertisingEvent = this->timerModule->getTimestamp();
 	uint8_t *adv_ind;
 	size_t adv_ind_size;
 	BLEPacket::forgeAdvInd(&adv_ind, &adv_ind_size, this->own.bytes, this->ownRandom, this->advertisingData.advertisingData, this->advertisingData.advertisingDataSize);
 	this->radio->send(adv_ind, adv_ind_size, BLEController::channelToFrequency(this->channel),this->channel);
-	nrf_delay_us(400);
 	bsp_board_led_invert(0);
 	free(adv_ind);
 	return true;
@@ -1736,11 +1736,11 @@ void BLEController::sendTriggeredReport(uint8_t id) {
 }
 
 void BLEController::sendConnectedReport() {
-	Message *msg = Whad::buildBLEConnectedMessage(this->own.bytes, this->ownRandom, this->connectionInitiationData.responder.bytes, this->connectionInitiationData.responderRandom, this->accessAddress);
+	Message *msg = Whad::buildBLEConnectedMessage(this->own.bytes, this->ownRandom, this->connectionInitiationData.responder.bytes, this->connectionInitiationData.responderRandom, this->accessAddress, 0);
 	Core::instance->pushMessageToQueue(msg);
 }
 void BLEController::sendSlaveConnectedReport() {
-	Message *msg = Whad::buildBLEConnectedMessage(this->connectionInitiationData.responder.bytes, this->connectionInitiationData.responderRandom, this->own.bytes, this->ownRandom, this->accessAddress);
+	Message *msg = Whad::buildBLEConnectedMessage(this->connectionInitiationData.responder.bytes, this->connectionInitiationData.responderRandom, this->own.bytes, this->ownRandom, this->accessAddress, 1);
 	Core::instance->pushMessageToQueue(msg);
 }
 
@@ -1977,15 +1977,19 @@ void BLEController::connectionInitiationConnectedSlaveProcessing(BLEPacket *pkt)
 	if (!this->sync) {
 		this->sync = true;
 
+		this->setAnchorPoint(pkt->getTimestamp());
+		pkt->setConnectionHandle(1);
 
 		bsp_board_led_on(0);
 		bsp_board_led_on(1);
 		this->slavePayload.transmitted = true;
 		this->slavePayload.responseReceived = false;
 
+		this->setEmptyTransmitIndicator(false);
+
 		this->controllerState = SIMULATING_SLAVE;
-		this->sendSlaveConnectedReport();
 		this->enterSlaveMode();
+		this->sendSlaveConnectedReport();
 	}
 }
 void BLEController::advertisementScanningProcessing(BLEPacket *pkt) {
@@ -2149,7 +2153,12 @@ void BLEController::connectionSynchronizationProcessing(BLEPacket *pkt) {
 		}
 		else if (relativeTimestamp >= 100 && relativeTimestamp < 600) {
 		// If we received the packet between anchorPoint + 100us and anchorPoint + 600 us, it's a slave packet
-			this->slavePacketProcessing(pkt);
+			if (this->controllerState != SIMULATING_SLAVE) {
+				this->slavePacketProcessing(pkt);
+			}
+			else {
+				this->masterPacketProcessing(pkt);
+			}
 		}
 	}
 }
@@ -2319,6 +2328,7 @@ void BLEController::advertisementPacketProcessing(BLEPacket *pkt) {
 	}
 
 	else if (this->controllerState == ADVERTISING) {
+
 		if (pkt->extractAdvertisementType() == SCAN_REQ) {
 			nrf_delay_us(60);
 			uint8_t *scan_rsp;
@@ -2331,7 +2341,7 @@ void BLEController::advertisementPacketProcessing(BLEPacket *pkt) {
 		}
 		else if (pkt->extractAdvertisementType() == CONNECT_REQ) {
 			if (this->follow) {
-				this->radio->disableFilter();
+				this->releaseTimers();
 				// Start following the connection
 				this->followConnection(
 					pkt->extractHopInterval(),
@@ -2346,11 +2356,12 @@ void BLEController::advertisementPacketProcessing(BLEPacket *pkt) {
 				this->radio->reload();
 				pkt->extractAdvertiserAddress(this->connectionInitiationData.responder.bytes, &this->connectionInitiationData.responderRandom);
 				this->controllerState = CONNECTION_INITIATION_SLAVE;
+
 			}
-			//this->enterSlaveMode();
 		}
 		pkt->updateSource(DIRECTION_UNKNOWN);
 		this->addPacket(pkt);
+
 	}
 
 	else if (this->controllerState == SNIFFING_ADVERTISEMENTS) {

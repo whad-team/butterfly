@@ -401,8 +401,7 @@ void Core::processBLEInputMessage(ble_Message msg) {
         response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
       }
       else {
-        this->bleController->setEmptyTransmitIndicator(true);
-        this->bleController->setFollowMode(true);
+        //this->bleController->setEmptyTransmitIndicator(true);
         this->bleController->advertise(msg.msg.periph_mode.scan_data.bytes, msg.msg.periph_mode.scan_data.size, msg.msg.periph_mode.scanrsp_data.bytes, msg.msg.periph_mode.scanrsp_data.size, true, 100);
         this->bleController->start();
         response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);

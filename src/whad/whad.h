@@ -39,7 +39,7 @@ class Whad {
     static Message* buildBLEHijackedMessage(bool success, uint32_t accessAddress);
     static Message* buildBLETriggeredMessage(uint8_t identifier);
     static Message* buildBLEAccessAddressDiscoveredMessage(uint32_t accessAddress, uint32_t timestamp, int32_t rssi);
-    static Message* buildBLEConnectedMessage(uint8_t *initiator, bool initiatorRandom, uint8_t *advertiser, bool advertiserRandom, uint32_t accessAddress);
+    static Message* buildBLEConnectedMessage(uint8_t *initiator, bool initiatorRandom, uint8_t *advertiser, bool advertiserRandom, uint32_t accessAddress, int connectionHandle);
     static Message* buildBLEDisconnectedMessage(uint32_t reason);
 
 };

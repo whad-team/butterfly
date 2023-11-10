@@ -29,6 +29,7 @@ typedef enum ConnectionStatus {
 } ConnectionStatus;
 
 typedef enum BLEControllerState {
+	IDLE, 
 	SNIFFING_ADVERTISEMENTS,
 	COLLECTING_ADVINTERVAL,
 	FOLLOWING_ADVERTISEMENTS,
