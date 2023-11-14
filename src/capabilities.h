@@ -3,12 +3,6 @@
 
 #define CMD(X) (1 << (X))
 
-typedef struct {
-    discovery_Domain domain;
-    discovery_Capability cap;
-    uint64_t supported_commands;
-} DeviceCapability;
-
 
 const DeviceCapability CAPABILITIES[] = {
   {

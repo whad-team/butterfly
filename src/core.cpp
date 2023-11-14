@@ -53,20 +53,46 @@ void Core::processDiscoveryInputMessage(discovery_Message msg) {
   Message *response = NULL;
 
   if (msg.which_msg == discovery_Message_reset_query_tag) {
-      // Disable controller
-      this->radio->disable();
-      this->currentController = NULL;
-      this->radio->setController(NULL);
-      // Send Ready Response
-      response = Whad::buildDiscoveryReadyResponseMessage();
-      this->pushMessageToQueue(response);
+    // Disable controller
+    this->radio->disable();
+    this->currentController = NULL;
+    this->radio->setController(NULL);
+
+    // Send Ready Response
+    whad::discovery::ReadyRespMessage readyRsp = whad::discovery::ReadyRespMessage();
+    response = readyRsp.getRaw();
+
+    //bsp_board_led_on(0);
+    this->pushMessageToQueue(response);
+    //response = Whad::buildDiscoveryReadyResponseMessage();
+    //this->pushMessageToQueue(response);
   }
   else if (msg.which_msg == discovery_Message_info_query_tag) {
         if (msg.msg.info_query.proto_ver <= WHAD_MIN_VERSION) {
-          response = Whad::buildDiscoveryDeviceInfoMessage();
+            /* Craft device ID from unique values. */
+            uint8_t deviceId[16];
+            memcpy(&deviceId[0], (const void *)NRF_FICR->DEVICEID, 8);
+            memcpy(&deviceId[8], (const void *)NRF_FICR->DEVICEADDR, 8);
+
+            whad::discovery::DeviceInfoRespMessage deviceInfo(
+                whad::discovery::Butterfly,
+                deviceId,
+                WHAD_MIN_VERSION,
+                115200,
+                std::string(FIRMWARE_AUTHOR),
+                std::string(FIRMWARE_URL),
+                VERSION_MAJOR,
+                VERSION_MINOR,
+                VERSION_REVISION,
+                (DeviceCapability *)CAPABILITIES
+            );
+            response = deviceInfo.getRaw();
+          //response = Whad::buildDiscoveryDeviceInfoMessage();
         }
         else {
-          response = Whad::buildResultMessage(generic_ResultCode_ERROR); // unsupported protcol version
+          whad::generic::CommandResult result(WHAD_RESULT_ERROR);
+          response = result.getRaw();
+          //response = Whad::buildResultMessage(generic_ResultCode_ERROR); // unsupported protcol version
         }
         this->pushMessageToQueue(response);
    }
@@ -1103,8 +1129,14 @@ bool Core::sendMessage(Message *msg) {
 }
 
 void Core::sendVerbose(const char* data) {
+  std::string message(data);
+  whad::generic::VerboseMessage verbMsg(message);
+  this->pushMessageToQueue(verbMsg.getRaw());
+
+#if 0
   Message *msg = Whad::buildVerboseMessage(data);
   this->pushMessageToQueue(msg);
+#endif
 }
 
 void Core::loop() {

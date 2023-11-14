@@ -1,3 +1,4 @@
+SDK_ROOT		 := ../../nRF5_SDK_17.1.0_ddde560
 PROJECT_NAME     := injectable
 TARGETS          := nrf52840_xxaa
 OUTPUT_DIRECTORY := build
@@ -195,7 +196,7 @@ SRC_FILES += \
 #$(PROJ_DIR)/whad/nanopb/pb_encode.c
 
 SRC_FILES += \
-	$(PROJ_DIR)/whad/whad.cpp \
+	$(PROJ_DIR)/whad/whad_.cpp \
 	$(PROJ_DIR)/controllers/dot15d4controller.cpp \
 	$(PROJ_DIR)/controllers/blecontroller.cpp \
 	$(PROJ_DIR)/controllers/esbcontroller.cpp \
@@ -222,7 +223,11 @@ SRC_FILES += \
 	$(WHAD_DIR)/src/protocol.c \
 	$(WHAD_DIR)/src/ringbuf.c \
 	$(WHAD_DIR)/src/transport.c \
-	$(WHAD_DIR)/src/whad.c
+	$(WHAD_DIR)/src/whad.c \
+	$(WHAD_DIR)/src/message.cpp \
+	$(WHAD_DIR)/src/generic.cpp \
+	$(WHAD_DIR)/src/discovery.cpp \
+	$(WHAD_DIR)/src/whad.cpp
 
 # Include folders common to all targets
 INC_FOLDERS += \
