@@ -59,13 +59,13 @@ void Core::processDiscoveryInputMessage(discovery_Message msg) {
     this->radio->setController(NULL);
 
     // Send Ready Response
-    whad::discovery::ReadyRespMessage readyRsp = whad::discovery::ReadyRespMessage();
+    whad::discovery::ReadyResp readyRsp;
     response = readyRsp.getRaw();
 
     //bsp_board_led_on(0);
-    this->pushMessageToQueue(response);
-    //response = Whad::buildDiscoveryReadyResponseMessage();
     //this->pushMessageToQueue(response);
+    //response = Whad::buildDiscoveryReadyResponseMessage();
+    this->pushMessageToQueue(response);
   }
   else if (msg.which_msg == discovery_Message_info_query_tag) {
         if (msg.msg.info_query.proto_ver <= WHAD_MIN_VERSION) {
@@ -74,7 +74,7 @@ void Core::processDiscoveryInputMessage(discovery_Message msg) {
             memcpy(&deviceId[0], (const void *)NRF_FICR->DEVICEID, 8);
             memcpy(&deviceId[8], (const void *)NRF_FICR->DEVICEADDR, 8);
 
-            whad::discovery::DeviceInfoRespMessage deviceInfo(
+            whad::discovery::DeviceInfoResp deviceInfo(
                 whad::discovery::Butterfly,
                 deviceId,
                 WHAD_MIN_VERSION,
@@ -99,7 +99,12 @@ void Core::processDiscoveryInputMessage(discovery_Message msg) {
    else if (msg.which_msg == discovery_Message_domain_query_tag) {
       discovery_Domain domain = (discovery_Domain)msg.msg.domain_query.domain;
       if (Whad::isDomainSupported(domain)) {
-        response = Whad::buildDiscoveryDomainInfoMessage(domain);
+        whad::discovery::DomainInfoResp domainInfoRsp(
+            (whad::discovery::Domains)domain,
+            (DeviceCapability *)CAPABILITIES
+        );
+        response = domainInfoRsp.getRaw();
+        //response = Whad::buildDiscoveryDomainInfoMessage(domain);
       }
       else {
         response = Whad::buildResultMessage(generic_ResultCode_UNSUPPORTED_DOMAIN);
@@ -1130,7 +1135,7 @@ bool Core::sendMessage(Message *msg) {
 
 void Core::sendVerbose(const char* data) {
   std::string message(data);
-  whad::generic::VerboseMessage verbMsg(message);
+  whad::generic::Verbose verbMsg(message);
   this->pushMessageToQueue(verbMsg.getRaw());
 
 #if 0
