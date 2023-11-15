@@ -29,7 +29,8 @@ const DeviceCapability CAPABILITIES[] = {
       CMD(ble_BleCommand_TriggerSequence) |
       CMD(ble_BleCommand_DeleteSequence) |
       CMD(ble_BleCommand_ScanMode) |
-      CMD(ble_BleCommand_SetBdAddress)
+      CMD(ble_BleCommand_SetBdAddress) |
+      CMD(ble_BleCommand_SetEncryption)
 
       )
   },

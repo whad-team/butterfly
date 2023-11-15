@@ -29,7 +29,7 @@ typedef enum ConnectionStatus {
 } ConnectionStatus;
 
 typedef enum BLEControllerState {
-	IDLE, 
+	IDLE,
 	SNIFFING_ADVERTISEMENTS,
 	COLLECTING_ADVINTERVAL,
 	FOLLOWING_ADVERTISEMENTS,
@@ -183,6 +183,14 @@ typedef struct AdvertisingData {
 	bool connectable;
 } AdvertisingData;
 
+typedef struct EncryptionData {
+	uint8_t key[16];
+	uint32_t counter;
+	uint32_t direction;
+	uint8_t iv[8];
+} EncryptionData;
+
+
 class BLEController : public Controller {
 	protected:
 		TimerModule *timerModule;
@@ -274,6 +282,7 @@ class BLEController : public Controller {
 		int mdCount;
 
 		AdvertisingData advertisingData;
+		EncryptionData encryptionData;
 
 	public:
 		static int channelToFrequency(int channel);
@@ -285,6 +294,10 @@ class BLEController : public Controller {
 		void sniff();
 
 		void setAnchorPoint(uint32_t timestamp);
+
+		bool configureEncryption(uint8_t *key, uint8_t *iv, uint32_t counter);
+		bool startEncryption();
+		bool stopEncryption();
 
 		bool newAdvertisingTransmission();
 

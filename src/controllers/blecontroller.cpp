@@ -174,9 +174,29 @@ void BLEController::setOwnAddress(uint8_t *address, bool random) {
 	this->ownRandom = random;
 }
 
-/*void BLEController::matchPattern(uint8_t pattern, size_t size) {
+bool BLEController::configureEncryption(uint8_t *key, uint8_t *iv, uint32_t counter) {
+	memcpy(this->encryptionData.key, key, 16);
+	memcpy(this->encryptionData.iv, iv, 8);
+	this->encryptionData.counter = 0;
+	this->encryptionData.direction = 0;
+	return true;
+}
 
-}*/
+bool BLEController::startEncryption() {
+	bsp_board_led_on(0);
+	bsp_board_led_on(1);
+	this->radio->enableEncryption((uint32_t)&(this->encryptionData));
+	return true;
+}
+
+bool BLEController::stopEncryption() {
+	bsp_board_led_off(0);
+	bsp_board_led_off(1);
+	this->radio->disableEncryption();
+	return true;
+}
+
+
 void BLEController::onMatch(uint8_t *buffer, size_t size) {
 	if ((buffer[0] & 3) == 2 && (buffer[1]) == 7) // && buffer[6] == 0xa)
 		return;
@@ -1736,11 +1756,45 @@ void BLEController::sendTriggeredReport(uint8_t id) {
 }
 
 void BLEController::sendConnectedReport() {
-	Message *msg = Whad::buildBLEConnectedMessage(this->own.bytes, this->ownRandom, this->connectionInitiationData.responder.bytes, this->connectionInitiationData.responderRandom, this->accessAddress, 0);
+	uint8_t initiator[6] = {
+		this->own.bytes[5],
+		this->own.bytes[4],
+		this->own.bytes[3],
+		this->own.bytes[2],
+		this->own.bytes[1],
+		this->own.bytes[0]
+	};
+	uint8_t responder[6] = {
+		this->connectionInitiationData.responder.bytes[0],
+		this->connectionInitiationData.responder.bytes[1],
+		this->connectionInitiationData.responder.bytes[2],
+		this->connectionInitiationData.responder.bytes[3],
+		this->connectionInitiationData.responder.bytes[4],
+		this->connectionInitiationData.responder.bytes[5]
+
+	};
+	Message *msg = Whad::buildBLEConnectedMessage(initiator, this->ownRandom, responder, this->connectionInitiationData.responderRandom, this->accessAddress, 0);
 	Core::instance->pushMessageToQueue(msg);
 }
 void BLEController::sendSlaveConnectedReport() {
-	Message *msg = Whad::buildBLEConnectedMessage(this->connectionInitiationData.responder.bytes, this->connectionInitiationData.responderRandom, this->own.bytes, this->ownRandom, this->accessAddress, 1);
+	uint8_t responder[6] = {
+		this->own.bytes[5],
+		this->own.bytes[4],
+		this->own.bytes[3],
+		this->own.bytes[2],
+		this->own.bytes[1],
+		this->own.bytes[0]
+	};
+	uint8_t initiator[6] = {
+		this->connectionInitiationData.responder.bytes[0],
+		this->connectionInitiationData.responder.bytes[1],
+		this->connectionInitiationData.responder.bytes[2],
+		this->connectionInitiationData.responder.bytes[3],
+		this->connectionInitiationData.responder.bytes[4],
+		this->connectionInitiationData.responder.bytes[5]
+
+	};
+	Message *msg = Whad::buildBLEConnectedMessage(initiator, this->connectionInitiationData.responderRandom, responder, this->ownRandom, this->accessAddress, 1);
 	Core::instance->pushMessageToQueue(msg);
 }
 
