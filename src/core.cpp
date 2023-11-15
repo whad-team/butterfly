@@ -65,6 +65,8 @@ void Core::processDiscoveryInputMessage(discovery_Message msg) {
     this->pushMessageToQueue(response);
     //response = Whad::buildDiscoveryReadyResponseMessage();
     //this->pushMessageToQueue(response);
+    //response = Whad::buildDiscoveryReadyResponseMessage();
+    this->pushMessageToQueue(response);
   }
   else if (msg.which_msg == discovery_Message_info_query_tag) {
         if (msg.msg.info_query.proto_ver <= WHAD_MIN_VERSION) {
@@ -98,7 +100,12 @@ void Core::processDiscoveryInputMessage(discovery_Message msg) {
    else if (msg.which_msg == discovery_Message_domain_query_tag) {
       discovery_Domain domain = (discovery_Domain)msg.msg.domain_query.domain;
       if (Whad::isDomainSupported(domain)) {
-        response = Whad::buildDiscoveryDomainInfoMessage(domain);
+        whad::discovery::DomainInfoResp domainInfoRsp(
+            (whad::discovery::Domains)domain,
+            (DeviceCapability *)CAPABILITIES
+        );
+        response = domainInfoRsp.getRaw();
+        //response = Whad::buildDiscoveryDomainInfoMessage(domain);
       }
       else {
         response = Whad::buildResultMessage(generic_ResultCode_UNSUPPORTED_DOMAIN);
