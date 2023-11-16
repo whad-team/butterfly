@@ -59,10 +59,11 @@ void Core::processDiscoveryInputMessage(discovery_Message msg) {
     this->radio->setController(NULL);
 
     // Send Ready Response
-    whad::discovery::ReadyResp readyRsp;
+    whad::discovery::ReadyResp readyRsp = whad::discovery::ReadyResp();
     response = readyRsp.getRaw();
-
-    //bsp_board_led_on(0);
+    //
+    this->pushMessageToQueue(response);
+    //response = Whad::buildDiscoveryReadyResponseMessage();
     //this->pushMessageToQueue(response);
     //response = Whad::buildDiscoveryReadyResponseMessage();
     this->pushMessageToQueue(response);
@@ -581,6 +582,29 @@ void Core::processBLEInputMessage(ble_Message msg) {
     }
     else {
       response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+    }
+  }
+  else if (msg.which_msg == ble_Message_encryption_tag) {
+    if (msg.msg.encryption.enabled) {
+      this->bleController->configureEncryption(
+        msg.msg.encryption.ll_key,
+        msg.msg.encryption.ll_iv,
+        0
+      );
+      if (this->bleController->startEncryption()) {
+        response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      }
+      else {
+        response = Whad::buildResultMessage(generic_ResultCode_ERROR);
+      }
+    }
+    else {
+      if (this->bleController->stopEncryption()) {
+        response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      }
+      else {
+        response = Whad::buildResultMessage(generic_ResultCode_ERROR);
+      }
     }
   }
   /*

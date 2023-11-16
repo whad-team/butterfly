@@ -36,10 +36,6 @@ TimerModule::TimerModule() {
 	NVIC_SetPriority(TIMER3_IRQn, 1);
 	NVIC_SetPriority(TIMER4_IRQn, 1);
 
-	// Configure PPI to synchronize timers
-
-	NRF_PPI->CHEN = (1 << 2) | (1 << 1) | 1;
-
 	NRF_TIMER3->TASKS_CLEAR = 1;
 	NRF_TIMER4->TASKS_CLEAR = 1;
 	NRF_TIMER3->TASKS_START = 1;

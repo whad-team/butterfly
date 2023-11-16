@@ -9,12 +9,17 @@
 #include "helpers.h"
 
 #define MAX_PACKET_SIZE 257
-
+#define SCRATCHPAD_SIZE 273
 class Controller;
 
 class Radio
 {
 	private:
+
+		bool encryption;
+		uint8_t encryptionScratchpad[SCRATCHPAD_SIZE];
+
+
 		uint32_t jammingInterval;
 		int frequency;
 		int channel;
@@ -85,6 +90,9 @@ class Radio
 
 		Controller* getController();
 		bool setController(Controller *controller);
+
+		bool enableEncryption(uint32_t encryptionData);
+		bool disableEncryption();
 
 		void enableMatch(int matchingSize);
 		void disableMatch();

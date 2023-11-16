@@ -1,4 +1,3 @@
-SDK_ROOT		 := ../../nRF5_SDK_17.1.0_ddde560
 PROJECT_NAME     := injectable
 TARGETS          := nrf52840_xxaa
 OUTPUT_DIRECTORY := build

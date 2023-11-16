@@ -17,11 +17,33 @@ Radio::Radio() {
 	this->jammingPatternsEnabled = false;
 	this->jammingPatternsCounter = 0;
 	this->jammingInterval = 0;
+	this->encryption = false;
 
 	this->initJammingPatternsQueue();
 	instance = this;
 }
 
+bool Radio::enableEncryption(uint32_t encryptionData) {
+	//Configure shorts between  CCM->ENDKSGEN and  CCM->CRYPT
+	NRF_CCM->SHORTS |= CCM_SHORTS_ENDKSGEN_CRYPT_Msk;
+	// Provision encryption data
+	NRF_CCM->CNFPTR = encryptionData;
+	// Provision scratch zone
+	NRF_CCM->SCRATCHPTR = (uint32_t)(this->encryptionScratchpad);
+
+	/*
+	Configure PPI shorts between RADIO->EVENTS_READY and CCM->TASKS_KSGEN
+	and between RADIO->EVENTS_ADDRESS and CCM->TASKS_CRYPT
+	*/
+	NRF_PPI->CHEN = (1 << 24) | (1 << 25);
+
+	this->encryption = true;
+	return true;
+}
+
+bool Radio::disableEncryption() {
+	return true;
+}
 
 void Radio::enableMatch(int matchingSize) {
 	this->matchingEnable = true;
@@ -1048,6 +1070,13 @@ bool Radio::enable() {
 	if (success) {
 		NRF_RADIO->TIFS = this->interFrameSpacing;
 		NRF_RADIO->PACKETPTR = (uint32_t)(this->rxBuffer);
+		if (this->encryption) {
+		// TODO: update the INPTR and OUTPTR, maybe in interrupt too
+		// TODO: add AES interrupt to manage state, or maybe reading right registers is enough ? 
+		}
+		else {
+		// TODO: update the INPTR and OUTPTR
+		}
 		if (this->mode == MODE_NORMAL) {
 			if (this->isFilterEnabled()) {
 
