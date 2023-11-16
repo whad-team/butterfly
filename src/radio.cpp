@@ -24,6 +24,7 @@ Radio::Radio() {
 }
 
 bool Radio::enableEncryption(uint32_t encryptionData) {
+
 	//Configure shorts between  CCM->ENDKSGEN and  CCM->CRYPT
 	NRF_CCM->SHORTS |= CCM_SHORTS_ENDKSGEN_CRYPT_Msk;
 	// Provision encryption data
@@ -1071,8 +1072,16 @@ bool Radio::enable() {
 		NRF_RADIO->TIFS = this->interFrameSpacing;
 		NRF_RADIO->PACKETPTR = (uint32_t)(this->rxBuffer);
 		if (this->encryption) {
+			NRF_RADIO->PACKETPTR = (uint32_t)(this->tmpBuffer);
+			NRF_CCM->INPTR = (uint32_t)(this->tmpBuffer);
+			NRF_CCM->OUTPTR = (uint32_t)(this->rxBuffer);
+			NRF_CCM->MODE = (CCM_MODE_MODE_Decryption << CCM_MODE_MODE_Pos) |
+			 								(CCM_MODE_DATARATE_1Mbit << CCM_MODE_DATARATE_Pos) |
+			 								(CCM_MODE_LENGTH_Extended << CCM_MODE_LENGTH_Pos);
+			bsp_board_led_on(0);
+			bsp_board_led_on(1);
 		// TODO: update the INPTR and OUTPTR, maybe in interrupt too
-		// TODO: add AES interrupt to manage state, or maybe reading right registers is enough ? 
+		// TODO: add AES interrupt to manage state, or maybe reading right registers is enough ?
 		}
 		else {
 		// TODO: update the INPTR and OUTPTR
@@ -1190,6 +1199,19 @@ bool Radio::send(uint8_t *data,int size,int frequency, uint8_t channel) {
 	NRF_RADIO->DATAWHITEIV = channel;
 	NRF_RADIO->PACKETPTR = (uint32_t)data;
 
+	if (this->encryption) {
+		NRF_RADIO->PACKETPTR = (uint32_t)(this->tmpBuffer);
+		NRF_CCM->INPTR = (uint32_t)(this->tmpBuffer);
+		NRF_CCM->OUTPTR = (uint32_t)(this->txBuffer);
+		NRF_CCM->MODE = (CCM_MODE_MODE_Encryption << CCM_MODE_MODE_Pos) |
+										(CCM_MODE_DATARATE_1Mbit << CCM_MODE_DATARATE_Pos) |
+										(CCM_MODE_LENGTH_Extended << CCM_MODE_LENGTH_Pos);
+
+	// TODO: update the INPTR and OUTPTR, maybe in interrupt too
+	// TODO: add AES interrupt to manage state, or maybe reading right registers is enough ?
+	}
+
+
 	// Turn on the transmitter, and wait for it to signal that it's ready to use.
 	this->state = TX;
 	NRF_RADIO->INTENSET =  0x00000008;
@@ -1201,7 +1223,6 @@ bool Radio::send(uint8_t *data,int size,int frequency, uint8_t channel) {
 
 	return false;
 }
-
 
 static uint8_t jamBuffer[] = {0x00,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
 extern "C" void RADIO_IRQHandler(void) {
@@ -1254,6 +1275,11 @@ extern "C" void RADIO_IRQHandler(void) {
 	}
 	if (NRF_RADIO->EVENTS_END) {
 		NRF_RADIO->EVENTS_END = 0;
+		if (NRF_CCM->MICSTATUS == 1) {
+			bsp_board_led_on(0);
+			bsp_board_led_on(1);
+		}
+
 		/*
 		if (Radio::instance->isFilterEnabled() && Radio::instance->getState() == RX) {
 			if (NRF_RADIO->EVENTS_DEVMATCH == 0) {

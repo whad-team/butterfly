@@ -83,6 +83,7 @@ class Radio
 		static Radio *instance;
 		uint32_t currentTimestamp;
 
+		uint8_t tmpBuffer[MAX_PACKET_SIZE];
 		uint8_t rxBuffer[MAX_PACKET_SIZE];
 		uint8_t txBuffer[MAX_PACKET_SIZE];
 

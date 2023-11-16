@@ -175,16 +175,13 @@ void BLEController::setOwnAddress(uint8_t *address, bool random) {
 }
 
 bool BLEController::configureEncryption(uint8_t *key, uint8_t *iv, uint32_t counter) {
-	memcpy(this->encryptionData.key, key, 16);
-	memcpy(this->encryptionData.iv, iv, 8);
-	this->encryptionData.counter = 0;
+	for (int i=0;i<16;i++) this->encryptionData.key[i] = key[i];
+	for (int i=0;i<8;i++) this->encryptionData.iv[i] = iv[7-i]; //memcpy(this->encryptionData.iv, iv, 8);
 	this->encryptionData.direction = 0;
 	return true;
 }
 
 bool BLEController::startEncryption() {
-	bsp_board_led_on(0);
-	bsp_board_led_on(1);
 	this->radio->enableEncryption((uint32_t)&(this->encryptionData));
 	return true;
 }
@@ -1460,6 +1457,7 @@ void BLEController::executeAttack() {
 bool BLEController::masterRoleCallback(BLEPacket *pkt) {
 
 	if (!this->masterPayload.transmitted) {
+		
 		if ((this->masterPayload.payload[0] & 0x10) != 0) {
 			this->mdSequence = true;
 			this->mdCount = 4;
@@ -1471,6 +1469,7 @@ bool BLEController::masterRoleCallback(BLEPacket *pkt) {
 		this->masterPayload.responseReceived = !BLEPacket::needResponse(this->masterPayload.payload, this->masterPayload.size);
 		this->masterPayload.payload[0] = (this->masterPayload.payload[0] & 0xF3) | (this->simulatedMasterSequenceNumbers.nesn  << 2) | (this->simulatedMasterSequenceNumbers.sn << 3);
 		this->radio->send(this->masterPayload.payload,this->masterPayload.size,BLEController::channelToFrequency(this->channel),this->channel);
+
 	}
 	else {
 		this->temporaryPayload.payload[0] = (0x01 & 0xF3) | (this->simulatedMasterSequenceNumbers.nesn  << 2) | (this->simulatedMasterSequenceNumbers.sn << 3);
@@ -1478,7 +1477,7 @@ bool BLEController::masterRoleCallback(BLEPacket *pkt) {
 		this->temporaryPayload.size = 2;
 		this->radio->send(this->temporaryPayload.payload, this->temporaryPayload.size, BLEController::channelToFrequency(this->channel), this->channel);
 	}
-
+	this->encryptionData.direction = 1 - this->encryptionData.direction;
 	return true;
 }
 
@@ -1867,6 +1866,8 @@ void BLEController::connect(uint8_t *address, bool random,  uint32_t accessAddre
 	// Enter Connection Initiation mode
 	this->controllerState = CONNECTION_INITIATION;
 
+	// Configure encryption counter
+	this->encryptionData.counter = 0;
 
 	// Configure Hardware to monitor advertisements
 	this->setHardwareConfiguration(0x8e89bed6,0x555555);
