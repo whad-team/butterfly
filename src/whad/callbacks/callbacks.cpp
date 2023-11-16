@@ -30,7 +30,7 @@ bool whad_verbose_msg_encode_cb_(pb_ostream_t *ostream, const pb_field_t *field,
 
 bool whad_disc_enum_capabilities_cb_(pb_ostream_t *ostream, const pb_field_t *field, void * const *arg)
 {
-    DeviceCapability *capabilities = *(DeviceCapability **)arg;
+    whad_domain_desc_t *capabilities = *(whad_domain_desc_t **)arg;
     if (ostream != NULL && field->tag == discovery_DeviceInfoResp_capabilities_tag)
     {
         while ((capabilities->cap != 0) && (capabilities->domain != 0))

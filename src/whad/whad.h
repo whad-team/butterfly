@@ -11,8 +11,8 @@
 class Whad {
 
   public:
-    static bool isDomainSupported(discovery_Domain domain);
-    static uint64_t getSupportedCommandByDomain(discovery_Domain domain);
+    static bool isDomainSupported(whad_domain_t domain);
+    static uint64_t getSupportedCommandByDomain(whad_domain_t domain);
 
     static Message decodeMessage(uint8_t *buffer, size_t size);
     static size_t encodeMessage(Message* msg, uint8_t* buffer, size_t maxSize);
@@ -24,7 +24,7 @@ class Whad {
     static Message* buildVerboseMessage(const char* data);
     static Message* buildDiscoveryDeviceInfoMessage();
     static Message* buildDiscoveryReadyResponseMessage();
-    static Message* buildDiscoveryDomainInfoMessage(discovery_Domain domain);
+    static Message* buildDiscoveryDomainInfoMessage(whad_domain_t domain);
 
     static Message* buildMessageFromPacket(Packet* packet);
     static Message* buildESBRawPduMessage(ESBPacket* packet);

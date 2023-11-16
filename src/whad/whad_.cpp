@@ -1,7 +1,7 @@
 #include "whad/whad.h"
 
 
-bool Whad::isDomainSupported(discovery_Domain domain) {
+bool Whad::isDomainSupported(whad_domain_t domain) {
   bool found = false;
   int index = 0;
   while (CAPABILITIES[index].domain != 0 && CAPABILITIES[index].cap != 0) {
@@ -14,7 +14,7 @@ bool Whad::isDomainSupported(discovery_Domain domain) {
   return found;
 }
 
-uint64_t Whad::getSupportedCommandByDomain(discovery_Domain domain) {
+uint64_t Whad::getSupportedCommandByDomain(whad_domain_t domain) {
   uint64_t supportedCommands = 0x00000000;
   int index = 0;
   while (CAPABILITIES[index].domain != 0) {
@@ -107,14 +107,14 @@ Message* Whad::buildDiscoveryDeviceInfoMessage() {
   msg->msg.discovery.msg.info_resp.fw_version_minor = VERSION_MINOR;
   msg->msg.discovery.msg.info_resp.fw_version_rev = VERSION_REVISION;
   msg->msg.discovery.msg.info_resp.type = discovery_DeviceType_Butterfly;
-  msg->msg.discovery.msg.info_resp.capabilities.arg = (DeviceCapability*)CAPABILITIES;
+  msg->msg.discovery.msg.info_resp.capabilities.arg = (whad_domain_desc_t*)CAPABILITIES;
   msg->msg.discovery.msg.info_resp.capabilities.funcs.encode = whad_disc_enum_capabilities_cb_;
   return msg;
 }
 
 
 
-Message* Whad::buildDiscoveryDomainInfoMessage(discovery_Domain domain) {
+Message* Whad::buildDiscoveryDomainInfoMessage(whad_domain_t domain) {
   Message *msg = Whad::buildMessage();
   msg->which_msg = Message_discovery_tag;
   msg->msg.discovery.which_msg = discovery_Message_domain_resp_tag;

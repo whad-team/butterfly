@@ -84,7 +84,7 @@ void Core::processDiscoveryInputMessage(discovery_Message msg) {
                 VERSION_MAJOR,
                 VERSION_MINOR,
                 VERSION_REVISION,
-                (DeviceCapability *)CAPABILITIES
+                (whad_domain_desc_t *)CAPABILITIES
             );
             response = deviceInfo.getRaw();
           //response = Whad::buildDiscoveryDeviceInfoMessage();
@@ -97,11 +97,11 @@ void Core::processDiscoveryInputMessage(discovery_Message msg) {
         this->pushMessageToQueue(response);
    }
    else if (msg.which_msg == discovery_Message_domain_query_tag) {
-      discovery_Domain domain = (discovery_Domain)msg.msg.domain_query.domain;
+      whad_domain_t domain = (whad_domain_t)msg.msg.domain_query.domain;
       if (Whad::isDomainSupported(domain)) {
         whad::discovery::DomainInfoResp domainInfoRsp(
             (whad::discovery::Domains)domain,
-            (DeviceCapability *)CAPABILITIES
+            (whad_domain_desc_t *)CAPABILITIES
         );
         response = domainInfoRsp.getRaw();
         //response = Whad::buildDiscoveryDomainInfoMessage(domain);

@@ -4,10 +4,10 @@
 #define CMD(X) (1 << (X))
 
 
-const DeviceCapability CAPABILITIES[] = {
+const whad_domain_desc_t CAPABILITIES[] = {
   {
-    discovery_Domain_BtLE,
-    (discovery_Capability)(discovery_Capability_Sniff | discovery_Capability_Inject | discovery_Capability_Hijack | discovery_Capability_SimulateRole),
+    DOMAIN_BTLE,
+    (whad_capability_t)(CAP_SNIFF | CAP_INJECT | CAP_HIJACK | CAP_SIMULATE_ROLE),
     (
       CMD(ble_BleCommand_SniffAdv) |
       CMD(ble_BleCommand_SniffConnReq) |
@@ -34,8 +34,8 @@ const DeviceCapability CAPABILITIES[] = {
       )
   },
   {
-    discovery_Domain_Zigbee,
-    (discovery_Capability)(discovery_Capability_Sniff | discovery_Capability_Inject | discovery_Capability_Jam | discovery_Capability_SimulateRole),
+    DOMAIN_ZIGBEE,
+    (whad_capability_t)(CAP_SNIFF | CAP_INJECT | CAP_JAM | CAP_SIMULATE_ROLE),
     (
       CMD(zigbee_ZigbeeCommand_Sniff) |
       CMD(zigbee_ZigbeeCommand_Jam) |
@@ -51,8 +51,8 @@ const DeviceCapability CAPABILITIES[] = {
       )
   },
   {
-    discovery_Domain_Esb,
-    (discovery_Capability)(discovery_Capability_Sniff | discovery_Capability_Inject | discovery_Capability_Jam | discovery_Capability_SimulateRole),
+    DOMAIN_ESB,
+    (whad_capability_t)(discovery_Capability_Sniff | discovery_Capability_Inject | discovery_Capability_Jam | discovery_Capability_SimulateRole),
     (
       CMD(esb_ESBCommand_Sniff) |
       CMD(esb_ESBCommand_Send) |
@@ -65,8 +65,8 @@ const DeviceCapability CAPABILITIES[] = {
       )
   },
   {
-    discovery_Domain_LogitechUnifying,
-    (discovery_Capability)(discovery_Capability_Sniff | discovery_Capability_Inject | discovery_Capability_Jam | discovery_Capability_SimulateRole),
+    DOMAIN_LOGITECH_UNIFYING,
+    (whad_capability_t)(discovery_Capability_Sniff | discovery_Capability_Inject | discovery_Capability_Jam | discovery_Capability_SimulateRole),
     (
       CMD(unifying_UnifyingCommand_Sniff) |
       CMD(unifying_UnifyingCommand_Send) |
@@ -81,8 +81,8 @@ const DeviceCapability CAPABILITIES[] = {
 
       )
   },
-  {discovery_Domain_Phy,
-  (discovery_Capability)(discovery_Capability_Sniff | discovery_Capability_Inject | discovery_Capability_Jam | discovery_Capability_NoRawData),
+  {DOMAIN_PHY,
+  (whad_capability_t)(discovery_Capability_Sniff | discovery_Capability_Inject | discovery_Capability_Jam | discovery_Capability_NoRawData),
   (
     CMD(phy_PhyCommand_SetGFSKModulation) |
     CMD(phy_PhyCommand_GetSupportedFrequencies) |
@@ -101,7 +101,7 @@ const DeviceCapability CAPABILITIES[] = {
 
     )
 },
-  {discovery_Domain__DomainNone, discovery_Capability__CapNone, 0x00000000}
+  {DOMAIN_NONE, CAP_NONE, 0x00000000}
 };
 
 const phy_SupportedFrequencyRanges_FrequencyRange SUPPORTED_FREQUENCY_RANGES[]  = {
