@@ -219,14 +219,17 @@ SRC_FILES += \
 	$(WHAD_DIR)/protocol/esb/esb.pb.c \
 	$(WHAD_DIR)/protocol/unifying/unifying.pb.c \
 	$(WHAD_DIR)/protocol/phy/phy.pb.c \
-	$(WHAD_DIR)/src/protocol.c \
+	$(WHAD_DIR)/src/generic.c \
+	$(WHAD_DIR)/src/discovery.c \
+	$(WHAD_DIR)/src/domains/ble.c \
+	$(WHAD_DIR)/src/domains/phy.c \
 	$(WHAD_DIR)/src/ringbuf.c \
 	$(WHAD_DIR)/src/transport.c \
 	$(WHAD_DIR)/src/whad.c \
-	$(WHAD_DIR)/src/message.cpp \
-	$(WHAD_DIR)/src/generic.cpp \
-	$(WHAD_DIR)/src/discovery.cpp \
-	$(WHAD_DIR)/src/whad.cpp
+	$(WHAD_DIR)/src/cpp/message.cpp \
+	$(WHAD_DIR)/src/cpp/generic.cpp \
+	$(WHAD_DIR)/src/cpp/discovery.cpp \
+	$(WHAD_DIR)/src/cpp/whad.cpp
 
 # Include folders common to all targets
 INC_FOLDERS += \
