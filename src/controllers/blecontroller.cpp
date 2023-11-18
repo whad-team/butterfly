@@ -1457,7 +1457,7 @@ void BLEController::executeAttack() {
 bool BLEController::masterRoleCallback(BLEPacket *pkt) {
 
 	if (!this->masterPayload.transmitted) {
-		
+
 		if ((this->masterPayload.payload[0] & 0x10) != 0) {
 			this->mdSequence = true;
 			this->mdCount = 4;
@@ -2365,7 +2365,7 @@ void BLEController::connectionPacketProcessing(BLEPacket *pkt) {
 	}
 
 	// Decide if the packet must be transmitted to host
-	if (pkt->extractPayloadLength() > 2 || this->emptyTransmitIndicator) {
+	if (pkt->extractPayloadLength() >= 2 || this->emptyTransmitIndicator) {
 		this->addPacket(pkt);
 	}
 }
