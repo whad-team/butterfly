@@ -61,11 +61,6 @@ void Core::processDiscoveryInputMessage(discovery_Message msg) {
     // Send Ready Response
     whad::discovery::ReadyResp readyRsp = whad::discovery::ReadyResp();
     response = readyRsp.getRaw();
-    //
-    this->pushMessageToQueue(response);
-    //response = Whad::buildDiscoveryReadyResponseMessage();
-    //this->pushMessageToQueue(response);
-    //response = Whad::buildDiscoveryReadyResponseMessage();
     this->pushMessageToQueue(response);
   }
   else if (msg.which_msg == discovery_Message_info_query_tag) {
@@ -88,12 +83,10 @@ void Core::processDiscoveryInputMessage(discovery_Message msg) {
                 (whad_domain_desc_t *)CAPABILITIES
             );
             response = deviceInfo.getRaw();
-          //response = Whad::buildDiscoveryDeviceInfoMessage();
         }
         else {
           whad::generic::CommandResult result(WHAD_RESULT_ERROR);
           response = result.getRaw();
-          //response = Whad::buildResultMessage(generic_ResultCode_ERROR); // unsupported protcol version
         }
         this->pushMessageToQueue(response);
    }
@@ -105,10 +98,10 @@ void Core::processDiscoveryInputMessage(discovery_Message msg) {
             (whad_domain_desc_t *)CAPABILITIES
         );
         response = domainInfoRsp.getRaw();
-        //response = Whad::buildDiscoveryDomainInfoMessage(domain);
       }
       else {
-        response = Whad::buildResultMessage(generic_ResultCode_UNSUPPORTED_DOMAIN);
+        //response = Whad::buildResultMessage(generic_ResultCode_UNSUPPORTED_DOMAIN);
+        response = whad::generic::CommandResult(WHAD_RESULT_UNSUPPORTED_DOMAIN).getRaw();
       }
     }
     this->pushMessageToQueue(response);
@@ -126,10 +119,12 @@ void Core::processZigbeeInputMessage(zigbee_Message msg) {
       this->dot15d4Controller->setChannel(channel);
       this->dot15d4Controller->enterReceptionMode();
       this->dot15d4Controller->setAutoAcknowledgement(false);
-      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
     }
     else {
-      response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+      response = whad::generic::CommandResult(WHAD_RESULT_PARAMETER_ERROR).getRaw();
+      //response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
     }
   }
   else if (msg.which_msg == zigbee_Message_ed_tag) {
@@ -137,15 +132,17 @@ void Core::processZigbeeInputMessage(zigbee_Message msg) {
     if (channel >= 11 && channel <= 26) {
       this->dot15d4Controller->setChannel(channel);
       this->dot15d4Controller->enterEDScanMode();
-      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
     }
     else {
-      response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+      //response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+      response = whad::generic::CommandResult(WHAD_RESULT_PARAMETER_ERROR).getRaw();
     }
   }
   else if (msg.which_msg == zigbee_Message_start_tag) {
     this->currentController->start();
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
   }
 
   else if (msg.which_msg == zigbee_Message_end_device_tag) {
@@ -154,10 +151,10 @@ void Core::processZigbeeInputMessage(zigbee_Message msg) {
       this->dot15d4Controller->setChannel(channel);
       this->dot15d4Controller->enterReceptionMode();
       this->dot15d4Controller->setAutoAcknowledgement(true);
-      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
     }
     else {
-      response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+      response = whad::generic::CommandResult(WHAD_RESULT_PARAMETER_ERROR).getRaw();
     }
   }
 
@@ -168,10 +165,10 @@ void Core::processZigbeeInputMessage(zigbee_Message msg) {
       this->dot15d4Controller->setChannel(channel);
       this->dot15d4Controller->enterReceptionMode();
       this->dot15d4Controller->setAutoAcknowledgement(true);
-      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
     }
     else {
-      response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+      response = whad::generic::CommandResult(WHAD_RESULT_PARAMETER_ERROR).getRaw();
     }
   }
 
@@ -181,24 +178,23 @@ void Core::processZigbeeInputMessage(zigbee_Message msg) {
       this->dot15d4Controller->setChannel(channel);
       this->dot15d4Controller->enterReceptionMode();
       this->dot15d4Controller->setAutoAcknowledgement(true);
-      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
     }
     else {
-      response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+      response = whad::generic::CommandResult(WHAD_RESULT_PARAMETER_ERROR).getRaw();
     }
   }
   else if (msg.which_msg == zigbee_Message_set_node_addr_tag) {
     if (msg.msg.set_node_addr.address_type == zigbee_AddressType_SHORT) {
       uint16_t shortAddress = msg.msg.set_node_addr.address & 0xFFFF;
       this->dot15d4Controller->setShortAddress(shortAddress);
-      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
 
     }
     else {
       uint64_t extendedAddress = msg.msg.set_node_addr.address;
       this->dot15d4Controller->setExtendedAddress(extendedAddress);
-      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
-
+      response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
     }
   }
 
@@ -275,7 +271,8 @@ void Core::processBLEInputMessage(ble_Message msg) {
     );
     this->bleController->setFollowMode(false);
     this->bleController->sniff();
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
   }
   else if (msg.which_msg == ble_Message_reactive_jam_tag) {
 
@@ -286,7 +283,8 @@ void Core::processBLEInputMessage(ble_Message msg) {
 
     this->bleController->setChannel(channel);
     this->bleController->setReactiveJammerConfiguration(pattern, pattern_size, position );
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
   }
   else if (msg.which_msg == ble_Message_sniff_connreq_tag) {
     int channel = msg.msg.sniff_connreq.channel;
@@ -306,14 +304,16 @@ void Core::processBLEInputMessage(ble_Message msg) {
     );
     this->bleController->setFollowMode(true);
     this->bleController->sniff();
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
   }
   else if (msg.which_msg == ble_Message_sniff_aa_tag) {
     this->bleController->setChannel(0);
     this->bleController->setMonitoredChannels(msg.msg.sniff_aa.monitored_channels);
     this->bleController->sniffAccessAddresses();
 
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
   }
   else if (msg.which_msg == ble_Message_sniff_conn_tag) {
     this->bleController->setChannel(0);
@@ -335,21 +335,25 @@ void Core::processBLEInputMessage(ble_Message msg) {
       this->bleController->attachToExistingConnection(msg.msg.sniff_conn.access_address, msg.msg.sniff_conn.crc_init, msg.msg.sniff_conn.channel_map, msg.msg.sniff_conn.hop_interval, msg.msg.sniff_conn.hop_increment);
     }
 
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
   }
   else if (msg.which_msg == ble_Message_start_tag) {
     this->bleController->start();
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
   }
 
   else if (msg.which_msg == ble_Message_stop_tag) {
     this->bleController->stop();
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
   }
 
   else if (msg.which_msg == ble_Message_scan_mode_tag) {
     this->bleController->startScanning(msg.msg.scan_mode.active_scan);
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
   }
 
   else if (msg.which_msg == ble_Message_send_raw_pdu_tag) {
@@ -364,20 +368,24 @@ void Core::processBLEInputMessage(ble_Message msg) {
 
         this->bleController->setAttackPayload(msg.msg.send_raw_pdu.pdu.bytes, msg.msg.send_raw_pdu.pdu.size);
   			this->bleController->startAttack(BLE_ATTACK_FRAME_INJECTION_TO_SLAVE);
-        response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+        //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+        response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
       }
       else {
-        response = Whad::buildResultMessage(generic_ResultCode_WRONG_MODE);
+        //response = Whad::buildResultMessage(generic_ResultCode_WRONG_MODE);
+        response = whad::generic::CommandResult(WHAD_RESULT_WRONG_MODE).getRaw();
       }
     }
     else if (msg.msg.send_raw_pdu.direction == ble_BleDirection_INJECTION_TO_MASTER) {
       if (this->bleController->getState() == SNIFFING_CONNECTION) {
         this->bleController->setAttackPayload(msg.msg.send_raw_pdu.pdu.bytes, msg.msg.send_raw_pdu.pdu.size);
   			this->bleController->startAttack(BLE_ATTACK_FRAME_INJECTION_TO_MASTER);
-        response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+        //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+        response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
       }
       else {
-        response = Whad::buildResultMessage(generic_ResultCode_WRONG_MODE);
+        //response = Whad::buildResultMessage(generic_ResultCode_WRONG_MODE);
+        response = whad::generic::CommandResult(WHAD_RESULT_WRONG_MODE).getRaw();
       }
     }
     else if (msg.msg.send_raw_pdu.direction == ble_BleDirection_MASTER_TO_SLAVE) {
@@ -385,13 +393,16 @@ void Core::processBLEInputMessage(ble_Message msg) {
         this->bleController->setMasterPayload(msg.msg.send_raw_pdu.pdu.bytes, msg.msg.send_raw_pdu.pdu.size);
         while (!max_retry && !this->bleController->isMasterPayloadTransmitted()) {--max_retry;}
         if (max_retry != 0) {
-            response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+            //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+            response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
         } else {
-            response = Whad::buildResultMessage(generic_ResultCode_ERROR);
+            //response = Whad::buildResultMessage(generic_ResultCode_ERROR);
+            response = whad::generic::CommandResult(WHAD_RESULT_ERROR).getRaw();
         }
       }
       else {
-        response = Whad::buildResultMessage(generic_ResultCode_WRONG_MODE);
+        //response = Whad::buildResultMessage(generic_ResultCode_WRONG_MODE);
+        response = whad::generic::CommandResult(WHAD_RESULT_WRONG_MODE).getRaw();
       }
     }
     else if (msg.msg.send_raw_pdu.direction == ble_BleDirection_SLAVE_TO_MASTER) {
@@ -399,29 +410,35 @@ void Core::processBLEInputMessage(ble_Message msg) {
 
         this->bleController->setSlavePayload(msg.msg.send_raw_pdu.pdu.bytes, msg.msg.send_raw_pdu.pdu.size);
         while (!this->bleController->isSlavePayloadTransmitted()) {}
-        response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+        //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+        response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
       }
       else {
-        response = Whad::buildResultMessage(generic_ResultCode_WRONG_MODE);
+        //response = Whad::buildResultMessage(generic_ResultCode_WRONG_MODE);
+        response = whad::generic::CommandResult(WHAD_RESULT_WRONG_MODE).getRaw();
       }
     }
   }
   else if (msg.which_msg == ble_Message_hijack_master_tag) {
         this->bleController->startAttack(BLE_ATTACK_MASTER_HIJACKING);
-        response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+        //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+        response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
   }
   else if (msg.which_msg == ble_Message_hijack_slave_tag) {
         this->bleController->startAttack(BLE_ATTACK_SLAVE_HIJACKING);
-        response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+        //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+        response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
   }
   else if (msg.which_msg == ble_Message_hijack_both_tag) {
         this->bleController->startAttack(BLE_ATTACK_MITM);
-        response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+        //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+        response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
   }
   else if (msg.which_msg == ble_Message_central_mode_tag) {
 
       //if (this->bleController->getState() == CONNECTION_INITIATION || this->bleController->getState() == SIMULATING_MASTER || this->bleController->getState() == PERFORMING_MITM) {
-      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
       /*}
       else {
         response = Whad::buildResultMessage(generic_ResultCode_WRONG_MODE);
@@ -430,13 +447,15 @@ void Core::processBLEInputMessage(ble_Message msg) {
 
   else if (msg.which_msg == ble_Message_periph_mode_tag) {
       if (this->bleController->getState() == SIMULATING_SLAVE || this->bleController->getState() == PERFORMING_MITM) {
-        response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+        //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+        response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
       }
       else {
         //this->bleController->setEmptyTransmitIndicator(true);
         this->bleController->advertise(msg.msg.periph_mode.scan_data.bytes, msg.msg.periph_mode.scan_data.size, msg.msg.periph_mode.scanrsp_data.bytes, msg.msg.periph_mode.scanrsp_data.size, true, 100);
         this->bleController->start();
-        response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+        //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+        response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
       }
   }
 
@@ -495,12 +514,14 @@ void Core::processBLEInputMessage(ble_Message msg) {
         channelMap
     );
 
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
   }
 
   else if (msg.which_msg == ble_Message_disconnect_tag) {
     this->bleController->disconnect();
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
   }
   else if (msg.which_msg == ble_Message_prepare_tag) {
     SequenceDirection direction = BLE_TO_SLAVE;
@@ -519,7 +540,8 @@ void Core::processBLEInputMessage(ble_Message msg) {
       direction = BLE_TO_MASTER;
     }
     else {
-      response = Whad::buildResultMessage(generic_ResultCode_WRONG_MODE);
+      //response = Whad::buildResultMessage(generic_ResultCode_WRONG_MODE);
+      response = whad::generic::CommandResult(WHAD_RESULT_WRONG_MODE).getRaw();
     }
     if (response == NULL) {
       if (msg.msg.prepare.trigger.which_trigger == ble_PrepareSequenceCmd_Trigger_reception_tag) {
@@ -540,7 +562,8 @@ void Core::processBLEInputMessage(ble_Message msg) {
       }
       else {
 
-        response = Whad::buildResultMessage(generic_ResultCode_WRONG_MODE);
+        //response = Whad::buildResultMessage(generic_ResultCode_WRONG_MODE);
+        response = whad::generic::CommandResult(WHAD_RESULT_WRONG_MODE).getRaw();
       }
     }
     if (trigger != NULL) {
@@ -550,17 +573,20 @@ void Core::processBLEInputMessage(ble_Message msg) {
       for (int i=0;i<numberOfPackets;i++) {
         sequence->preparePacket(msg.msg.prepare.sequence[i].packet.bytes,msg.msg.prepare.sequence[i].packet.size, true);
       }
-      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
     }
 
   }
   else if (msg.which_msg == ble_Message_trigger_tag) {
       uint8_t id = msg.msg.trigger.id;
       if (this->bleController->checkManualTriggers(id)) {
-        response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+        //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+        response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
       }
       else {
-        response = Whad::buildResultMessage(generic_ResultCode_ERROR);
+        //response = Whad::buildResultMessage(generic_ResultCode_ERROR);
+        response = whad::generic::CommandResult(WHAD_RESULT_ERROR).getRaw();
       }
   }
   else if (msg.which_msg == ble_Message_set_bd_addr_tag) {
@@ -573,15 +599,18 @@ void Core::processBLEInputMessage(ble_Message msg) {
       msg.msg.set_bd_addr.bd_address[0]
     };
     this->bleController->setOwnAddress(address, false);
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
   }
   else if (msg.which_msg == ble_Message_delete_seq_tag) {
     uint8_t id = msg.msg.delete_seq.id;
     if (this->bleController->deleteSequence(id)) {
-      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
     }
     else {
-      response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+      //response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+      response = whad::generic::CommandResult(WHAD_RESULT_PARAMETER_ERROR).getRaw();
     }
   }
   else if (msg.which_msg == ble_Message_encryption_tag) {
@@ -592,18 +621,22 @@ void Core::processBLEInputMessage(ble_Message msg) {
         0
       );
       if (this->bleController->startEncryption()) {
-        response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+        //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+        response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
       }
       else {
-        response = Whad::buildResultMessage(generic_ResultCode_ERROR);
+        //response = Whad::buildResultMessage(generic_ResultCode_ERROR);
+        response = whad::generic::CommandResult(WHAD_RESULT_ERROR).getRaw();
       }
     }
     else {
       if (this->bleController->stopEncryption()) {
-        response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+        //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+        response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
       }
       else {
-        response = Whad::buildResultMessage(generic_ResultCode_ERROR);
+        //response = Whad::buildResultMessage(generic_ResultCode_ERROR);
+        response = whad::generic::CommandResult(WHAD_RESULT_ERROR).getRaw();
       }
     }
   }
@@ -646,19 +679,23 @@ void Core::processESBInputMessage(esb_Message msg) {
         this->esbController->disableAcknowledgementsSniffing();
       }
 
-      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
     }
     else {
-      response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+      //response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+      response = whad::generic::CommandResult(WHAD_RESULT_PARAMETER_ERROR).getRaw();
     }
   }
   else if (msg.which_msg == esb_Message_start_tag) {
     this->esbController->start();
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
   }
   else if (msg.which_msg == esb_Message_stop_tag) {
     this->esbController->stop();
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
   }
   else if (msg.which_msg == esb_Message_send_raw_tag) {
     int channel = msg.msg.send_raw.channel;
@@ -666,10 +703,12 @@ void Core::processESBInputMessage(esb_Message msg) {
       this->esbController->setChannel(channel);
     }
     if (this->esbController->send(msg.msg.send_raw.pdu.bytes, msg.msg.send_raw.pdu.size, msg.msg.send_raw.retransmission_count)) {
-      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
     }
     else {
-      response = Whad::buildResultMessage(generic_ResultCode_ERROR);
+      //response = Whad::buildResultMessage(generic_ResultCode_ERROR);
+      response = whad::generic::CommandResult(WHAD_RESULT_ERROR).getRaw();
     }
   }
   else if (msg.which_msg == esb_Message_set_node_addr_tag) {
@@ -680,19 +719,22 @@ void Core::processESBInputMessage(esb_Message msg) {
               msg.msg.set_node_addr.address.bytes[3],
               msg.msg.set_node_addr.address.bytes[4]
     );
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
   }
   else if (msg.which_msg == esb_Message_prx_tag) {
     this->esbController->setChannel(msg.msg.prx.channel);
     this->esbController->disableAcknowledgementsSniffing();
     this->esbController->enableAcknowledgementsTransmission();
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
   }
   else if (msg.which_msg == esb_Message_ptx_tag) {
     this->esbController->setChannel(msg.msg.ptx.channel);
     this->esbController->enableAcknowledgementsSniffing();
     this->esbController->disableAcknowledgementsTransmission();
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
   }
   this->pushMessageToQueue(response);
 }
@@ -722,19 +764,23 @@ void Core::processUnifyingInputMessage(unifying_Message msg) {
         this->esbController->disableAcknowledgementsSniffing();
       }
 
-      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
     }
     else {
-      response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+      //response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+      response = whad::generic::CommandResult(WHAD_RESULT_PARAMETER_ERROR).getRaw();
     }
   }
   else if (msg.which_msg == unifying_Message_start_tag) {
     this->esbController->start();
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
   }
   else if (msg.which_msg == unifying_Message_stop_tag) {
     this->esbController->stop();
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
   }
   else if (msg.which_msg == unifying_Message_send_raw_tag) {
     int channel = msg.msg.send_raw.channel;
@@ -742,10 +788,12 @@ void Core::processUnifyingInputMessage(unifying_Message msg) {
       this->esbController->setChannel(channel);
     }
     if (this->esbController->send(msg.msg.send_raw.pdu.bytes, msg.msg.send_raw.pdu.size, msg.msg.send_raw.retransmission_count)) {
-      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
     }
     else {
-      response = Whad::buildResultMessage(generic_ResultCode_ERROR);
+      //response = Whad::buildResultMessage(generic_ResultCode_ERROR);
+      response = whad::generic::CommandResult(WHAD_RESULT_ERROR).getRaw();
     }
   }
   else if (msg.which_msg == unifying_Message_set_node_addr_tag) {
@@ -756,37 +804,43 @@ void Core::processUnifyingInputMessage(unifying_Message msg) {
               msg.msg.set_node_addr.address.bytes[3],
               msg.msg.set_node_addr.address.bytes[4]
     );
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
   }
   else if (msg.which_msg == unifying_Message_dongle_tag) {
     this->esbController->setChannel(msg.msg.dongle.channel);
     this->esbController->disableAcknowledgementsSniffing();
     this->esbController->enableAcknowledgementsTransmission();
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
   }
   else if (msg.which_msg == unifying_Message_mouse_tag) {
     if (msg.msg.mouse.channel == 0xFF || (msg.msg.mouse.channel >= 0 && msg.msg.mouse.channel <= 100)) {
       this->esbController->setChannel(msg.msg.mouse.channel);
       this->esbController->enableAcknowledgementsSniffing();
       this->esbController->disableAcknowledgementsTransmission();
-      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
     }
     else {
-      response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+      //response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+      response = whad::generic::CommandResult(WHAD_RESULT_PARAMETER_ERROR).getRaw();
     }
   }
   else if (msg.which_msg == unifying_Message_keyboard_tag) {
     this->esbController->setChannel(msg.msg.keyboard.channel);
     this->esbController->enableAcknowledgementsSniffing();
     this->esbController->disableAcknowledgementsTransmission();
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
   }
   else if (msg.which_msg == unifying_Message_sniff_pairing_tag) {
 
     this->esbController->setFilter(0xBB, 0x0A, 0xDC, 0xA5, 0x75);
     this->esbController->setChannel(5);
 
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
   }
   this->pushMessageToQueue(response);
 }
@@ -801,28 +855,34 @@ void Core::processPhyInputMessage(phy_Message msg) {
   if (msg.which_msg == phy_Message_mod_gfsk_tag) {
     if (msg.msg.mod_gfsk.deviation == 170000) {
       this->genericController->setPhy(GENERIC_PHY_1MBPS_ESB);
-      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
     }
     else if (msg.msg.mod_gfsk.deviation == 250000) {
-      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
       this->genericController->setPhy(GENERIC_PHY_1MBPS_BLE);
     }
     else if (msg.msg.mod_gfsk.deviation == 320000) {
       this->genericController->setPhy(GENERIC_PHY_2MBPS_ESB);
-      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
     }
     else if (msg.msg.mod_gfsk.deviation == 500000) {
       this->genericController->setPhy(GENERIC_PHY_2MBPS_BLE);
-      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
     }
     else {
-      response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+      //response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+      response = whad::generic::CommandResult(WHAD_RESULT_PARAMETER_ERROR).getRaw();
     }
   }
   else if (msg.which_msg == phy_Message_send_tag) {
 
     this->genericController->send(msg.msg.send.packet.bytes, msg.msg.send.packet.size);
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
   }
   else if (msg.which_msg == phy_Message_get_supported_freq_tag) {
     response = Whad::buildPhySupportedFrequencyRangeMessage();
@@ -832,10 +892,12 @@ void Core::processPhyInputMessage(phy_Message msg) {
     if (frequency >= 2400000000L && frequency <= 2500000000L) {
       int frequency_offset = (frequency / 1000000) - 2400;
       this->genericController->setChannel(frequency_offset);
-      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
     }
     else {
-      response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+      //response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+      response = whad::generic::CommandResult(WHAD_RESULT_PARAMETER_ERROR).getRaw();
     }
   }
 
@@ -846,17 +908,20 @@ void Core::processPhyInputMessage(phy_Message msg) {
           this->genericController->getPhy() == GENERIC_PHY_2MBPS_ESB
       ) {
          this->genericController->setPhy(GENERIC_PHY_1MBPS_ESB);
-         response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+         //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+         response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
       }
       else if (
         this->genericController->getPhy() == GENERIC_PHY_1MBPS_BLE ||
         this->genericController->getPhy() == GENERIC_PHY_2MBPS_BLE
       ) {
         this->genericController->setPhy(GENERIC_PHY_1MBPS_BLE);
-        response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+        //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+        response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
       }
       else {
-        response = Whad::buildResultMessage(generic_ResultCode_ERROR);
+        //response = Whad::buildResultMessage(generic_ResultCode_ERROR);
+        response = whad::generic::CommandResult(WHAD_RESULT_ERROR).getRaw();
       }
     }
     else if (msg.msg.datarate.rate == 2000000) {
@@ -865,21 +930,25 @@ void Core::processPhyInputMessage(phy_Message msg) {
           this->genericController->getPhy() == GENERIC_PHY_2MBPS_ESB
       ) {
          this->genericController->setPhy(GENERIC_PHY_2MBPS_ESB);
-         response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+         //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+         response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
       }
       else if (
         this->genericController->getPhy() == GENERIC_PHY_1MBPS_BLE ||
         this->genericController->getPhy() == GENERIC_PHY_2MBPS_BLE
       ) {
         this->genericController->setPhy(GENERIC_PHY_2MBPS_BLE);
-        response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+        //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+        response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
       }
       else {
-        response = Whad::buildResultMessage(generic_ResultCode_ERROR);
+        //response = Whad::buildResultMessage(generic_ResultCode_ERROR);
+        response = whad::generic::CommandResult(WHAD_RESULT_ERROR).getRaw();
       }
     }
     else {
-      response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+      //response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+      response = whad::generic::CommandResult(WHAD_RESULT_PARAMETER_ERROR).getRaw();
     }
   }
   else if (msg.which_msg == phy_Message_endianness_tag) {
@@ -889,7 +958,8 @@ void Core::processPhyInputMessage(phy_Message msg) {
     else {
       this->genericController->setEndianness(GENERIC_ENDIANNESS_LITTLE);
     }
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
   }
   else if (msg.which_msg == phy_Message_tx_power_tag) {
     if (msg.msg.tx_power.tx_power == phy_TXPower_LOW) {
@@ -901,38 +971,46 @@ void Core::processPhyInputMessage(phy_Message msg) {
     else {
       this->genericController->setTxPower(HIGH);
     }
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
   }
 
   else if (msg.which_msg == phy_Message_packet_size_tag) {
     if (msg.msg.packet_size.packet_size <= 252) {
       this->genericController->setPacketSize(msg.msg.packet_size.packet_size);
-      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
     }
     else {
-      response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+      //response = Whad::buildResultMessage(generic_ResultCode_PARAMETER_ERROR);
+      response = whad::generic::CommandResult(WHAD_RESULT_PARAMETER_ERROR).getRaw();
     }
   }
   else if (msg.which_msg == phy_Message_sync_word_tag) {
     this->genericController->setPreamble(msg.msg.sync_word.sync_word.bytes, msg.msg.sync_word.sync_word.size);
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
   }
   else if (msg.which_msg == phy_Message_sniff_tag) {
     if (msg.msg.sniff.iq_stream) {
-      response = Whad::buildResultMessage(generic_ResultCode_ERROR);
+      //response = Whad::buildResultMessage(generic_ResultCode_ERROR);
+      response = whad::generic::CommandResult(WHAD_RESULT_ERROR).getRaw();
     }
     else {
-      response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+      response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
     }
   }
   else if (msg.which_msg == phy_Message_start_tag) {
     this->genericController->start();
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
   }
 
   else if (msg.which_msg == phy_Message_stop_tag) {
     this->genericController->stop();
-    response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
+    response = whad::generic::CommandResult(WHAD_RESULT_SUCCESS).getRaw();
   }
   this->pushMessageToQueue(response);
 }
