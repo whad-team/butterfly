@@ -126,7 +126,22 @@ Message* Whad::buildDiscoveryDomainInfoMessage(whad_domain_t domain) {
 Message* Whad::buildMessageFromPacket(Packet* packet) {
   Message *msg = NULL;
   if (packet->getPacketType() == BLE_PACKET_TYPE) {
-    msg = Whad::buildBLERawPduMessage((BLEPacket*)packet);
+    BLEPacket *blePacket = static_cast<BLEPacket*>(packet);
+    //msg = Whad::buildBLERawPduMessage((BLEPacket*)packet);
+    msg = whad::ble::RawPdu(
+        blePacket->getChannel(),
+        blePacket->getRssi(),
+        blePacket->getConnectionHandle(),
+        blePacket->getAccessAddress(),
+        whad::ble::PDU(packet->getPacketBuffer()+4, blePacket->extractPayloadLength() + 2),
+        blePacket->getCrc(),
+        blePacket->isCrcValid(),
+        blePacket->getTimestamp(),
+        (blePacket->getAccessAddress()==0x8e89bed6)?0:blePacket->getRelativeTimestamp(),
+        (whad::ble::Direction)blePacket->getSource(),
+        false,
+        false
+    ).getRaw();
   }
   else if (packet->getPacketType() == DOT15D4_PACKET_TYPE) {
     msg = Whad::buildDot15d4RawPduMessage((Dot15d4Packet*)packet);
