@@ -12,38 +12,52 @@ void Core::handleInputData(uint8_t *buffer, size_t size) {
 }
 
 void Core::processInputMessage(Message msg) {
-  switch (msg.which_msg) {
-    case Message_generic_tag:
+  whad::NanoPbMsg whadMsg(&msg);
+
+  switch (whadMsg.getType())
+  {
+    case whad::MessageType::GenericMsg:
       this->processGenericInputMessage(msg.msg.generic);
       break;
 
-    case Message_discovery_tag:
+    case whad::MessageType::DiscoveryMsg:
       this->processDiscoveryInputMessage(msg.msg.discovery);
       break;
 
-    case Message_ble_tag:
-      this->processBLEInputMessage(msg.msg.ble);
-      break;
+    case whad::MessageType::DomainMsg:
+    {
+        switch (whadMsg.getDomain())
+        {
+            case whad::MessageDomain::DomainBle:
+                this->processBLEInputMessage(msg.msg.ble);
+                break;
 
-    case Message_zigbee_tag:
-      this->processZigbeeInputMessage(msg.msg.zigbee);
-      break;
+            case whad::MessageDomain::DomainZigbee:
+                this->processZigbeeInputMessage(msg.msg.zigbee);
+                break;
 
-    case Message_esb_tag:
-      this->processESBInputMessage(msg.msg.esb);
-      break;
+            case whad::MessageDomain::DomainEsb:
+                this->processESBInputMessage(msg.msg.esb);
+                break;
 
-    case Message_unifying_tag:
-      this->processUnifyingInputMessage(msg.msg.unifying);
-      break;
+            case whad::MessageDomain::DomainUnifying:
+                this->processUnifyingInputMessage(msg.msg.unifying);
+                break;
 
-    case Message_phy_tag:
-      this->processPhyInputMessage(msg.msg.phy);
-      break;
+            case whad::MessageDomain::DomainPhy:
+                this->processPhyInputMessage(msg.msg.phy);
+                break;
+
+            default:
+                // send error ?
+                break;
+        }
+    }
+    break;
+
     default:
-      // send error ?
-      break;
-  };
+        break;
+  }
 }
 
 void Core::processGenericInputMessage(generic_Message msg) {
