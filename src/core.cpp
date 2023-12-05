@@ -17,12 +17,12 @@ void Core::processInputMessage(Message msg) {
   switch (whadMsg.getType())
   {
     case whad::MessageType::GenericMsg:
-      this->processGenericInputMessage(msg.msg.generic);
+      this->processGenericInputMessage(whadMsg);
       break;
 
     case whad::MessageType::DiscoveryMsg:
-      this->processDiscoveryInputMessage(msg.msg.discovery);
-      break;
+        this->processDiscoveryInputMessage(whad::discovery::DiscoveryMsg(whadMsg));
+        break;
 
     case whad::MessageType::DomainMsg:
     {
@@ -60,63 +60,92 @@ void Core::processInputMessage(Message msg) {
   }
 }
 
-void Core::processGenericInputMessage(generic_Message msg) {
+void Core::processGenericInputMessage(whad::NanoPbMsg msg) {
 }
 
-void Core::processDiscoveryInputMessage(discovery_Message msg) {
-  Message *response = NULL;
+void Core::processDiscoveryInputMessage(whad::discovery::DiscoveryMsg msg) {
+    Message *response = NULL;
 
-  if (msg.which_msg == discovery_Message_reset_query_tag) {
-    // Disable controller
-    this->radio->disable();
-    this->currentController = NULL;
-    this->radio->setController(NULL);
+    switch (msg.getType())
+    {
+        /* Device reset message processing. */
+        case whad::discovery::MessageType::DeviceResetMsg:
+            {
+                // Disable controller
+                this->radio->disable();
+                this->currentController = NULL;
+                this->radio->setController(NULL);
 
-    // Send Ready Response
-    whad::discovery::ReadyResp readyRsp = whad::discovery::ReadyResp();
-    response = readyRsp.getRaw();
-    this->pushMessageToQueue(response);
-  }
-  else if (msg.which_msg == discovery_Message_info_query_tag) {
-        if (msg.msg.info_query.proto_ver <= WHAD_MIN_VERSION) {
-            /* Craft device ID from unique values. */
-            uint8_t deviceId[16];
-            memcpy(&deviceId[0], (const void *)NRF_FICR->DEVICEID, 8);
-            memcpy(&deviceId[8], (const void *)NRF_FICR->DEVICEADDR, 8);
+                // Send Ready Response
+                whad::discovery::ReadyResp readyRsp = whad::discovery::ReadyResp();
+                response = readyRsp.getRaw();
+            }
+            break;
 
-            whad::discovery::DeviceInfoResp deviceInfo(
-                whad::discovery::Butterfly,
-                deviceId,
-                WHAD_MIN_VERSION,
-                115200,
-                std::string(FIRMWARE_AUTHOR),
-                std::string(FIRMWARE_URL),
-                VERSION_MAJOR,
-                VERSION_MINOR,
-                VERSION_REVISION,
-                (whad_domain_desc_t *)CAPABILITIES
-            );
-            response = deviceInfo.getRaw();
-        }
-        else {
-          response = whad::generic::Error().getRaw();
-        }
-        this->pushMessageToQueue(response);
-   }
-   else if (msg.which_msg == discovery_Message_domain_query_tag) {
-      whad_domain_t domain = (whad_domain_t)msg.msg.domain_query.domain;
-      if (Whad::isDomainSupported(domain)) {
-        whad::discovery::DomainInfoResp domainInfoRsp(
-            (whad::discovery::Domains)domain,
-            (whad_domain_desc_t *)CAPABILITIES
-        );
-        response = domainInfoRsp.getRaw();
-      }
-      else {
-        //response = Whad::buildResultMessage(generic_ResultCode_UNSUPPORTED_DOMAIN);
-        response = whad::generic::UnsupportedDomain().getRaw();
-      }
+        /* Device info query message processing. */
+        case whad::discovery::MessageType::DeviceInfoQueryMsg:
+            {
+                whad::discovery::DeviceInfoQuery query(msg);
+
+                if (query.getVersion() <= WHAD_MIN_VERSION)
+                {
+                    /* Craft device ID from unique values. */
+                    uint8_t deviceId[16];
+                    memcpy(&deviceId[0], (const void *)NRF_FICR->DEVICEID, 8);
+                    memcpy(&deviceId[8], (const void *)NRF_FICR->DEVICEADDR, 8);
+
+                    whad::discovery::DeviceInfoResp deviceInfo(
+                        whad::discovery::Butterfly,
+                        deviceId,
+                        WHAD_MIN_VERSION,
+                        115200,
+                        std::string(FIRMWARE_AUTHOR),
+                        std::string(FIRMWARE_URL),
+                        VERSION_MAJOR,
+                        VERSION_MINOR,
+                        VERSION_REVISION,
+                        (whad_domain_desc_t *)CAPABILITIES
+                    );
+                    response = deviceInfo.getRaw();
+                }
+                else
+                {
+                    response = whad::generic::Error().getRaw();
+                }
+
+                this->pushMessageToQueue(response);
+            }
+            break;
+
+        /* Domain info query message processing. */
+        case whad::discovery::MessageType::DomainInfoQueryMsg:
+            {
+                whad::discovery::DomainInfoQuery query(msg);
+                whad::discovery::Domains domain = query.getDomain();
+
+                if (Whad::isDomainSupported((whad_domain_t)domain))
+                {
+                    whad::discovery::DomainInfoResp domainInfoRsp(
+                        (whad::discovery::Domains)domain,
+                        (whad_domain_desc_t *)CAPABILITIES
+                    );
+                    
+                    response = domainInfoRsp.getRaw();
+                }
+                else {
+                    response = whad::generic::UnsupportedDomain().getRaw();
+                }
+
+                this->pushMessageToQueue(response);
+            }
+            break;
+
+        default:
+            response = whad::generic::Error().getRaw();
+            break;
     }
+
+    /* Send response. */
     this->pushMessageToQueue(response);
 }
 

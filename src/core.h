@@ -70,8 +70,8 @@ class Core {
 		void sendDebug(uint8_t *buffer, uint8_t size);
 
 		void processInputMessage(Message msg);
-		void processGenericInputMessage(generic_Message msg);
-		void processDiscoveryInputMessage(discovery_Message msg);
+		void processGenericInputMessage(whad::NanoPbMsg msg);
+		void processDiscoveryInputMessage(whad::discovery::DiscoveryMsg msg);
 		void processZigbeeInputMessage(zigbee_Message msg);
 		void processBLEInputMessage(ble_Message msg);
 		void processESBInputMessage(esb_Message msg);
