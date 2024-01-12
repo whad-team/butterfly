@@ -112,8 +112,6 @@ void Core::processDiscoveryInputMessage(whad::discovery::DiscoveryMsg msg) {
                 {
                     response = whad::generic::Error().getRaw();
                 }
-
-                this->pushMessageToQueue(response);
             }
             break;
 
@@ -135,8 +133,6 @@ void Core::processDiscoveryInputMessage(whad::discovery::DiscoveryMsg msg) {
                 else {
                     response = whad::generic::UnsupportedDomain().getRaw();
                 }
-
-                this->pushMessageToQueue(response);
             }
             break;
 
