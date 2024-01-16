@@ -254,7 +254,7 @@ void Core::processZigbeeInputMessage(zigbee_Message msg) {
   }
   else if (msg.which_msg == zigbee_Message_send_raw_tag) {
     int channel = msg.msg.send_raw.channel;
-    generic_ResultCode code = generic_ResultCode_SUCCESS;
+
     if (channel >= 11 && channel <= 26) {
       /* Set channel. */
       this->dot15d4Controller->setChannel(channel);
