@@ -1049,7 +1049,7 @@ void Core::processPhyInputMessage(phy_Message msg) {
   else if (msg.which_msg == phy_Message_stop_tag) {
     this->genericController->stop();
     //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
-    
+    response = whad::generic::Success().getRaw();
   }
   this->pushMessageToQueue(response);
 }
