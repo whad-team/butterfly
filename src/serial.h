@@ -48,28 +48,27 @@ typedef struct txUartState {
 } txUartState;
 
 class SerialComm {
-public:
-    CoreCallback inputCallback;
-	Core *coreInstance;
+    public:
+        CoreCallback inputCallback;
+        Core *coreInstance;
 
-    rxUartState rxState;
-    txUartState txState;
-    uint8_t rxBuffer[RX_BUFFER_SIZE];
-    uint8_t txBuffer[TX_BUFFER_SIZE];
-    bool txInProgress;
+        rxUartState rxState;
+        txUartState txState;
+        uint8_t rxBuffer[RX_BUFFER_SIZE];
+        uint8_t txBuffer[TX_BUFFER_SIZE];
+        bool txInProgress;
 
-    uint8_t currentByte;
-		static SerialComm *instance;
+        uint8_t currentByte;
+        static SerialComm *instance;
 
-		static void cdcAcmHandler(app_usbd_class_inst_t const * p_inst,app_usbd_cdc_acm_user_event_t event);
-		static void usbdHandler(app_usbd_event_type_t event);
+        static void cdcAcmHandler(app_usbd_class_inst_t const * p_inst,app_usbd_cdc_acm_user_event_t event);
+        static void usbdHandler(app_usbd_event_type_t event);
 
 
-		SerialComm(CoreCallback inputCallback,Core *coreInstance);
-    bool send(uint8_t *buffer, size_t size);
-		void init();
-		void process();
-
+        SerialComm(void);
+        bool send(uint8_t *buffer, size_t size);
+        void init();
+        void process();
 };
 
 APP_USBD_CDC_ACM_GLOBAL_DEF(m_app_cdc_acm,

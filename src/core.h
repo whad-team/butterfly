@@ -83,7 +83,6 @@ class Core {
 		void pushMessageToQueue(Message *msg);
 		Message* popMessageFromQueue();
 
-		void handleInputData(uint8_t *buffer, size_t size);
 		bool sendMessage(Message *msg);
 
 		//void handleCommand(Command *cmd);

@@ -119,20 +119,17 @@ void  SerialComm::usbdHandler(app_usbd_event_type_t event)
 }
 
 
-SerialComm::SerialComm(CoreCallback inputCallback,Core *coreInstance) {
-	instance = this;
-  this->coreInstance = coreInstance;
-  this->inputCallback = inputCallback;
-  this->rxState.index = 0;
-  this->rxState.decoding = false;
-  this->rxState.last_received_byte = 0x00;
-
-  this->txState.size = 0;
-  this->txState.waiting = false;
-	this->txState.done = true;
-  this->currentByte = 0x00;
-  this->txInProgress = false;
-	this->init();
+SerialComm::SerialComm(void) {
+    instance = this;
+    this->rxState.index = 0;
+    this->rxState.decoding = false;
+    this->rxState.last_received_byte = 0x00;
+    this->txState.size = 0;
+    this->txState.waiting = false;
+    this->txState.done = true;
+    this->currentByte = 0x00;
+    this->txInProgress = false;
+    this->init();
 }
 
 void SerialComm::init() {
