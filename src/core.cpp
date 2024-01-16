@@ -1051,6 +1051,9 @@ void Core::processPhyInputMessage(phy_Message msg) {
     //response = Whad::buildResultMessage(generic_ResultCode_SUCCESS);
     response = whad::generic::Success().getRaw();
   }
+  else {
+    response = whad::generic::Error().getRaw();
+  }
   this->pushMessageToQueue(response);
 }
 
