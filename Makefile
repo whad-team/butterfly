@@ -215,7 +215,7 @@ SRC_FILES += \
 	$(WHAD_DIR)/protocol/generic.pb.c \
 	$(WHAD_DIR)/protocol/whad.pb.c \
 	$(WHAD_DIR)/protocol/ble/ble.pb.c \
-	$(WHAD_DIR)/protocol/zigbee/zigbee.pb.c \
+	$(WHAD_DIR)/protocol/dot15d4/dot15d4.pb.c \
 	$(WHAD_DIR)/protocol/esb/esb.pb.c \
 	$(WHAD_DIR)/protocol/unifying/unifying.pb.c \
 	$(WHAD_DIR)/protocol/phy/phy.pb.c \
@@ -287,7 +287,7 @@ INC_FOLDERS += \
 	$(WHAD_DIR)/nanopb \
 	$(WHAD_DIR)/protocol \
 	$(WHAD_DIR)/protocol/ble \
-	$(WHAD_DIR)/protocol/zigbee \
+	$(WHAD_DIR)/protocol/dot15d4 \
 	$(WHAD_DIR)/protocol/esb \
 	$(WHAD_DIR)/protocol/phy \
 

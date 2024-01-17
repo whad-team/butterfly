@@ -227,31 +227,31 @@ Message* Whad::buildESBRawPduMessage(ESBPacket* packet) {
 
 Message* Whad::buildDot15d4RawPduMessage(Dot15d4Packet* packet) {
   Message* msg = Whad::buildMessage();
-  msg->which_msg = Message_zigbee_tag;
-  msg->msg.zigbee.which_msg = zigbee_Message_raw_pdu_tag;
-  msg->msg.zigbee.msg.raw_pdu.has_rssi = true;
-  msg->msg.zigbee.msg.raw_pdu.rssi = packet->getRssi();
-  msg->msg.zigbee.msg.raw_pdu.channel = packet->getChannel();
-  msg->msg.zigbee.msg.raw_pdu.has_timestamp = true;
-  msg->msg.zigbee.msg.raw_pdu.timestamp = packet->getTimestamp();
-  msg->msg.zigbee.msg.raw_pdu.has_fcs_validity = true;
-  msg->msg.zigbee.msg.raw_pdu.fcs_validity = packet->isCrcValid();
-  msg->msg.zigbee.msg.raw_pdu.has_lqi = true;
-  msg->msg.zigbee.msg.raw_pdu.lqi = packet->getLQI();
-  msg->msg.zigbee.msg.raw_pdu.pdu.size = packet->getPacketSize()-3;
-  memcpy(msg->msg.zigbee.msg.raw_pdu.pdu.bytes, packet->getPacketBuffer()+1, packet->getPacketSize()-3);
-  msg->msg.zigbee.msg.raw_pdu.fcs = packet->getFCS();
-  //msg->msg.zigbee.msg.raw_pdu.processed = false;
+  msg->which_msg = Message_dot15d4_tag;
+  msg->msg.dot15d4.which_msg = dot15d4_Message_raw_pdu_tag;
+  msg->msg.dot15d4.msg.raw_pdu.has_rssi = true;
+  msg->msg.dot15d4.msg.raw_pdu.rssi = packet->getRssi();
+  msg->msg.dot15d4.msg.raw_pdu.channel = packet->getChannel();
+  msg->msg.dot15d4.msg.raw_pdu.has_timestamp = true;
+  msg->msg.dot15d4.msg.raw_pdu.timestamp = packet->getTimestamp();
+  msg->msg.dot15d4.msg.raw_pdu.has_fcs_validity = true;
+  msg->msg.dot15d4.msg.raw_pdu.fcs_validity = packet->isCrcValid();
+  msg->msg.dot15d4.msg.raw_pdu.has_lqi = true;
+  msg->msg.dot15d4.msg.raw_pdu.lqi = packet->getLQI();
+  msg->msg.dot15d4.msg.raw_pdu.pdu.size = packet->getPacketSize()-3;
+  memcpy(msg->msg.dot15d4.msg.raw_pdu.pdu.bytes, packet->getPacketBuffer()+1, packet->getPacketSize()-3);
+  msg->msg.dot15d4.msg.raw_pdu.fcs = packet->getFCS();
+  //msg->msg.dot15d4.msg.raw_pdu.processed = false;
   return msg;
 
 }
 
 Message* Whad::buildDot15d4EnergyDetectionSampleMessage(uint32_t sample, uint32_t timestamp) {
   Message* msg = Whad::buildMessage();
-  msg->which_msg = Message_zigbee_tag;
-  msg->msg.zigbee.which_msg = zigbee_Message_ed_sample_tag;
-  msg->msg.zigbee.msg.ed_sample.timestamp = timestamp;
-  msg->msg.zigbee.msg.ed_sample.sample = sample;
+  msg->which_msg = Message_dot15d4_tag;
+  msg->msg.dot15d4.which_msg = dot15d4_Message_ed_sample_tag;
+  msg->msg.dot15d4.msg.ed_sample.timestamp = timestamp;
+  msg->msg.dot15d4.msg.ed_sample.sample = sample;
   return msg;
 
 }

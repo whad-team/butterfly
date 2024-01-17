@@ -26,8 +26,8 @@ void Core::processInputMessage(Message msg) {
                 this->processBLEInputMessage(msg.msg.ble);
                 break;
 
-            case whad::MessageDomain::DomainZigbee:
-                this->processZigbeeInputMessage(msg.msg.zigbee);
+            case whad::MessageDomain::DomainDot15d4:
+                this->processDot15d4InputMessage(msg.msg.dot15d4);
                 break;
 
             case whad::MessageDomain::DomainEsb:
@@ -121,7 +121,7 @@ void Core::processDiscoveryInputMessage(whad::discovery::DiscoveryMsg msg) {
                         (whad::discovery::Domains)domain,
                         (whad_domain_desc_t *)CAPABILITIES
                     );
-                    
+
                     response = domainInfoRsp.getRaw();
                 }
                 else {
@@ -139,13 +139,13 @@ void Core::processDiscoveryInputMessage(whad::discovery::DiscoveryMsg msg) {
     this->pushMessageToQueue(response);
 }
 
-void Core::processZigbeeInputMessage(zigbee_Message msg) {
+void Core::processDot15d4InputMessage(dot15d4_Message msg) {
   Message *response = NULL;
   if (this->currentController != this->dot15d4Controller) {
       this->selectController(DOT15D4_PROTOCOL);
   }
 
-  if (msg.which_msg == zigbee_Message_sniff_tag) {
+  if (msg.which_msg == dot15d4_Message_sniff_tag) {
     int channel = msg.msg.sniff.channel;
     if (channel >= 11 && channel <= 26) {
       this->dot15d4Controller->setChannel(channel);
@@ -157,7 +157,7 @@ void Core::processZigbeeInputMessage(zigbee_Message msg) {
       response = whad::generic::ParameterError().getRaw();
     }
   }
-  else if (msg.which_msg == zigbee_Message_ed_tag) {
+  else if (msg.which_msg == dot15d4_Message_ed_tag) {
     int channel = msg.msg.ed.channel;
     if (channel >= 11 && channel <= 26) {
       this->dot15d4Controller->setChannel(channel);
@@ -168,12 +168,12 @@ void Core::processZigbeeInputMessage(zigbee_Message msg) {
       response = whad::generic::ParameterError().getRaw();
     }
   }
-  else if (msg.which_msg == zigbee_Message_start_tag) {
+  else if (msg.which_msg == dot15d4_Message_start_tag) {
     this->currentController->start();
     response = whad::generic::Success().getRaw();
   }
 
-  else if (msg.which_msg == zigbee_Message_end_device_tag) {
+  else if (msg.which_msg == dot15d4_Message_end_device_tag) {
     int channel = msg.msg.end_device.channel;
     if (channel >= 11 && channel <= 26) {
       this->dot15d4Controller->setChannel(channel);
@@ -187,7 +187,7 @@ void Core::processZigbeeInputMessage(zigbee_Message msg) {
   }
 
 
-  else if (msg.which_msg == zigbee_Message_coordinator_tag) {
+  else if (msg.which_msg == dot15d4_Message_coordinator_tag) {
     int channel = msg.msg.coordinator.channel;
     if (channel >= 11 && channel <= 26) {
       this->dot15d4Controller->setChannel(channel);
@@ -200,7 +200,7 @@ void Core::processZigbeeInputMessage(zigbee_Message msg) {
     }
   }
 
-  else if (msg.which_msg == zigbee_Message_router_tag) {
+  else if (msg.which_msg == dot15d4_Message_router_tag) {
     int channel = msg.msg.router.channel;
     if (channel >= 11 && channel <= 26) {
       this->dot15d4Controller->setChannel(channel);
@@ -212,8 +212,8 @@ void Core::processZigbeeInputMessage(zigbee_Message msg) {
       response = whad::generic::ParameterError().getRaw();
     }
   }
-  else if (msg.which_msg == zigbee_Message_set_node_addr_tag) {
-    if (msg.msg.set_node_addr.address_type == zigbee_AddressType_SHORT) {
+  else if (msg.which_msg == dot15d4_Message_set_node_addr_tag) {
+    if (msg.msg.set_node_addr.address_type == dot15d4_AddressType_SHORT) {
       uint16_t shortAddress = msg.msg.set_node_addr.address & 0xFFFF;
       this->dot15d4Controller->setShortAddress(shortAddress);
       response = whad::generic::Success().getRaw();
@@ -226,13 +226,13 @@ void Core::processZigbeeInputMessage(zigbee_Message msg) {
     }
   }
 
-  else if (msg.which_msg == zigbee_Message_stop_tag) {
+  else if (msg.which_msg == dot15d4_Message_stop_tag) {
     this->currentController->stop();
     response = whad::generic::Success().getRaw();
   }
-  else if (msg.which_msg == zigbee_Message_send_tag) {
+  else if (msg.which_msg == dot15d4_Message_send_tag) {
     int channel = msg.msg.send.channel;
-    
+
     if (channel >= 11 && channel <= 26) {
       /* Set channel. */
       this->dot15d4Controller->setChannel(channel);
@@ -252,7 +252,7 @@ void Core::processZigbeeInputMessage(zigbee_Message msg) {
       response = whad::generic::ParameterError().getRaw();
     }
   }
-  else if (msg.which_msg == zigbee_Message_send_raw_tag) {
+  else if (msg.which_msg == dot15d4_Message_send_raw_tag) {
     int channel = msg.msg.send_raw.channel;
 
     if (channel >= 11 && channel <= 26) {
@@ -266,7 +266,7 @@ void Core::processZigbeeInputMessage(zigbee_Message msg) {
       memcpy(packet+1,msg.msg.send_raw.pdu.bytes, size);
       memcpy(packet+1+size, &msg.msg.send_raw.fcs, 2);
       this->dot15d4Controller->send(packet, size+3, true);
-      free(packet);        
+      free(packet);
 
       /* Success. */
       response = whad::generic::Success().getRaw();
