@@ -2,6 +2,7 @@ PROJECT_NAME     := injectable
 TARGETS          := nrf52840_xxaa
 OUTPUT_DIRECTORY := build
 DIST_DIRECTORY 	 := dist
+SDK_ROOT		 := ../../nRF5_SDK_17.1.0_ddde560/
 
 ifeq ($(PLATFORM),)
     PLATFORM = BOARD_PCA10059
@@ -230,6 +231,7 @@ SRC_FILES += \
 	$(WHAD_DIR)/src/cpp/generic.cpp \
 	$(WHAD_DIR)/src/cpp/discovery.cpp \
 	$(WHAD_DIR)/src/cpp/domains/ble.cpp \
+	$(WHAD_DIR)/src/cpp/domains/phy.cpp \
 	$(WHAD_DIR)/src/cpp/whad.cpp
 
 # Include folders common to all targets

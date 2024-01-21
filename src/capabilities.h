@@ -105,7 +105,7 @@ const whad_domain_desc_t CAPABILITIES[] = {
   {DOMAIN_NONE, CAP_NONE, 0x00000000}
 };
 
-const phy_SupportedFrequencyRanges_FrequencyRange SUPPORTED_FREQUENCY_RANGES[]  = {
+const whad_phy_frequency_range_t SUPPORTED_FREQUENCY_RANGES[]  = {
     {2400000000, 2500000000},
     {0, 0}
 };

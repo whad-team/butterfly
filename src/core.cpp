@@ -39,7 +39,7 @@ void Core::processInputMessage(Message msg) {
                 break;
 
             case whad::MessageDomain::DomainPhy:
-                this->processPhyInputMessage(msg.msg.phy);
+                this->processPhyInputMessage(msg, msg.msg.phy);
                 break;
 
             default:
@@ -826,152 +826,190 @@ void Core::processUnifyingInputMessage(unifying_Message msg) {
   this->pushMessageToQueue(response);
 }
 
-void Core::processPhyInputMessage(phy_Message msg) {
+void Core::processPhyInputMessage(Message msg_raw, phy_Message msg) {
   Message *response = NULL;
+  whad::phy::PhyMsg message(&msg_raw);
 
   if (this->currentController != this->genericController) {
     this->selectController(GENERIC_PROTOCOL);
   }
 
-  if (msg.which_msg == phy_Message_mod_gfsk_tag) {
-    if (msg.msg.mod_gfsk.deviation == 170000) {
-      this->genericController->setPhy(GENERIC_PHY_1MBPS_ESB);
-      response = whad::generic::Success().getRaw();
-    }
-    else if (msg.msg.mod_gfsk.deviation == 250000) {
-      response = whad::generic::Success().getRaw();
-      this->genericController->setPhy(GENERIC_PHY_1MBPS_BLE);
-    }
-    else if (msg.msg.mod_gfsk.deviation == 320000) {
-      this->genericController->setPhy(GENERIC_PHY_2MBPS_ESB);
-      response = whad::generic::Success().getRaw();
-    }
-    else if (msg.msg.mod_gfsk.deviation == 500000) {
-      this->genericController->setPhy(GENERIC_PHY_2MBPS_BLE);
-      response = whad::generic::Success().getRaw();
-    }
-    else {
-      response = whad::generic::ParameterError().getRaw();
-    }
-  }
-  else if (msg.which_msg == phy_Message_send_tag) {
+  switch (message.getType())
+  {
+    case whad::phy::SetGfskModMsg:
+        {
+            if (msg.msg.mod_gfsk.deviation == 170000) {
+            this->genericController->setPhy(GENERIC_PHY_1MBPS_ESB);
+            response = whad::generic::Success().getRaw();
+            }
+            else if (msg.msg.mod_gfsk.deviation == 250000) {
+            response = whad::generic::Success().getRaw();
+            this->genericController->setPhy(GENERIC_PHY_1MBPS_BLE);
+            }
+            else if (msg.msg.mod_gfsk.deviation == 320000) {
+            this->genericController->setPhy(GENERIC_PHY_2MBPS_ESB);
+            response = whad::generic::Success().getRaw();
+            }
+            else if (msg.msg.mod_gfsk.deviation == 500000) {
+            this->genericController->setPhy(GENERIC_PHY_2MBPS_BLE);
+            response = whad::generic::Success().getRaw();
+            }
+            else {
+            response = whad::generic::ParameterError().getRaw();
+            }
+        }
+        break;
 
-    this->genericController->send(msg.msg.send.packet.bytes, msg.msg.send.packet.size);
-    response = whad::generic::Success().getRaw();
-  }
-  else if (msg.which_msg == phy_Message_get_supported_freq_tag) {
-    response = Whad::buildPhySupportedFrequencyRangeMessage();
-  }
-  else if (msg.which_msg == phy_Message_set_freq_tag) {
-    uint64_t frequency = msg.msg.set_freq.frequency;
-    if (frequency >= 2400000000L && frequency <= 2500000000L) {
-      int frequency_offset = (frequency / 1000000) - 2400;
-      this->genericController->setChannel(frequency_offset);
-      response = whad::generic::Success().getRaw();
-    }
-    else {
-      response = whad::generic::ParameterError().getRaw();
-    }
-  }
+    case whad::phy::SendMsg:
+        {
+            this->genericController->send(msg.msg.send.packet.bytes, msg.msg.send.packet.size);
+            response = whad::generic::Success().getRaw();
+        }
+        break;
 
-  else if (msg.which_msg == phy_Message_datarate_tag) {
-    if (msg.msg.datarate.rate == 1000000) {
-      if (
-          this->genericController->getPhy() == GENERIC_PHY_1MBPS_ESB ||
-          this->genericController->getPhy() == GENERIC_PHY_2MBPS_ESB
-      ) {
-         this->genericController->setPhy(GENERIC_PHY_1MBPS_ESB);
-         response = whad::generic::Success().getRaw();
-      }
-      else if (
-        this->genericController->getPhy() == GENERIC_PHY_1MBPS_BLE ||
-        this->genericController->getPhy() == GENERIC_PHY_2MBPS_BLE
-      ) {
-        this->genericController->setPhy(GENERIC_PHY_1MBPS_BLE);
-        response = whad::generic::Success().getRaw();
-      }
-      else {
+    case whad::phy::GetSupportedFreqsMsg:
+        {
+            //response = Whad::buildPhySupportedFrequencyRangeMessage();
+            response = whad::phy::SupportedFreqsResp(SUPPORTED_FREQUENCY_RANGES).getRaw();
+        }
+        break;
+
+    case whad::phy::SetFreqMsg:
+        {
+            uint64_t frequency = msg.msg.set_freq.frequency;
+            if (frequency >= 2400000000L && frequency <= 2500000000L) {
+                int frequency_offset = (frequency / 1000000) - 2400;
+                this->genericController->setChannel(frequency_offset);
+                response = whad::generic::Success().getRaw();
+            }
+            else {
+            response = whad::generic::ParameterError().getRaw();
+            }            
+        }
+        break;
+
+    case whad::phy::SetDatarateMsg:
+        {
+            if (msg.msg.datarate.rate == 1000000) {
+                if (
+                    this->genericController->getPhy() == GENERIC_PHY_1MBPS_ESB ||
+                    this->genericController->getPhy() == GENERIC_PHY_2MBPS_ESB
+                ) {
+                    this->genericController->setPhy(GENERIC_PHY_1MBPS_ESB);
+                    response = whad::generic::Success().getRaw();
+                }
+                else if (
+                    this->genericController->getPhy() == GENERIC_PHY_1MBPS_BLE ||
+                    this->genericController->getPhy() == GENERIC_PHY_2MBPS_BLE
+                ) {
+                    this->genericController->setPhy(GENERIC_PHY_1MBPS_BLE);
+                    response = whad::generic::Success().getRaw();
+                }
+                else {
+                    response = whad::generic::Error().getRaw();
+                }
+            }
+            else if (msg.msg.datarate.rate == 2000000) {
+                if (
+                    this->genericController->getPhy() == GENERIC_PHY_1MBPS_ESB ||
+                    this->genericController->getPhy() == GENERIC_PHY_2MBPS_ESB
+                ) {
+                    this->genericController->setPhy(GENERIC_PHY_2MBPS_ESB);
+                    response = whad::generic::Success().getRaw();
+                }
+                else if (
+                    this->genericController->getPhy() == GENERIC_PHY_1MBPS_BLE ||
+                    this->genericController->getPhy() == GENERIC_PHY_2MBPS_BLE
+                ) {
+                    this->genericController->setPhy(GENERIC_PHY_2MBPS_BLE);
+                    response = whad::generic::Success().getRaw();
+                }
+                else {
+                    response = whad::generic::Error().getRaw();
+                }
+            }
+            else {
+                response = whad::generic::ParameterError().getRaw();
+            }
+        }
+        break;
+
+    case whad::phy::SetEndiannessMsg:
+        {
+            if (msg.msg.endianness.endianness == phy_Endianness_BIG) {
+                this->genericController->setEndianness(GENERIC_ENDIANNESS_BIG);
+            }
+            else {
+                this->genericController->setEndianness(GENERIC_ENDIANNESS_LITTLE);
+            }
+            response = whad::generic::Success().getRaw();
+        }
+        break;
+
+    case whad::phy::SetTxPowerMsg:
+        {
+            if (msg.msg.tx_power.tx_power == phy_TXPower_LOW) {
+                this->genericController->setTxPower(LOW);
+            }
+            else if (msg.msg.tx_power.tx_power == phy_TXPower_MEDIUM) {
+                this->genericController->setTxPower(MEDIUM);
+            }
+            else {
+                this->genericController->setTxPower(HIGH);
+            }
+            response = whad::generic::Success().getRaw();
+        }
+        break;
+
+    case whad::phy::SetPacketSizeMsg:
+        {
+            if (msg.msg.packet_size.packet_size <= 252) {
+                this->genericController->setPacketSize(msg.msg.packet_size.packet_size);
+                response = whad::generic::Success().getRaw();
+            }
+            else {
+                response = whad::generic::ParameterError().getRaw();
+            }
+        }
+        break;
+
+    case whad::phy::SetSyncWordMsg:
+        {
+            this->genericController->setPreamble(msg.msg.sync_word.sync_word.bytes, msg.msg.sync_word.sync_word.size);
+            response = whad::generic::Success().getRaw();
+        }
+        break;
+
+    case whad::phy::SetSniffModeMsg:
+        {
+            if (msg.msg.sniff.iq_stream) {
+                response = whad::generic::Error().getRaw();
+            }
+            else {
+                response = whad::generic::Success().getRaw();
+            }
+        }
+        break;
+
+    case whad::phy::StartMsg:
+        {
+            this->genericController->start();
+            response = whad::generic::Success().getRaw();
+        }
+        break;
+
+    case whad::phy::StopMsg:
+        {
+            this->genericController->stop();
+            response = whad::generic::Success().getRaw();
+        }
+        break;
+
+    default:
         response = whad::generic::Error().getRaw();
-      }
-    }
-    else if (msg.msg.datarate.rate == 2000000) {
-      if (
-          this->genericController->getPhy() == GENERIC_PHY_1MBPS_ESB ||
-          this->genericController->getPhy() == GENERIC_PHY_2MBPS_ESB
-      ) {
-         this->genericController->setPhy(GENERIC_PHY_2MBPS_ESB);
-         response = whad::generic::Success().getRaw();
-      }
-      else if (
-        this->genericController->getPhy() == GENERIC_PHY_1MBPS_BLE ||
-        this->genericController->getPhy() == GENERIC_PHY_2MBPS_BLE
-      ) {
-        this->genericController->setPhy(GENERIC_PHY_2MBPS_BLE);
-        response = whad::generic::Success().getRaw();
-      }
-      else {
-        response = whad::generic::Error().getRaw();
-      }
-    }
-    else {
-      response = whad::generic::ParameterError().getRaw();
-    }
-  }
-  else if (msg.which_msg == phy_Message_endianness_tag) {
-    if (msg.msg.endianness.endianness == phy_Endianness_BIG) {
-      this->genericController->setEndianness(GENERIC_ENDIANNESS_BIG);
-    }
-    else {
-      this->genericController->setEndianness(GENERIC_ENDIANNESS_LITTLE);
-    }
-    response = whad::generic::Success().getRaw();
-  }
-  else if (msg.which_msg == phy_Message_tx_power_tag) {
-    if (msg.msg.tx_power.tx_power == phy_TXPower_LOW) {
-      this->genericController->setTxPower(LOW);
-    }
-    else if (msg.msg.tx_power.tx_power == phy_TXPower_MEDIUM) {
-      this->genericController->setTxPower(MEDIUM);
-    }
-    else {
-      this->genericController->setTxPower(HIGH);
-    }
-    response = whad::generic::Success().getRaw();
+        break;
   }
 
-  else if (msg.which_msg == phy_Message_packet_size_tag) {
-    if (msg.msg.packet_size.packet_size <= 252) {
-      this->genericController->setPacketSize(msg.msg.packet_size.packet_size);
-      response = whad::generic::Success().getRaw();
-    }
-    else {
-      response = whad::generic::ParameterError().getRaw();
-    }
-  }
-  else if (msg.which_msg == phy_Message_sync_word_tag) {
-    this->genericController->setPreamble(msg.msg.sync_word.sync_word.bytes, msg.msg.sync_word.sync_word.size);
-    response = whad::generic::Success().getRaw();
-  }
-  else if (msg.which_msg == phy_Message_sniff_tag) {
-    if (msg.msg.sniff.iq_stream) {
-      response = whad::generic::Error().getRaw();
-    }
-    else {
-      response = whad::generic::Success().getRaw();
-    }
-  }
-  else if (msg.which_msg == phy_Message_start_tag) {
-    this->genericController->start();
-    response = whad::generic::Success().getRaw();
-  }
-
-  else if (msg.which_msg == phy_Message_stop_tag) {
-    this->genericController->stop();
-    response = whad::generic::Success().getRaw();
-  }
-  else {
-    response = whad::generic::Error().getRaw();
-  }
   this->pushMessageToQueue(response);
 }
 
