@@ -224,6 +224,7 @@ SRC_FILES += \
 	$(WHAD_DIR)/src/discovery.c \
 	$(WHAD_DIR)/src/domains/ble.c \
 	$(WHAD_DIR)/src/domains/phy.c \
+	$(WHAD_DIR)/src/domains/esb.c \
 	$(WHAD_DIR)/src/ringbuf.c \
 	$(WHAD_DIR)/src/transport.c \
 	$(WHAD_DIR)/src/whad.c \
