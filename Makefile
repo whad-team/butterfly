@@ -233,6 +233,7 @@ SRC_FILES += \
 	$(WHAD_DIR)/src/cpp/discovery.cpp \
 	$(WHAD_DIR)/src/cpp/domains/ble.cpp \
 	$(WHAD_DIR)/src/cpp/domains/phy.cpp \
+	$(WHAD_DIR)/src/cpp/domains/esb.cpp \
 	$(WHAD_DIR)/src/cpp/whad.cpp
 
 # Include folders common to all targets
