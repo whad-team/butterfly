@@ -882,7 +882,7 @@ void Core::processPhyInputMessage(whad::phy::PhyMsg msg) {
         {
             whad::phy::SendPacket query(msg);
             whad::phy::Packet packet = query.getPacket();
-            this->genericController->send(packet.getBuf(), packet.getLength());
+            this->genericController->send(packet.getBytes(), packet.getSize());
             response = whad::generic::Success().getRaw();
         }
         break;
