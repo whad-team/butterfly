@@ -183,18 +183,6 @@ SRC_FILES += \
 	$(PROJ_DIR)/packet.cpp \
 	$(PROJ_DIR)/whad/callbacks/callbacks.cpp
 
-#$(PROJ_DIR)/whad/protocol/device.pb.c \
-#$(PROJ_DIR)/whad/protocol/generic.pb.c \
-#$(PROJ_DIR)/whad/protocol/whad.pb.c \
-#$(PROJ_DIR)/whad/protocol/ble/ble.pb.c \
-#$(PROJ_DIR)/whad/protocol/zigbee/zigbee.pb.c \
-#$(PROJ_DIR)/whad/protocol/esb/esb.pb.c \
-#$(PROJ_DIR)/whad/protocol/unifying/unifying.pb.c \
-#$(PROJ_DIR)/whad/protocol/phy/phy.pb.c \
-#$(PROJ_DIR)/whad/nanopb/pb_common.c \
-#$(PROJ_DIR)/whad/nanopb/pb_decode.c \
-#$(PROJ_DIR)/whad/nanopb/pb_encode.c
-
 SRC_FILES += \
 	$(PROJ_DIR)/whad/whad_.cpp \
 	$(PROJ_DIR)/controllers/dot15d4controller.cpp \
@@ -207,34 +195,16 @@ SRC_FILES += \
 	$(PROJ_DIR)/main.cpp \
 
 # WHAD Library
-SRC_FILES += \
-	$(WHAD_DIR)/nanopb/pb_common.c \
-	$(WHAD_DIR)/nanopb/pb_decode.c \
-	$(WHAD_DIR)/nanopb/pb_encode.c \
-	$(WHAD_DIR)/nanopb/pb_encode.c \
-	$(WHAD_DIR)/protocol/device.pb.c \
-	$(WHAD_DIR)/protocol/generic.pb.c \
-	$(WHAD_DIR)/protocol/whad.pb.c \
-	$(WHAD_DIR)/protocol/ble/ble.pb.c \
-	$(WHAD_DIR)/protocol/zigbee/zigbee.pb.c \
-	$(WHAD_DIR)/protocol/esb/esb.pb.c \
-	$(WHAD_DIR)/protocol/unifying/unifying.pb.c \
-	$(WHAD_DIR)/protocol/phy/phy.pb.c \
-	$(WHAD_DIR)/src/generic.c \
-	$(WHAD_DIR)/src/discovery.c \
-	$(WHAD_DIR)/src/domains/ble.c \
-	$(WHAD_DIR)/src/domains/phy.c \
-	$(WHAD_DIR)/src/domains/esb.c \
-	$(WHAD_DIR)/src/ringbuf.c \
-	$(WHAD_DIR)/src/transport.c \
-	$(WHAD_DIR)/src/whad.c \
-	$(WHAD_DIR)/src/cpp/message.cpp \
-	$(WHAD_DIR)/src/cpp/generic.cpp \
-	$(WHAD_DIR)/src/cpp/discovery.cpp \
-	$(WHAD_DIR)/src/cpp/domains/ble.cpp \
-	$(WHAD_DIR)/src/cpp/domains/phy.cpp \
-	$(WHAD_DIR)/src/cpp/domains/esb.cpp \
-	$(WHAD_DIR)/src/cpp/whad.cpp
+WHAD_SRC := $(wildcard $(WHAD_DIR)/nanopb/*.c) \
+	$(wildcard $(WHAD_DIR)/protocol/*.c) \
+	$(wildcard $(WHAD_DIR)/protocol/*/*.c) \
+	$(wildcard $(WHAD_DIR)/src/*.c) \
+	$(wildcard $(WHAD_DIR)/src/domains/*.c) \
+	$(wildcard $(WHAD_DIR)/src/cpp/*.cpp) \
+	$(wildcard $(WHAD_DIR)/src/cpp/domains/*.cpp) \
+	$(wildcard $(WHAD_DIR)/src/cpp/generic/*.cpp)
+SRC_FILES += $(WHAD_SRC)
+
 
 # Include folders common to all targets
 INC_FOLDERS += \
@@ -288,6 +258,7 @@ INC_FOLDERS += \
 INC_FOLDERS += \
 	$(WHAD_DIR)/ \
 	$(WHAD_DIR)/inc \
+	$(WHAD_DIR)/inc/cpp \
 	$(WHAD_DIR)/nanopb \
 	$(WHAD_DIR)/protocol \
 	$(WHAD_DIR)/protocol/ble \
