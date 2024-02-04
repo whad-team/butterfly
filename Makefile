@@ -202,6 +202,7 @@ WHAD_SRC := $(wildcard $(WHAD_DIR)/nanopb/*.c) \
 	$(wildcard $(WHAD_DIR)/src/domains/*.c) \
 	$(wildcard $(WHAD_DIR)/src/cpp/*.cpp) \
 	$(wildcard $(WHAD_DIR)/src/cpp/domains/*.cpp) \
+	$(wildcard $(WHAD_DIR)/src/cpp/discovery/*.cpp) \
 	$(wildcard $(WHAD_DIR)/src/cpp/generic/*.cpp)
 SRC_FILES += $(WHAD_SRC)
 
