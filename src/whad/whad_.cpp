@@ -240,7 +240,9 @@ Message* Whad::buildDot15d4RawPduMessage(Dot15d4Packet* packet) {
   msg->msg.dot15d4.msg.raw_pdu.lqi = packet->getLQI();
   msg->msg.dot15d4.msg.raw_pdu.pdu.size = packet->getPacketSize()-3;
   memcpy(msg->msg.dot15d4.msg.raw_pdu.pdu.bytes, packet->getPacketBuffer()+1, packet->getPacketSize()-3);
-  msg->msg.dot15d4.msg.raw_pdu.fcs = packet->getFCS();
+  uint16_t fcs = ((packet->getFCS() & 0x00FF) << 8) | ((packet->getFCS() & 0xFF00) >> 8);
+
+  msg->msg.dot15d4.msg.raw_pdu.fcs = fcs;
   //msg->msg.dot15d4.msg.raw_pdu.processed = false;
   return msg;
 

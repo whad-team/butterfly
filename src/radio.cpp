@@ -1315,19 +1315,23 @@ extern "C" void RADIO_IRQHandler(void) {
 				else if (Radio::instance->getState() == RX) {
 
 					uint8_t bufferSize = 0;
-					if (Radio::instance->getHeader().s0 != 0) {
-						bufferSize += 1;
-					}
-					if (Radio::instance->getHeader().s1 != 0) {
-						bufferSize += 1;
-					}
-					if (Radio::instance->getHeader().length != 0) {
-						bufferSize += 1+(Radio::instance->getHeader().s0 == 0 ? Radio::instance->rxBuffer[0] : Radio::instance->rxBuffer[1]);
+					if (Radio::instance->getPhy() == DOT15D4_NATIVE)  {
+						bufferSize = 128;
 					}
 					else {
-						bufferSize += Radio::instance->getPayloadLength();
+						if (Radio::instance->getHeader().s0 != 0) {
+							bufferSize += 1;
+						}
+						if (Radio::instance->getHeader().s1 != 0) {
+							bufferSize += 1;
+						}
+						if (Radio::instance->getHeader().length != 0) {
+							bufferSize += 1+(Radio::instance->getHeader().s0 == 0 ? Radio::instance->rxBuffer[0] : Radio::instance->rxBuffer[1]);
+						}
+						else {
+							bufferSize += Radio::instance->getPayloadLength();
+						}
 					}
-
 					if (bufferSize <= 2+Radio::instance->getPayloadLength()) {
 						uint8_t *buffer = (uint8_t *)malloc(sizeof(uint8_t)*bufferSize);
 						memcpy(buffer,Radio::instance->rxBuffer,bufferSize);
