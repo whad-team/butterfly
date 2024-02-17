@@ -291,17 +291,19 @@ void Core::processBLEInputMessage(ble_Message msg, whad::ble::BleMsg bleMsg) {
     {
         case whad::ble::SniffAdvMsg:
         {
-            int channel = msg.msg.sniff_adv.channel;
-            this->bleController->setChannel(channel);
+            whad::ble::SniffAdv query(bleMsg);
+            uint8_t *bd_addr = query.getAddress().getAddressBuf();
+
+            this->bleController->setChannel(query.getChannel());
             this->bleController->setAdvertisementsTransmitIndicator(true);
             this->bleController->setFilter(
                                             true,
-                                            msg.msg.sniff_adv.bd_address[5],
-                                            msg.msg.sniff_adv.bd_address[4],
-                                            msg.msg.sniff_adv.bd_address[3],
-                                            msg.msg.sniff_adv.bd_address[2],
-                                            msg.msg.sniff_adv.bd_address[1],
-                                            msg.msg.sniff_adv.bd_address[0]
+                                            bd_addr[5],
+                                            bd_addr[4],
+                                            bd_addr[3],
+                                            bd_addr[2],
+                                            bd_addr[1],
+                                            bd_addr[0]
             );
             this->bleController->setFollowMode(false);
             this->bleController->sniff();
@@ -311,13 +313,10 @@ void Core::processBLEInputMessage(ble_Message msg, whad::ble::BleMsg bleMsg) {
 
         case whad::ble::ReactiveJamMsg:
         {
-            int channel = msg.msg.reactive_jam.channel;
-            uint8_t *pattern = msg.msg.reactive_jam.pattern.bytes;
-            size_t pattern_size = msg.msg.reactive_jam.pattern.size;
-            int position = msg.msg.reactive_jam.position;
-
-            this->bleController->setChannel(channel);
-            this->bleController->setReactiveJammerConfiguration(pattern, pattern_size, position );
+            whad::ble::ReactiveJam query(bleMsg);
+            
+            this->bleController->setChannel(query.getChannel());
+            this->bleController->setReactiveJammerConfiguration(query.getPattern(), query.getPatternLength(), query.getPosition());
             response = whad::generic::Success().getRaw();
         }
         break;
@@ -395,7 +394,8 @@ void Core::processBLEInputMessage(ble_Message msg, whad::ble::BleMsg bleMsg) {
 
         case whad::ble::ScanModeMsg:
         {
-            this->bleController->startScanning(msg.msg.scan_mode.active_scan);
+            whad::ble::ScanMode query(bleMsg);
+            this->bleController->startScanning(query.isActiveModeEnabled());
             response = whad::generic::Success().getRaw();
         }
         break;
@@ -510,12 +510,20 @@ void Core::processBLEInputMessage(ble_Message msg, whad::ble::BleMsg bleMsg) {
 
         case whad::ble::PeriphModeMsg:
         {
+            whad::ble::PeripheralMode query(bleMsg);
+
             if (this->bleController->getState() == SIMULATING_SLAVE || this->bleController->getState() == PERFORMING_MITM) {
                 response = whad::generic::Success().getRaw();
             }
             else {
                 //this->bleController->setEmptyTransmitIndicator(true);
-                this->bleController->advertise(msg.msg.periph_mode.scan_data.bytes, msg.msg.periph_mode.scan_data.size, msg.msg.periph_mode.scanrsp_data.bytes, msg.msg.periph_mode.scanrsp_data.size, true, 100);
+
+                //this->bleController->advertise(msg.msg.periph_mode.scan_data.bytes, msg.msg.periph_mode.scan_data.size, msg.msg.periph_mode.scanrsp_data.bytes, msg.msg.periph_mode.scanrsp_data.size, true, 100);
+                this->bleController->advertise(
+                    query.getAdvData(), query.getAdvDataLength(),
+                    query.getScanRsp(), query.getScanRspLength(),
+                    true,
+                    100);
                 this->bleController->start();
                 response = whad::generic::Success().getRaw();
             }
@@ -524,14 +532,17 @@ void Core::processBLEInputMessage(ble_Message msg, whad::ble::BleMsg bleMsg) {
 
         case whad::ble::ConnectToMsg:
         {
+            whad::ble::ConnectTo query(bleMsg);
+            uint8_t *bd_address = query.getTargetAddr().getAddressBuf();
+
             this->bleController->setChannel(37);
             uint8_t address[6];
-            address[0] = msg.msg.connect.bd_address[5];
-            address[1] = msg.msg.connect.bd_address[4];
-            address[2] = msg.msg.connect.bd_address[3];
-            address[3] = msg.msg.connect.bd_address[2];
-            address[4] = msg.msg.connect.bd_address[1];
-            address[5] = msg.msg.connect.bd_address[0];
+            address[0] = bd_address[5];
+            address[1] = bd_address[4];
+            address[2] = bd_address[3];
+            address[3] = bd_address[2];
+            address[4] = bd_address[1];
+            address[5] = bd_address[0];
 
             uint32_t accessAddress = 0x23a3d487;
             uint32_t crcInit = 0x049095;
@@ -544,25 +555,34 @@ void Core::processBLEInputMessage(ble_Message msg, whad::ble::BleMsg bleMsg) {
             0xFF,
             0x1F
             };
-            if (msg.msg.connect.has_access_address) {
-            accessAddress = msg.msg.connect.access_address;
-            }
-            if (msg.msg.connect.has_channel_map) {
-            memcpy(channelMap, msg.msg.connect.channel_map, 5);
+
+            if (query.getAccessAddr() != 0)
+            {
+                accessAddress = query.getAccessAddr();
             }
 
-            if (msg.msg.connect.has_crc_init) {
-            crcInit = msg.msg.connect.crc_init;
+            if (!query.getChannelMap().isNull())
+            {
+                memcpy(channelMap, query.getChannelMap().getChannelMapBuf(), 5);
             }
 
-            if (msg.msg.connect.has_hop_interval) {
-            hopInterval = msg.msg.connect.hop_interval;
+            if (query.getCrcInit() != 0)
+            {
+                crcInit = query.getCrcInit();
             }
 
-            if (msg.msg.connect.has_hop_increment) {
-            hopIncrement = msg.msg.connect.hop_increment;
+            if (query.getHopInterval() != 0)
+            {
+                hopInterval = query.getHopInterval();
             }
+
+            if (query.getHopIncrement() != 0)
+            {
+                hopIncrement = query.getHopIncrement();
+            }
+
             //this->bleController->setEmptyTransmitIndicator(true);
+
             this->bleController->connect(
                 address,
                 msg.msg.connect.addr_type == ble_BleAddrType_RANDOM,
@@ -595,19 +615,19 @@ void Core::processBLEInputMessage(ble_Message msg, whad::ble::BleMsg bleMsg) {
             Trigger* trigger = NULL;
 
             if (
-            msg.msg.prepare.direction == ble_BleDirection_INJECTION_TO_SLAVE ||
-            msg.msg.prepare.direction == ble_BleDirection_MASTER_TO_SLAVE
+                msg.msg.prepare.direction == ble_BleDirection_INJECTION_TO_SLAVE ||
+                msg.msg.prepare.direction == ble_BleDirection_MASTER_TO_SLAVE
             ) {
-            direction = BLE_TO_SLAVE;
+                direction = BLE_TO_SLAVE;
             }
             else if (
-            msg.msg.prepare.direction == ble_BleDirection_INJECTION_TO_MASTER ||
-            msg.msg.prepare.direction == ble_BleDirection_SLAVE_TO_MASTER
+                msg.msg.prepare.direction == ble_BleDirection_INJECTION_TO_MASTER ||
+                msg.msg.prepare.direction == ble_BleDirection_SLAVE_TO_MASTER
             ) {
-            direction = BLE_TO_MASTER;
+                direction = BLE_TO_MASTER;
             }
             else {
-            response = whad::generic::WrongMode().getRaw();
+                response = whad::generic::WrongMode().getRaw();
             }
             if (response == NULL) {
             if (msg.msg.prepare.trigger.which_trigger == ble_PrepareSequenceCmd_Trigger_reception_tag) {
@@ -658,12 +678,12 @@ void Core::processBLEInputMessage(ble_Message msg, whad::ble::BleMsg bleMsg) {
         case whad::ble::SetBdAddressMsg:
         {
             uint8_t address[6] = {
-            msg.msg.set_bd_addr.bd_address[5],
-            msg.msg.set_bd_addr.bd_address[4],
-            msg.msg.set_bd_addr.bd_address[3],
-            msg.msg.set_bd_addr.bd_address[2],
-            msg.msg.set_bd_addr.bd_address[1],
-            msg.msg.set_bd_addr.bd_address[0]
+                msg.msg.set_bd_addr.bd_address[5],
+                msg.msg.set_bd_addr.bd_address[4],
+                msg.msg.set_bd_addr.bd_address[3],
+                msg.msg.set_bd_addr.bd_address[2],
+                msg.msg.set_bd_addr.bd_address[1],
+                msg.msg.set_bd_addr.bd_address[0]
             };
             this->bleController->setOwnAddress(address, false);
             response = whad::generic::Success().getRaw();
