@@ -323,20 +323,20 @@ void Core::processBLEInputMessage(ble_Message msg, whad::ble::BleMsg bleMsg) {
 
         case whad::ble::SniffConnReqMsg:
         {
-            int channel = msg.msg.sniff_connreq.channel;
-            bool show_advertisements = msg.msg.sniff_connreq.show_advertisements;
-            bool show_empty_packets = msg.msg.sniff_connreq.show_empty_packets;
-            this->bleController->setChannel(channel);
-            this->bleController->setAdvertisementsTransmitIndicator(show_advertisements);
-            this->bleController->setEmptyTransmitIndicator(show_empty_packets);
+            whad::ble::SniffConnReq query(bleMsg);
+            uint8_t *bd_address = query.getTargetAddress().getAddressBuf();
+
+            this->bleController->setChannel(query.getChannel());
+            this->bleController->setAdvertisementsTransmitIndicator(query.mustReportAdv());
+            this->bleController->setEmptyTransmitIndicator(query.mustReportEmpty());
             this->bleController->setFilter(
-                                            false,
-                                            msg.msg.sniff_connreq.bd_address[5],
-                                            msg.msg.sniff_connreq.bd_address[4],
-                                            msg.msg.sniff_connreq.bd_address[3],
-                                            msg.msg.sniff_connreq.bd_address[2],
-                                            msg.msg.sniff_connreq.bd_address[1],
-                                            msg.msg.sniff_connreq.bd_address[0]
+                false,
+                bd_address[5],
+                bd_address[4],
+                bd_address[3],
+                bd_address[2],
+                bd_address[1],
+                bd_address[0]
             );
             this->bleController->setFollowMode(true);
             this->bleController->sniff();
@@ -346,8 +346,10 @@ void Core::processBLEInputMessage(ble_Message msg, whad::ble::BleMsg bleMsg) {
 
         case whad::ble::SniffAAMsg:
         {
+            whad::ble::SniffAccessAddress query(bleMsg);
+            
             this->bleController->setChannel(0);
-            this->bleController->setMonitoredChannels(msg.msg.sniff_aa.monitored_channels);
+            this->bleController->setMonitoredChannels(query.getChannelMap().getChannelMapBuf());
             this->bleController->sniffAccessAddresses();
             response = whad::generic::Success().getRaw();
         }
@@ -355,23 +357,26 @@ void Core::processBLEInputMessage(ble_Message msg, whad::ble::BleMsg bleMsg) {
 
         case whad::ble::SniffActConnMsg:
         {
+            whad::ble::SniffActiveConn query(bleMsg);
+            
             this->bleController->setChannel(0);
-            this->bleController->setMonitoredChannels(msg.msg.sniff_conn.monitored_channels);
+            this->bleController->setMonitoredChannels(query.getChannels().getChannelMapBuf());
 
-            if (msg.msg.sniff_conn.crc_init == 0) {
-            this->bleController->recoverCrcInit(msg.msg.sniff_conn.access_address);
+            if (query.getCrcInit() == 0)
+            {
+                this->bleController->recoverCrcInit(query.getAccessAddress());
             }
-            else if (msg.msg.sniff_conn.channel_map[0] == 0 && msg.msg.sniff_conn.channel_map[1] == 0 && msg.msg.sniff_conn.channel_map[2] == 0 && msg.msg.sniff_conn.channel_map[3] == 0 && msg.msg.sniff_conn.channel_map[4] == 0) {
-            this->bleController->recoverChannelMap(msg.msg.sniff_conn.access_address, msg.msg.sniff_conn.crc_init);
+            else if (query.getChannelMap().isNull()) {
+                this->bleController->recoverChannelMap(query.getAccessAddress(), query.getCrcInit());
             }
-            else if (msg.msg.sniff_conn.hop_interval == 0) {
-            this->bleController->recoverHopInterval(msg.msg.sniff_conn.access_address, msg.msg.sniff_conn.crc_init, msg.msg.sniff_conn.channel_map);
+            else if (query.getHopInterval() == 0) {
+                this->bleController->recoverHopInterval(query.getAccessAddress(), query.getCrcInit(), query.getChannelMap().getChannelMapBuf());
             }
-            else if (msg.msg.sniff_conn.hop_increment == 0) {
-            this->bleController->recoverHopIncrement(msg.msg.sniff_conn.access_address, msg.msg.sniff_conn.crc_init, msg.msg.sniff_conn.channel_map, msg.msg.sniff_conn.hop_interval);
+            else if (query.getHopIncrement() == 0) {
+                this->bleController->recoverHopIncrement(query.getAccessAddress(), query.getCrcInit(), query.getChannelMap().getChannelMapBuf(), query.getHopInterval());
             }
             else {
-            this->bleController->attachToExistingConnection(msg.msg.sniff_conn.access_address, msg.msg.sniff_conn.crc_init, msg.msg.sniff_conn.channel_map, msg.msg.sniff_conn.hop_interval, msg.msg.sniff_conn.hop_increment);
+                this->bleController->attachToExistingConnection(query.getAccessAddress(), query.getCrcInit(), query.getChannelMap().getChannelMapBuf(), query.getHopInterval(), query.getHopIncrement());
             }
 
             response = whad::generic::Success().getRaw();
@@ -395,6 +400,7 @@ void Core::processBLEInputMessage(ble_Message msg, whad::ble::BleMsg bleMsg) {
         case whad::ble::ScanModeMsg:
         {
             whad::ble::ScanMode query(bleMsg);
+            
             this->bleController->startScanning(query.isActiveModeEnabled());
             response = whad::generic::Success().getRaw();
         }
@@ -665,7 +671,9 @@ void Core::processBLEInputMessage(ble_Message msg, whad::ble::BleMsg bleMsg) {
 
         case whad::ble::PrepareSeqTriggerMsg:
         {
-            uint8_t id = msg.msg.trigger.id;
+            whad::ble::ManualTrigger query(bleMsg);
+
+            uint8_t id = query.getId();
             if (this->bleController->checkManualTriggers(id)) {
                 response = whad::generic::Success().getRaw();
             }
@@ -677,13 +685,16 @@ void Core::processBLEInputMessage(ble_Message msg, whad::ble::BleMsg bleMsg) {
 
         case whad::ble::SetBdAddressMsg:
         {
+            whad::ble::SetBdAddress query(bleMsg);
+            uint8_t *bd_address = query.getAddress()->getAddressBuf();
+
             uint8_t address[6] = {
-                msg.msg.set_bd_addr.bd_address[5],
-                msg.msg.set_bd_addr.bd_address[4],
-                msg.msg.set_bd_addr.bd_address[3],
-                msg.msg.set_bd_addr.bd_address[2],
-                msg.msg.set_bd_addr.bd_address[1],
-                msg.msg.set_bd_addr.bd_address[0]
+                bd_address[5],
+                bd_address[4],
+                bd_address[3],
+                bd_address[2],
+                bd_address[1],
+                bd_address[0]
             };
             this->bleController->setOwnAddress(address, false);
             response = whad::generic::Success().getRaw();
@@ -692,7 +703,9 @@ void Core::processBLEInputMessage(ble_Message msg, whad::ble::BleMsg bleMsg) {
 
         case whad::ble::PrepareSeqDeleteMsg:
         {
-            uint8_t id = msg.msg.delete_seq.id;
+            whad::ble::DeleteSequence query(bleMsg);
+
+            uint8_t id = query.getId();
             if (this->bleController->deleteSequence(id)) {
             response = whad::generic::Success().getRaw();
             }
@@ -704,10 +717,12 @@ void Core::processBLEInputMessage(ble_Message msg, whad::ble::BleMsg bleMsg) {
 
         case whad::ble::SetEncryptionMsg:
         {
-            if (msg.msg.encryption.enabled) {
+            whad::ble::SetEncryption query(bleMsg);
+
+            if (query.isEnabled()) {
                 this->bleController->configureEncryption(
-                    msg.msg.encryption.ll_key,
-                    msg.msg.encryption.ll_iv,
+                    query.getLLKey(),
+                    query.getLLIv(),
                     0
                 );
                 if (this->bleController->startEncryption()) {
@@ -716,8 +731,8 @@ void Core::processBLEInputMessage(ble_Message msg, whad::ble::BleMsg bleMsg) {
                 else {
                     response = whad::generic::Error().getRaw();
                 }
-                }
-                else {
+            }
+            else {
                 if (this->bleController->stopEncryption()) {
                     response = whad::generic::Success().getRaw();
                 }
