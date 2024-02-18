@@ -617,6 +617,8 @@ void Core::processBLEInputMessage(ble_Message msg, whad::ble::BleMsg bleMsg) {
 
         case whad::ble::PrepareSeqMsg:
         {
+            /* TODO: Implement pattern-based sequence. */
+            
             SequenceDirection direction = BLE_TO_SLAVE;
             Trigger* trigger = NULL;
             int numberOfPackets = 0;
