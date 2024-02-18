@@ -619,53 +619,106 @@ void Core::processBLEInputMessage(ble_Message msg, whad::ble::BleMsg bleMsg) {
         {
             SequenceDirection direction = BLE_TO_SLAVE;
             Trigger* trigger = NULL;
+            int numberOfPackets = 0;
+            PacketSequence *sequence = NULL;
 
-            if (
-                msg.msg.prepare.direction == ble_BleDirection_INJECTION_TO_SLAVE ||
-                msg.msg.prepare.direction == ble_BleDirection_MASTER_TO_SLAVE
-            ) {
-                direction = BLE_TO_SLAVE;
+            switch (whad::ble::PrepareSequence::getType(bleMsg))
+            {
+                case whad::ble::SequenceManual:
+                {
+                    whad::ble::PrepareSequenceManual query(bleMsg);
+
+                    /* Change direction if targeted to master. */
+                    if ((query.getDirection() == whad::ble::DirectionInjectionToMaster) ||
+                        (query.getDirection() == whad::ble::DirectionSlaveToMaster))
+                    {
+                        direction = BLE_TO_MASTER;
+                    }
+
+                    /* Set trigger. */
+                    trigger = new ManualTrigger();
+
+                    /* Process sequence packets. */
+                    numberOfPackets = query.getPackets().size();
+                    sequence = this->sequenceModule->createSequence(numberOfPackets, trigger, direction, query.getId());
+                    for (whad::ble::PDU& packet : query.getPackets())
+                    {
+                        sequence->preparePacket(packet.getBytes(), packet.getSize() , true);
+                    }
+
+                    /* Success. */
+                    response = whad::generic::Success().getRaw();
+                }
+                break;
+
+                case whad::ble::SequenceConnEvt:
+                {
+                    whad::ble::PrepareSequenceConnEvt query(bleMsg);
+
+                    /* Change direction if targeted to master. */
+                    if ((query.getDirection() == whad::ble::DirectionInjectionToMaster) ||
+                        (query.getDirection() == whad::ble::DirectionSlaveToMaster))
+                    {
+                        direction = BLE_TO_MASTER;
+                    }
+
+                    /* Set trigger. */
+                    trigger = new ConnectionEventTrigger(query.getConnEvt());
+
+                    /* Process sequence packets. */
+                    numberOfPackets = query.getPackets().size();
+                    sequence = this->sequenceModule->createSequence(numberOfPackets, trigger, direction, query.getId());
+                    for (whad::ble::PDU& packet : query.getPackets())
+                    {
+                        sequence->preparePacket(packet.getBytes(), packet.getSize() , true);
+                    }
+
+                    /* Success. */
+                    response = whad::generic::Success().getRaw();
+                }
+                break;
+
+                case whad::ble::SequencePattern:
+                {
+                    response = whad::generic::WrongMode().getRaw();
+                }
+                break;
             }
-            else if (
-                msg.msg.prepare.direction == ble_BleDirection_INJECTION_TO_MASTER ||
-                msg.msg.prepare.direction == ble_BleDirection_SLAVE_TO_MASTER
-            ) {
-                direction = BLE_TO_MASTER;
-            }
-            else {
-                response = whad::generic::WrongMode().getRaw();
-            }
+
+            #if 0
             if (response == NULL) {
-            if (msg.msg.prepare.trigger.which_trigger == ble_PrepareSequenceCmd_Trigger_reception_tag) {
-                trigger = new ReceptionTrigger(
-                    msg.msg.prepare.trigger.trigger.reception.pattern.bytes,
-                    msg.msg.prepare.trigger.trigger.reception.mask.bytes,
-                    msg.msg.prepare.trigger.trigger.reception.pattern.size,
-                    msg.msg.prepare.trigger.trigger.reception.offset
-                );
-            }
-            else if (msg.msg.prepare.trigger.which_trigger == ble_PrepareSequenceCmd_Trigger_connection_event_tag) {
-                trigger = new ConnectionEventTrigger(
-                msg.msg.prepare.trigger.trigger.connection_event.connection_event
-                );
-            }
-            else if (msg.msg.prepare.trigger.which_trigger == ble_PrepareSequenceCmd_Trigger_manual_tag) {
-                trigger = new ManualTrigger();
-            }
-            else {
-                response = whad::generic::WrongMode().getRaw();
-            }
-            }
-            if (trigger != NULL) {
-            int numberOfPackets = msg.msg.prepare.sequence_count;
-            uint8_t identifier = msg.msg.prepare.id;
-            PacketSequence *sequence = this->sequenceModule->createSequence(numberOfPackets, trigger, direction, identifier);
-            for (int i=0;i<numberOfPackets;i++) {
-                sequence->preparePacket(msg.msg.prepare.sequence[i].packet.bytes,msg.msg.prepare.sequence[i].packet.size, true);
+                if (msg.msg.prepare.trigger.which_trigger == ble_PrepareSequenceCmd_Trigger_reception_tag) {
+                    trigger = new ReceptionTrigger(
+                        msg.msg.prepare.trigger.trigger.reception.pattern.bytes,
+                        msg.msg.prepare.trigger.trigger.reception.mask.bytes,
+                        msg.msg.prepare.trigger.trigger.reception.pattern.size,
+                        msg.msg.prepare.trigger.trigger.reception.offset
+                    );
+                }
+                else if (msg.msg.prepare.trigger.which_trigger == ble_PrepareSequenceCmd_Trigger_connection_event_tag) {
+                    trigger = new ConnectionEventTrigger(
+                    msg.msg.prepare.trigger.trigger.connection_event.connection_event
+                    );
+                }
+                else if (msg.msg.prepare.trigger.which_trigger == ble_PrepareSequenceCmd_Trigger_manual_tag) {
+                    trigger = new ManualTrigger();
+                }
+                else {
+                    response = whad::generic::WrongMode().getRaw();
+                }
             }
 
-            response = whad::generic::Success().getRaw();
-            }            
+            if (trigger != NULL) {
+                int numberOfPackets = msg.msg.prepare.sequence_count;
+                uint8_t identifier = msg.msg.prepare.id;
+                PacketSequence *sequence = this->sequenceModule->createSequence(numberOfPackets, trigger, direction, identifier);
+                for (int i=0;i<numberOfPackets;i++) {
+                    sequence->preparePacket(msg.msg.prepare.sequence[i].packet.bytes,msg.msg.prepare.sequence[i].packet.size, true);
+                }
+
+                response = whad::generic::Success().getRaw();
+            }
+            #endif
         }
         break;
 
