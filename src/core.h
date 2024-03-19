@@ -72,7 +72,7 @@ class Core {
 		void processInputMessage(Message msg);
 		void processGenericInputMessage(whad::NanoPbMsg msg);
 		void processDiscoveryInputMessage(whad::discovery::DiscoveryMsg msg);
-		void processZigbeeInputMessage(zigbee_Message msg);
+		void processZigbeeInputMessage(zigbee_Message msg, whad::zigbee::ZigbeeMsg zigbeeMsg);
 		void processBLEInputMessage(ble_Message msg, whad::ble::BleMsg bleMsg);
 		void processESBInputMessage(esb_Message msg);
 		void processUnifyingInputMessage(unifying_Message msg);
