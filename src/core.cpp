@@ -408,16 +408,15 @@ void Core::processBLEInputMessage(ble_Message msg, whad::ble::BleMsg bleMsg) {
 
         case whad::ble::SendRawPduMsg:
         {
-            //uint32_t access_address = msg.msg.send_pdu.access_address;
-            //uint32_t crc = msg.msg.send_pdu.crc;
+            whad::ble::SendRawPdu query(bleMsg);
             uint32_t max_retry = 1 << 24;
 
-            switch (msg.msg.send_raw_pdu.direction)
+            switch (query.getDirection())
             {
-                case ble_BleDirection_INJECTION_TO_SLAVE:
+                case whad::ble::DirectionInjectionToSlave:
                 {
                      if (this->bleController->getState() == SNIFFING_CONNECTION) {
-                        this->bleController->setAttackPayload(msg.msg.send_raw_pdu.pdu.bytes, msg.msg.send_raw_pdu.pdu.size);
+                        this->bleController->setAttackPayload(query.getPdu().getBytes(), query.getPdu().getSize());
                         this->bleController->startAttack(BLE_ATTACK_FRAME_INJECTION_TO_SLAVE);
                         response = whad::generic::Success().getRaw();
                     }
@@ -427,10 +426,10 @@ void Core::processBLEInputMessage(ble_Message msg, whad::ble::BleMsg bleMsg) {
                 }
                 break;
 
-                case ble_BleDirection_INJECTION_TO_MASTER:
+                case whad::ble::DirectionInjectionToMaster:
                 {
                     if (this->bleController->getState() == SNIFFING_CONNECTION) {
-                        this->bleController->setAttackPayload(msg.msg.send_raw_pdu.pdu.bytes, msg.msg.send_raw_pdu.pdu.size);
+                        this->bleController->setAttackPayload(query.getPdu().getBytes(), query.getPdu().getSize());
                             this->bleController->startAttack(BLE_ATTACK_FRAME_INJECTION_TO_MASTER);
                         response = whad::generic::Success().getRaw();
                     }
@@ -440,10 +439,10 @@ void Core::processBLEInputMessage(ble_Message msg, whad::ble::BleMsg bleMsg) {
                 }
                 break;
 
-                case ble_BleDirection_MASTER_TO_SLAVE:
+                case whad::ble::DirectionMasterToSlave:
                 {
                     if (this->bleController->getState() == SIMULATING_MASTER || this->bleController->getState() == PERFORMING_MITM) {
-                        this->bleController->setMasterPayload(msg.msg.send_raw_pdu.pdu.bytes, msg.msg.send_raw_pdu.pdu.size);
+                        this->bleController->setMasterPayload(query.getPdu().getBytes(), query.getPdu().getSize());
                         while (!max_retry && !this->bleController->isMasterPayloadTransmitted()) {--max_retry;}
                         if (max_retry != 0) {
                             response = whad::generic::Success().getRaw();
@@ -458,11 +457,11 @@ void Core::processBLEInputMessage(ble_Message msg, whad::ble::BleMsg bleMsg) {
                 }
                 break;
 
-                case ble_BleDirection_SLAVE_TO_MASTER:
+                case whad::ble::DirectionSlaveToMaster:
                 {
                     if (this->bleController->getState() == SIMULATING_SLAVE || this->bleController->getState() == PERFORMING_MITM) {
 
-                        this->bleController->setSlavePayload(msg.msg.send_raw_pdu.pdu.bytes, msg.msg.send_raw_pdu.pdu.size);
+                        this->bleController->setSlavePayload(query.getPdu().getBytes(), query.getPdu().getSize());
                         while (!this->bleController->isSlavePayloadTransmitted()) {}
                         response = whad::generic::Success().getRaw();
                     }
@@ -472,7 +471,7 @@ void Core::processBLEInputMessage(ble_Message msg, whad::ble::BleMsg bleMsg) {
                 }
                 break;
 
-                case ble_BleDirection_UNKNOWN:
+                case whad::ble::DirectionUnknown:
                 default:
                 {
                     response = whad::generic::ParameterError().getRaw();
