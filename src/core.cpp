@@ -23,19 +23,19 @@ void Core::processInputMessage(Message msg) {
         switch (whadMsg.getDomain())
         {
             case whad::MessageDomain::DomainBle:
-                this->processBLEInputMessage(msg.msg.ble, whad::ble::BleMsg(whadMsg));
+                this->processBLEInputMessage(whad::ble::BleMsg(whadMsg));
                 break;
 
             case whad::MessageDomain::DomainZigbee:
-                this->processZigbeeInputMessage(msg.msg.zigbee, whad::zigbee::ZigbeeMsg(whadMsg));
+                this->processZigbeeInputMessage(whad::zigbee::ZigbeeMsg(whadMsg));
                 break;
 
             case whad::MessageDomain::DomainEsb:
-                this->processESBInputMessage(msg.msg.esb);
+                this->processESBInputMessage(whad::esb::EsbMsg(whadMsg));
                 break;
 
             case whad::MessageDomain::DomainUnifying:
-                this->processUnifyingInputMessage(msg.msg.unifying);
+                this->processUnifyingInputMessage(whad::unifying::UnifyingMsg(whadMsg));
                 break;
 
             case whad::MessageDomain::DomainPhy:
@@ -139,7 +139,7 @@ void Core::processDiscoveryInputMessage(whad::discovery::DiscoveryMsg msg) {
     this->pushMessageToQueue(response);
 }
 
-void Core::processZigbeeInputMessage(zigbee_Message msg, whad::zigbee::ZigbeeMsg zigbeeMsg) {
+void Core::processZigbeeInputMessage(whad::zigbee::ZigbeeMsg zigbeeMsg) {
     Message *response = NULL;
 
     if (this->currentController != this->dot15d4Controller) {
@@ -334,7 +334,7 @@ void Core::processZigbeeInputMessage(zigbee_Message msg, whad::zigbee::ZigbeeMsg
     this->pushMessageToQueue(response);
 }
 
-void Core::processBLEInputMessage(ble_Message msg, whad::ble::BleMsg bleMsg) {
+void Core::processBLEInputMessage(whad::ble::BleMsg bleMsg) {
     Message *response = NULL;
 
     if (this->currentController != this->bleController) {
@@ -575,9 +575,6 @@ void Core::processBLEInputMessage(ble_Message msg, whad::ble::BleMsg bleMsg) {
                 response = whad::generic::Success().getRaw();
             }
             else {
-                //this->bleController->setEmptyTransmitIndicator(true);
-
-                //this->bleController->advertise(msg.msg.periph_mode.scan_data.bytes, msg.msg.periph_mode.scan_data.size, msg.msg.periph_mode.scanrsp_data.bytes, msg.msg.periph_mode.scanrsp_data.size, true, 100);
                 this->bleController->advertise(
                     query.getAdvData(), query.getAdvDataLength(),
                     query.getScanRsp(), query.getScanRspLength(),
@@ -644,7 +641,7 @@ void Core::processBLEInputMessage(ble_Message msg, whad::ble::BleMsg bleMsg) {
 
             this->bleController->connect(
                 address,
-                msg.msg.connect.addr_type == ble_BleAddrType_RANDOM,
+                query.getTargetAddr().getType() == whad::ble::AddressRandom,
                 accessAddress,
                 crcInit,
                 3,
@@ -739,41 +736,6 @@ void Core::processBLEInputMessage(ble_Message msg, whad::ble::BleMsg bleMsg) {
                 }
                 break;
             }
-
-            #if 0
-            if (response == NULL) {
-                if (msg.msg.prepare.trigger.which_trigger == ble_PrepareSequenceCmd_Trigger_reception_tag) {
-                    trigger = new ReceptionTrigger(
-                        msg.msg.prepare.trigger.trigger.reception.pattern.bytes,
-                        msg.msg.prepare.trigger.trigger.reception.mask.bytes,
-                        msg.msg.prepare.trigger.trigger.reception.pattern.size,
-                        msg.msg.prepare.trigger.trigger.reception.offset
-                    );
-                }
-                else if (msg.msg.prepare.trigger.which_trigger == ble_PrepareSequenceCmd_Trigger_connection_event_tag) {
-                    trigger = new ConnectionEventTrigger(
-                    msg.msg.prepare.trigger.trigger.connection_event.connection_event
-                    );
-                }
-                else if (msg.msg.prepare.trigger.which_trigger == ble_PrepareSequenceCmd_Trigger_manual_tag) {
-                    trigger = new ManualTrigger();
-                }
-                else {
-                    response = whad::generic::WrongMode().getRaw();
-                }
-            }
-
-            if (trigger != NULL) {
-                int numberOfPackets = msg.msg.prepare.sequence_count;
-                uint8_t identifier = msg.msg.prepare.id;
-                PacketSequence *sequence = this->sequenceModule->createSequence(numberOfPackets, trigger, direction, identifier);
-                for (int i=0;i<numberOfPackets;i++) {
-                    sequence->preparePacket(msg.msg.prepare.sequence[i].packet.bytes,msg.msg.prepare.sequence[i].packet.size, true);
-                }
-
-                response = whad::generic::Success().getRaw();
-            }
-            #endif
         }
         break;
 
@@ -862,179 +824,457 @@ void Core::processBLEInputMessage(ble_Message msg, whad::ble::BleMsg bleMsg) {
 }
 
 
-void Core::processESBInputMessage(esb_Message msg) {
-  Message *response = NULL;
+void Core::processESBInputMessage(whad::esb::EsbMsg esbMsg) {
+    Message *response = NULL;
+    uint8_t address[5];
+    uint8_t addressLen = 0;
 
-  if (this->currentController != this->esbController) {
-    this->selectController(ESB_PROTOCOL);
-    this->esbController->disableUnifying();
-  }
+    if (this->currentController != this->esbController) {
+        this->selectController(ESB_PROTOCOL);
+        this->esbController->disableUnifying();
+    }
 
-  if (msg.which_msg == esb_Message_sniff_tag) {
-    if (msg.msg.sniff.channel == 0xFF || (msg.msg.sniff.channel >= 0 && msg.msg.sniff.channel <= 100)) {
-      this->esbController->setFilter(
-                msg.msg.sniff.address.bytes[0],
-                msg.msg.sniff.address.bytes[1],
-                msg.msg.sniff.address.bytes[2],
-                msg.msg.sniff.address.bytes[3],
-                msg.msg.sniff.address.bytes[4]
-      );
-      this->esbController->setChannel(msg.msg.sniff.channel);
-      if (msg.msg.sniff.show_acknowledgements) {
-        this->esbController->enableAcknowledgementsSniffing();
-      }
-      else {
-        this->esbController->disableAcknowledgementsSniffing();
-      }
+    /* Dispatch ESB message. */
+    switch (esbMsg.getType())
+    {
+        /* Sniffing mode. */
+        case whad::esb::SniffMsg:
+        {
+            /* Wrap our ESB message into a SniffMode message. */
+            whad::esb::SniffMode query(esbMsg);
 
-      response = whad::generic::Success().getRaw();
+            /* If channel is valid (0xFF is a magic value to sniff on all channels). */
+            int channel = query.getChannel();
+            if (channel == 0xFF || (channel >= 0 && channel <= 100))
+            {
+                /* Retrieve the address length in bytes. */
+                addressLen = query.getAddress().getLength();
+
+                /* Make sure this length is valid (0 < length <= 5). */
+                if ((addressLen > 0) && (addressLen <= 5))
+                {
+                    /* Copy address temporarily. */
+                    memcpy(address, query.getAddress().getAddressBuf(), addressLen);
+
+                    /* Set this address as a filter for our ESB controller. */
+                    this->esbController->setFilter(
+                        address[0],
+                        address[1],
+                        address[2],
+                        address[3],
+                        address[4]
+                    );
+
+                    /* Set channel information. */
+                    this->esbController->setChannel(query.getChannel());
+
+                    /* If acks must be reported, ask our controller to do so. */
+                    if (query.mustShowAcks()) {
+                        this->esbController->enableAcknowledgementsSniffing();
+                    }
+                    else {
+                        this->esbController->disableAcknowledgementsSniffing();
+                    }
+
+                    /* Success ! */
+                    response = whad::generic::Success().getRaw();
+                }
+                else
+                {
+                    /* Parameter error (wrong address size). */
+                    response = whad::generic::ParameterError().getRaw();
+                }
+            }
+            else {
+                /* Parameter error (Invalid channel value). */
+                response = whad::generic::ParameterError().getRaw();
+            }
+        }
+        break;
+
+        /* Start message. */
+        case whad::esb::StartMsg:
+        {
+            /* Start our controller in current mode. */
+            this->esbController->start();
+
+            /* Success. */
+            response = whad::generic::Success().getRaw();
+        }
+        break;
+
+        /* Stop message. */
+        case whad::esb::StopMsg:
+        {
+            /* Stop our controller (go to idle mode). */
+            this->esbController->stop();
+
+            /* Success. */
+            response = whad::generic::Success().getRaw();            
+        }
+        break;
+
+        /* Send raw packet message. */
+        case whad::esb::SendRawMsg:
+        {
+            /* Wrap our esbMsg into a SendPacketRaw message. */
+            whad::esb::SendPacketRaw query(esbMsg);
+
+            int channel = query.getChannel();
+            if (channel >= 0 && channel <= 100) {
+                this->esbController->setChannel(channel);
+            }
+            if (this->esbController->send(query.getPacket().getBytes(), query.getPacket().getSize(), query.getRetrCount())) {
+                /* Success. */
+                response = whad::generic::Success().getRaw();
+            }
+            else {
+                /* Error while sending packet. */
+                response = whad::generic::Error().getRaw();
+            }            
+        }
+        break;
+
+        /* Set node address message. */
+        case whad::esb::SetNodeAddrMsg:
+        {
+            /* Wrap our ESB message into a SetNodeAddress message. */
+            whad::esb::SetNodeAddress query(esbMsg);
+
+            /* Retrieve the address length in bytes. */
+            addressLen = query.getAddress().getLength();
+
+            /* Make sure this length is valid (0 < length <= 5). */
+            if ((addressLen > 0) && (addressLen <= 5))
+            {
+                /* Copy address temporarily. */
+                memcpy(address, query.getAddress().getAddressBuf(), addressLen);
+
+                /* Set ESB address. */
+                this->esbController->setFilter(
+                    address[0],
+                    address[1],
+                    address[2],
+                    address[3],
+                    address[4]
+                );
+
+                /* Success. */
+                response = whad::generic::Success().getRaw();            
+            }
+            else
+            {
+                /* Parameter error (invalid address size). */
+                response = whad::generic::ParameterError().getRaw();
+            }
+        }
+        break;
+
+        /* Receiver mode message. */
+        case whad::esb::PrxMsg:
+        {
+            /* Wrap our ESB message in a PrxMode message. */
+            whad::esb::PrxMode query(esbMsg);
+
+            /* Configure our controller in PRX (receiver) mode. */
+            this->esbController->setChannel(query.getChannel());
+            this->esbController->disableAcknowledgementsSniffing();
+            this->esbController->enableAcknowledgementsTransmission();
+
+            /* Success. */
+            response = whad::generic::Success().getRaw();
+        }
+        break;
+
+        /* Transmitter mode message. */
+        case whad::esb::PtxMsg:
+        {
+            /* Wrap our ESB message into a PtxMode message. */
+            whad::esb::PtxMode query(esbMsg);
+
+            /* Configure our ESB controller in PTX (transmitter) mode. */
+            this->esbController->setChannel(query.getChannel());
+            this->esbController->enableAcknowledgementsSniffing();
+            this->esbController->disableAcknowledgementsTransmission();
+
+            /* Success. */
+            response = whad::generic::Success().getRaw();
+        }
+        break;
+
+        case whad::esb::UnknownMsg:
+        default:
+        {
+            /* Error (unknown message). */
+            response = whad::generic::Error().getRaw();
+        }
+        break;
+
     }
-    else {
-      response = whad::generic::ParameterError().getRaw();
-    }
-  }
-  else if (msg.which_msg == esb_Message_start_tag) {
-    this->esbController->start();
-    response = whad::generic::Success().getRaw();
-  }
-  else if (msg.which_msg == esb_Message_stop_tag) {
-    this->esbController->stop();
-    response = whad::generic::Success().getRaw();
-  }
-  else if (msg.which_msg == esb_Message_send_raw_tag) {
-    int channel = msg.msg.send_raw.channel;
-    if (channel >= 0 && channel <= 100) {
-      this->esbController->setChannel(channel);
-    }
-    if (this->esbController->send(msg.msg.send_raw.pdu.bytes, msg.msg.send_raw.pdu.size, msg.msg.send_raw.retransmission_count)) {
-      response = whad::generic::Success().getRaw();
-    }
-    else {
-      response = whad::generic::Error().getRaw();
-    }
-  }
-  else if (msg.which_msg == esb_Message_set_node_addr_tag) {
-    this->esbController->setFilter(
-              msg.msg.set_node_addr.address.bytes[0],
-              msg.msg.set_node_addr.address.bytes[1],
-              msg.msg.set_node_addr.address.bytes[2],
-              msg.msg.set_node_addr.address.bytes[3],
-              msg.msg.set_node_addr.address.bytes[4]
-    );
-    response = whad::generic::Success().getRaw();
-  }
-  else if (msg.which_msg == esb_Message_prx_tag) {
-    this->esbController->setChannel(msg.msg.prx.channel);
-    this->esbController->disableAcknowledgementsSniffing();
-    this->esbController->enableAcknowledgementsTransmission();
-    response = whad::generic::Success().getRaw();
-  }
-  else if (msg.which_msg == esb_Message_ptx_tag) {
-    this->esbController->setChannel(msg.msg.ptx.channel);
-    this->esbController->enableAcknowledgementsSniffing();
-    this->esbController->disableAcknowledgementsTransmission();
-    response = whad::generic::Success().getRaw();
-  }
-  this->pushMessageToQueue(response);
+
+    /* Send response. */
+    this->pushMessageToQueue(response);
 }
 
-void Core::processUnifyingInputMessage(unifying_Message msg) {
-  Message *response = NULL;
+void Core::processUnifyingInputMessage(whad::unifying::UnifyingMsg uniMsg) {
+    Message *response = NULL;
+    uint8_t address[5];
+    uint8_t addressLen = 0;
 
-  if (this->currentController != this->esbController) {
+    if (this->currentController != this->esbController) {
     this->selectController(ESB_PROTOCOL);
     this->esbController->enableUnifying();
-  }
-
-  if (msg.which_msg == unifying_Message_sniff_tag) {
-    if (msg.msg.sniff.channel == 0xFF || (msg.msg.sniff.channel >= 0 && msg.msg.sniff.channel <= 100)) {
-      this->esbController->setFilter(
-                msg.msg.sniff.address.bytes[0],
-                msg.msg.sniff.address.bytes[1],
-                msg.msg.sniff.address.bytes[2],
-                msg.msg.sniff.address.bytes[3],
-                msg.msg.sniff.address.bytes[4]
-      );
-      this->esbController->setChannel(msg.msg.sniff.channel);
-      if (msg.msg.sniff.show_acknowledgements) {
-        this->esbController->enableAcknowledgementsSniffing();
-      }
-      else {
-        this->esbController->disableAcknowledgementsSniffing();
-      }
-
-      response = whad::generic::Success().getRaw();
     }
-    else {
-      response = whad::generic::ParameterError().getRaw();
+
+    /* Dispatch messages. */
+    switch (uniMsg.getType())
+    {
+        /* Sniffing mode message. */
+        case whad::unifying::SniffModeMsg:
+        {
+            /* Wrap our Unifying message into a SniffMode message. */
+            whad::unifying::SniffMode query(uniMsg);
+
+            /* Check channel validity. */
+            int channel = query.getChannel();
+            if (channel == 0xFF || (channel >= 0 && channel <= 100))
+            {
+
+                addressLen = query.getAddress().getLength();
+                if ((addressLen > 0) && (addressLen <= 5))
+                {
+                    /* Copy address. */
+                    memcpy(address, query.getAddress().getBytes(), addressLen);
+
+                    /* Set address. */
+                    this->esbController->setFilter(
+                        address[0],
+                        address[1],
+                        address[2],
+                        address[3],
+                        address[4]
+                    );
+
+                    /* Set channel for our ESB controller. */
+                    this->esbController->setChannel(channel);
+
+                    /* Enable acks if required. */
+                    if (query.mustShowAcks()) {
+                        this->esbController->enableAcknowledgementsSniffing();
+                    }
+                    else {
+                        this->esbController->disableAcknowledgementsSniffing();
+                    }
+
+                    /* Success. */
+                    response = whad::generic::Success().getRaw();
+                }
+                else
+                {
+                    /* Parameter error (invalid address size). */
+                    response = whad::generic::ParameterError().getRaw();
+                }
+            }
+            else
+            {
+                /* Parameter error (invalid channel). */
+                response = whad::generic::ParameterError().getRaw();
+            }            
+        }
+        break;
+
+        /* Start message. */
+        case whad::unifying::StartMsg:
+        {
+            /* Start controller in current mode. */
+            this->esbController->start();
+
+            /* Success. */
+            response = whad::generic::Success().getRaw();            
+        }
+        break;
+
+        /* Stop message. */
+        case whad::unifying::StopMsg:
+        {
+            /* Stop controller. */
+            this->esbController->stop();
+
+            /* Success. */
+            response = whad::generic::Success().getRaw();
+        }
+        break;
+
+        /* Send raw packet message. */
+        case whad::unifying::SendRawMsg:
+        {
+            /* Wrap our Unifying message into a SendRawPdu message. */
+            whad::unifying::SendRawPdu query(uniMsg);
+
+            /* Check channel. */
+            int channel = query.getChannel();
+            if (channel >= 0 && channel <= 100) {
+
+                /* Set controller channel. */
+                this->esbController->setChannel(channel);
+
+                /* Send packet. */
+                if (this->esbController->send(query.getPdu().getBytes(), query.getPdu().getSize(), query.getRetrCounter()))
+                {
+                    /* Success. */
+                    response = whad::generic::Success().getRaw();
+                }
+                else
+                {
+                    /* Error while sending packet. */
+                    response = whad::generic::Error().getRaw();
+                }
+            }
+            else
+            {
+                /* Parameter error (invalid channel). */
+                response = whad::generic::ParameterError().getRaw();
+            }
+        }
+        break;
+
+        /* Set node address message. */
+        case whad::unifying::SetNodeAddressMsg:
+        {
+            /* Wrap our Unifying message into a SetNodeAddress message. */
+            whad::unifying::SetNodeAddress query(uniMsg);
+
+            /* Check address. */
+            addressLen = query.getAddress().getLength();
+            if ((addressLen > 0) && (addressLen <= 5))
+            {
+                /* Copy address. */
+                memcpy(address, query.getAddress().getBytes(), addressLen);
+
+                /* Set controller address. */
+                this->esbController->setFilter(
+                    address[0],
+                    address[1],
+                    address[2],
+                    address[3],
+                    address[4]
+                );
+
+                /* Success. */
+                response = whad::generic::Success().getRaw();
+            }
+            else
+            {
+                /* Parameter error (invalid address size). */
+                response = whad::generic::ParameterError().getRaw();
+            }
+        }
+        break;
+
+        /* Dongle mode message. */
+        case whad::unifying::DongleModeMsg:
+        {
+            /* Wrap our Unifying message into a DongleMode message. */
+            whad::unifying::DongleMode query(uniMsg);
+
+            /* Check channel value. */
+            int channel = query.getChannel();
+            if (((channel >= 0) && (channel <= 100)) || (channel == 0xFF))
+            {
+                /* Configure our ESB controller accordingly. */
+                this->esbController->setChannel(channel);
+                this->esbController->disableAcknowledgementsSniffing();
+                this->esbController->enableAcknowledgementsTransmission();
+
+                /* Success. */
+                response = whad::generic::Success().getRaw();
+            }
+            else
+            {
+                /* Parametter error (invalid channel). */
+                response = whad::generic::ParameterError().getRaw();
+            }
+        }
+        break;
+
+        /* Mouse mode message. */
+        case whad::unifying::MouseModeMsg:
+        {
+            /* Wrap our Unifying message into a MouseMode message. */
+            whad::unifying::MouseMode query(uniMsg);
+
+            /* Check channel value. */
+            int channel = query.getChannel();
+            if (((channel >= 0) && (channel <= 100)) || (channel == 0xFF))
+            {
+                /* Configure our ESB controller accordingly. */
+                this->esbController->setChannel(channel);
+                this->esbController->disableAcknowledgementsSniffing();
+                this->esbController->enableAcknowledgementsTransmission();
+
+                /* Success. */
+                response = whad::generic::Success().getRaw();
+            }
+            else
+            {
+                /* Parametter error (invalid channel). */
+                response = whad::generic::ParameterError().getRaw();
+            }
+        }
+        break;
+
+        /* Keyboard mode message. */
+        case whad::unifying::KeyboardModeMsg:
+        {
+            /* Wrap our Unifying message into a KeyboardMode message. */
+            whad::unifying::KeyboardMode query(uniMsg);
+
+            /* Check channel value. */
+            int channel = query.getChannel();
+            if (((channel >= 0) && (channel <= 100)) || (channel == 0xFF))
+            {
+                /* Configure our ESB controller accordingly. */
+                this->esbController->setChannel(channel);
+                this->esbController->disableAcknowledgementsSniffing();
+                this->esbController->enableAcknowledgementsTransmission();
+
+                /* Success. */
+                response = whad::generic::Success().getRaw();
+            }
+            else
+            {
+                /* Parametter error (invalid channel). */
+                response = whad::generic::ParameterError().getRaw();
+            }
+        }
+        break;
+
+        /* Pairing sniffing mode. */
+        case whad::unifying::SniffPairingMsg:
+        {
+            /*
+             * Put our ESB controller in sniffing mode in order to sniff
+             * Logitech Unifying pairing requests on channel 5.
+             */
+            this->esbController->setFilter(0xBB, 0x0A, 0xDC, 0xA5, 0x75);
+            this->esbController->setChannel(5);
+
+            /* Success. */
+            response = whad::generic::Success().getRaw();            
+        }
+        break;
+
+        /* Unkown message. */
+        case whad::unifying::UnknownMsg:
+        default:
+        {
+            /* Unkown message error. */
+            response = whad::generic::Error().getRaw();
+        }
+        break;
     }
-  }
-  else if (msg.which_msg == unifying_Message_start_tag) {
-    this->esbController->start();
-    response = whad::generic::Success().getRaw();
-  }
-  else if (msg.which_msg == unifying_Message_stop_tag) {
-    this->esbController->stop();
-    response = whad::generic::Success().getRaw();
-  }
-  else if (msg.which_msg == unifying_Message_send_raw_tag) {
-    int channel = msg.msg.send_raw.channel;
-    if (channel >= 0 && channel <= 100) {
-      this->esbController->setChannel(channel);
-    }
-    if (this->esbController->send(msg.msg.send_raw.pdu.bytes, msg.msg.send_raw.pdu.size, msg.msg.send_raw.retransmission_count)) {
-      response = whad::generic::Success().getRaw();
-    }
-    else {
-      response = whad::generic::Error().getRaw();
-    }
-  }
-  else if (msg.which_msg == unifying_Message_set_node_addr_tag) {
-    this->esbController->setFilter(
-              msg.msg.set_node_addr.address.bytes[0],
-              msg.msg.set_node_addr.address.bytes[1],
-              msg.msg.set_node_addr.address.bytes[2],
-              msg.msg.set_node_addr.address.bytes[3],
-              msg.msg.set_node_addr.address.bytes[4]
-    );
 
-    response = whad::generic::Success().getRaw();
-  }
-  else if (msg.which_msg == unifying_Message_dongle_tag) {
-    this->esbController->setChannel(msg.msg.dongle.channel);
-    this->esbController->disableAcknowledgementsSniffing();
-    this->esbController->enableAcknowledgementsTransmission();
-
-    response = whad::generic::Success().getRaw();
-  }
-  else if (msg.which_msg == unifying_Message_mouse_tag) {
-    if (msg.msg.mouse.channel == 0xFF || (msg.msg.mouse.channel >= 0 && msg.msg.mouse.channel <= 100)) {
-      this->esbController->setChannel(msg.msg.mouse.channel);
-      this->esbController->enableAcknowledgementsSniffing();
-      this->esbController->disableAcknowledgementsTransmission();
-
-      response = whad::generic::Success().getRaw();
-    }
-    else {
-
-      response = whad::generic::ParameterError().getRaw();
-    }
-  }
-  else if (msg.which_msg == unifying_Message_keyboard_tag) {
-    this->esbController->setChannel(msg.msg.keyboard.channel);
-    this->esbController->enableAcknowledgementsSniffing();
-    this->esbController->disableAcknowledgementsTransmission();
-
-    response = whad::generic::Success().getRaw();
-  }
-  else if (msg.which_msg == unifying_Message_sniff_pairing_tag) {
-
-    this->esbController->setFilter(0xBB, 0x0A, 0xDC, 0xA5, 0x75);
-    this->esbController->setChannel(5);
-
-    response = whad::generic::Success().getRaw();
-  }
-  this->pushMessageToQueue(response);
+    this->pushMessageToQueue(response);
 }
 
 void Core::processPhyInputMessage(whad::phy::PhyMsg msg) {

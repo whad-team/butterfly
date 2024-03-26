@@ -2,7 +2,6 @@
 #define CORE_H
 
 #include <stdlib.h>
-#include "whad/whad.h"
 #include <whad.h>
 
 #include "version.h"
@@ -72,10 +71,10 @@ class Core {
 		void processInputMessage(Message msg);
 		void processGenericInputMessage(whad::NanoPbMsg msg);
 		void processDiscoveryInputMessage(whad::discovery::DiscoveryMsg msg);
-		void processZigbeeInputMessage(zigbee_Message msg, whad::zigbee::ZigbeeMsg zigbeeMsg);
-		void processBLEInputMessage(ble_Message msg, whad::ble::BleMsg bleMsg);
-		void processESBInputMessage(esb_Message msg);
-		void processUnifyingInputMessage(unifying_Message msg);
+		void processZigbeeInputMessage(whad::zigbee::ZigbeeMsg zigbeeMsg);
+		void processBLEInputMessage(whad::ble::BleMsg bleMsg);
+		void processESBInputMessage(whad::esb::EsbMsg esbMsg);
+		void processUnifyingInputMessage(whad::unifying::UnifyingMsg uniMsg);
 		void processPhyInputMessage(whad::phy::PhyMsg msg);
 
 		bool selectController(Protocol controller);
