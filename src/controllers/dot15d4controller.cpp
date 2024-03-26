@@ -394,6 +394,7 @@ void Dot15d4Controller::onJam(uint32_t timestamp) {
 }
 
 void Dot15d4Controller::onEnergyDetection(uint32_t timestamp, uint8_t value) {
-	Message* msg = Whad::buildDot15d4EnergyDetectionSampleMessage(value, timestamp);
+	//Message* msg = Whad::buildDot15d4EnergyDetectionSampleMessage(value, timestamp);
+    Message *msg = whad::zigbee::EnergySample(timestamp, value).getRaw();
 	Core::instance->pushMessageToQueue(msg);
 }

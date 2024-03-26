@@ -1,4 +1,5 @@
 #include "whad/whad.h"
+#include <whad.h>
 
 
 bool Whad::isDomainSupported(whad_domain_t domain) {
@@ -144,10 +145,40 @@ Message* Whad::buildMessageFromPacket(Packet* packet) {
     ).getRaw();
   }
   else if (packet->getPacketType() == DOT15D4_PACKET_TYPE) {
-    msg = Whad::buildDot15d4RawPduMessage((Dot15d4Packet*)packet);
+    Dot15d4Packet *zigbeePacket = static_cast<Dot15d4Packet*>(packet);
+    whad::zigbee::ZigbeePacket packet(
+        zigbeePacket->getChannel(),
+        zigbeePacket->getPacketBuffer()+1,
+        zigbeePacket->getPacketSize()-3,
+        zigbeePacket->getFCS()
+    );
+    packet.addLqi(zigbeePacket->getLQI());
+    packet.addFcsValidity(zigbeePacket->isCrcValid());
+    packet.addRssi(zigbeePacket->getRssi());
+    packet.addTimestamp(zigbeePacket->getTimestamp());
+    //msg = Whad::buildDot15d4RawPduMessage((Dot15d4Packet*)packet);
+    msg = whad::zigbee::RawPduReceived(packet).getRaw();
   }
   else if (packet->getPacketType() == ESB_PACKET_TYPE) {
-    msg = Whad::buildESBRawPduMessage((ESBPacket*)packet);
+    ESBPacket *esbPacket = static_cast<ESBPacket*>(packet);
+
+    /* Create an ESB packet from ESBPacket. */
+    whad::esb::Packet packet(esbPacket->getPacketBuffer(), esbPacket->getPacketSize());
+
+    /* Extract ESB address. */
+    whad::esb::EsbAddress address(esbPacket->getAddress(), 5);
+
+    /* Create a RawPacketReceived notification. */
+    whad::esb::RawPacketReceived packetRecvd(esbPacket->getChannel(), packet);
+
+    /* Set RSSI, CRC validity, timestamp and address. */
+    packetRecvd.setRssi(esbPacket->getRssi());
+    packetRecvd.setCrcValidity(esbPacket->isCrcValid());
+    packetRecvd.setTimestamp(esbPacket->getTimestamp());
+    packetRecvd.setAddress(address);
+
+    /* Notification. */
+    msg = packetRecvd.getRaw();
   }
   else if (packet->getPacketType() == GENERIC_PACKET_TYPE) {
     msg = Whad::buildPhyPacketMessage((GenericPacket*)packet);
