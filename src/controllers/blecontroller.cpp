@@ -1,5 +1,6 @@
 #include "blecontroller.h"
 #include "../core.h"
+#include <whad.h>
 
 
 int BLEController::channelToFrequency(int channel) {
@@ -1674,12 +1675,15 @@ void BLEController::sendAdvIntervalReport(uint32_t interval) {
 	//Core::instance->pushMessageToQueue(new AdvIntervalReportNotification(interval));
 }
 void BLEController::sendAccessAddressReport(uint32_t accessAddress, uint32_t timestamp, int32_t rssi) {
-	Message* msg = Whad::buildBLEAccessAddressDiscoveredMessage(accessAddress, timestamp, rssi);
+	//Message* msg = Whad::buildBLEAccessAddressDiscoveredMessage(accessAddress, timestamp, rssi);
+    Message *msg = whad::ble::AccessAddressDiscovered(accessAddress, timestamp, rssi).getRaw();
 	Core::instance->pushMessageToQueue(msg);
 }
 
 void BLEController::sendExistingConnectionReport(uint32_t accessAddress, uint32_t crcInit, uint8_t *channelMap, uint16_t hopInterval, uint8_t hopIncrement) {
-	Message* msg = Whad::buildBLESynchronizedMessage(accessAddress, crcInit,hopInterval,hopIncrement,channelMap);
+	//Message* msg = Whad::buildBLESynchronizedMessage(accessAddress, crcInit,hopInterval,hopIncrement,channelMap);
+    whad::ble::ChannelMap chanMap(channelMap);
+    Message *msg = whad::ble::Synchronized(accessAddress, crcInit, hopInterval, hopIncrement, chanMap).getRaw();
 	Core::instance->pushMessageToQueue(msg);
 }
 
@@ -1693,7 +1697,8 @@ void BLEController::sendConnectionReport(ConnectionStatus status) {
 			Core::instance->pushMessageToQueue(msg);
 	}
 	else if (status == DISCONNECTED) {
-		Message* msg = Whad::buildBLEDisconnectedMessage(0x16);
+		//Message* msg = Whad::buildBLEDisconnectedMessage(0x16);
+        Message *msg = whad::ble::Disconnected(0, 0x16).getRaw();
 		Core::instance->pushMessageToQueue(msg);
 
 	}
@@ -1703,11 +1708,13 @@ void BLEController::sendConnectionReport(ConnectionStatus status) {
 		Core::instance->pushMessageToQueue(msg);
 	}
 	else if (status == ATTACK_SUCCESS && (this->attackStatus.attack == BLE_ATTACK_MITM || this->attackStatus.attack == BLE_ATTACK_MASTER_HIJACKING  || this->attackStatus.attack == BLE_ATTACK_SLAVE_HIJACKING)) {
-		Message* msg = Whad::buildBLEHijackedMessage(true, this->accessAddress);
+		//Message* msg = Whad::buildBLEHijackedMessage(true, this->accessAddress);
+        Message *msg = whad::ble::Hijacked(this->accessAddress, true).getRaw();
 		Core::instance->pushMessageToQueue(msg);
 	}
 	else if (status == ATTACK_FAILURE && (this->attackStatus.attack == BLE_ATTACK_MITM || this->attackStatus.attack == BLE_ATTACK_MASTER_HIJACKING  || this->attackStatus.attack == BLE_ATTACK_SLAVE_HIJACKING)) {
-		Message* msg = Whad::buildBLEHijackedMessage(false, this->accessAddress);
+		//Message* msg = Whad::buildBLEHijackedMessage(false, this->accessAddress);
+        Message *msg = whad::ble::Hijacked(this->accessAddress, false).getRaw();
 		Core::instance->pushMessageToQueue(msg);
 	}
 }
@@ -1757,7 +1764,8 @@ void BLEController::releaseTimers() {
 }
 
 void BLEController::sendTriggeredReport(uint8_t id) {
-	Message *msg = Whad::buildBLETriggeredMessage(id);
+	//Message *msg = Whad::buildBLETriggeredMessage(id);
+    Message *msg = whad::ble::Triggered(id).getRaw();
 	Core::instance->pushMessageToQueue(msg);
 }
 
@@ -1779,7 +1787,16 @@ void BLEController::sendConnectedReport() {
 		this->connectionInitiationData.responder.bytes[5]
 
 	};
-	Message *msg = Whad::buildBLEConnectedMessage(initiator, this->ownRandom, responder, this->connectionInitiationData.responderRandom, this->accessAddress, 0);
+	//Message *msg = Whad::buildBLEConnectedMessage(initiator, this->ownRandom, responder, this->connectionInitiationData.responderRandom, this->accessAddress, 0);
+    whad::ble::BDAddress initiatorAddr(
+        this->ownRandom?whad::ble::AddressRandom:whad::ble::AddressPublic,
+        initiator
+    );
+    whad::ble::BDAddress responderAddr(
+        this->connectionInitiationData.responderRandom?whad::ble::AddressRandom:whad::ble::AddressPublic,
+        responder
+    );
+    Message *msg = whad::ble::Connected(0, responderAddr, initiatorAddr).getRaw();
 	Core::instance->pushMessageToQueue(msg);
 }
 void BLEController::sendSlaveConnectedReport() {
@@ -1815,7 +1832,7 @@ void BLEController::sendSlaveConnectedReport() {
 	//Message *msg = Whad::buildBLEConnectedMessage(initiator, this->connectionInitiationData.responderRandom, responder, this->ownRandom, this->accessAddress, 1);
 	
     Message *msg = whad::ble::Connected(
-        1,              /* Connection handle */
+        0,              /* Connection handle */
         responderAddr,  /* Responder BD address */
         initiatorAddr   /* Initiator BD address */
     ).getRaw();
