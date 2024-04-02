@@ -79,6 +79,7 @@ class Core {
 
 		bool selectController(Protocol controller);
 
+        void pushMessageToQueue(whad::NanoPbMsg *msg);
 		void pushMessageToQueue(Message *msg);
 		Message* popMessageFromQueue();
 
