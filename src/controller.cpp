@@ -7,23 +7,35 @@ Controller::Controller(Radio *radio) {
 }
 
 void Controller::addPacket(Packet* packet) {
-	Core::instance->pushMessageToQueue(buildMessageFromPacket(packet));
+    /* Build a WHAD notification message from packet. */
+    whad::NanoPbMsg *message = buildMessageFromPacket(packet);
+
+    /* Add notification to our message queue. */
+	Core::instance->pushMessageToQueue(message);
+
+    /* Free the notification wrapper. */
+    delete message;
 }
 
 void Controller::sendDebug(const char* msg) {
     /* Craft a verbose message. */
-    whad::generic::Verbose verb(msg);
+    whad::NanoPbMsg *message = new whad::generic::Verbose(msg);
 
-	//Core::instance->pushMessageToQueue(Whad::buildVerboseMessage(msg));
-    Core::instance->pushMessageToQueue(verb.getRaw());
+	/* Add notification to our message queue. */
+    Core::instance->pushMessageToQueue(message);
+    
+    /* Free the notification wrapper. */
+    delete message;
 }
 
-Message* Controller::buildMessageFromPacket(Packet* packet) {
-  Message *msg = NULL;
+whad::NanoPbMsg *Controller::buildMessageFromPacket(Packet* packet) {
+  whad::NanoPbMsg *message = NULL;
+
   if (packet->getPacketType() == BLE_PACKET_TYPE) {
     BLEPacket *blePacket = static_cast<BLEPacket*>(packet);
-    //msg = Whad::buildBLERawPduMessage((BLEPacket*)packet);
-    msg = whad::ble::RawPdu(
+
+    /* Craft a BLE Raw PDU packet notification. */
+    message = new whad::ble::RawPdu(
         blePacket->getChannel(),
         blePacket->getRssi(),
         blePacket->getConnectionHandle(),
@@ -36,10 +48,12 @@ Message* Controller::buildMessageFromPacket(Packet* packet) {
         (whad::ble::Direction)blePacket->getSource(),
         false,
         false
-    ).getRaw();
+    );
   }
   else if (packet->getPacketType() == DOT15D4_PACKET_TYPE) {
     Dot15d4Packet *zigbeePacket = static_cast<Dot15d4Packet*>(packet);
+
+    /* Craft a ZigBee raw PDU notification. */
     whad::zigbee::ZigbeePacket packet(
         zigbeePacket->getChannel(),
         zigbeePacket->getPacketBuffer()+1,
@@ -50,12 +64,13 @@ Message* Controller::buildMessageFromPacket(Packet* packet) {
     packet.addFcsValidity(zigbeePacket->isCrcValid());
     packet.addRssi(zigbeePacket->getRssi());
     packet.addTimestamp(zigbeePacket->getTimestamp());
-    //msg = Whad::buildDot15d4RawPduMessage((Dot15d4Packet*)packet);
-    msg = whad::zigbee::RawPduReceived(packet).getRaw();
+    message = new whad::zigbee::RawPduReceived(packet);
   }
   else if (packet->getPacketType() == ESB_PACKET_TYPE) {
     ESBPacket *esbPacket = static_cast<ESBPacket*>(packet);
-    
+    whad::unifying::RawPduReceived *uniRawPduRecvd = NULL;
+
+    /* Specific processing if ESB packet contains Logitech Unifying data. */
     if (esbPacket->isUnifying())
     {
         /* Create a Unifying packet from ESBPacket. */
@@ -78,14 +93,16 @@ Message* Controller::buildMessageFromPacket(Packet* packet) {
         uniPacket.addCrcValidity(esbPacket->isCrcValid());
 
         /* Create a RawPacketReceived notification. */
-        whad::unifying::RawPduReceived packetRecvd(uniPacket);
-        packetRecvd.addAddress(address);
+        uniRawPduRecvd = new whad::unifying::RawPduReceived(uniPacket);
+        uniRawPduRecvd->addAddress(address);
 
         /* Send our RawPacketReceived notification. */
-        msg = packetRecvd.getRaw();
-    }
+        message = dynamic_cast<whad::NanoPbMsg*>(uniRawPduRecvd);
+    } 
     else
     {
+        whad::esb::RawPacketReceived *esbRawPacketRecvd = NULL;
+
         /* Create an ESB packet from ESBPacket. */
         whad::esb::Packet packet(esbPacket->getPacketBuffer(), esbPacket->getPacketSize());
 
@@ -93,20 +110,19 @@ Message* Controller::buildMessageFromPacket(Packet* packet) {
         whad::esb::EsbAddress address(esbPacket->getAddress(), 5);
 
         /* Create a RawPacketReceived notification. */
-        whad::esb::RawPacketReceived packetRecvd(esbPacket->getChannel(), packet);
+        esbRawPacketRecvd = new whad::esb::RawPacketReceived(esbPacket->getChannel(), packet);
 
         /* Set RSSI, CRC validity, timestamp and address. */
-        packetRecvd.setRssi(esbPacket->getRssi());
-        packetRecvd.setCrcValidity(esbPacket->isCrcValid());
-        packetRecvd.setTimestamp(esbPacket->getTimestamp());
-        packetRecvd.setAddress(address);
+        esbRawPacketRecvd->setRssi(esbPacket->getRssi());
+        esbRawPacketRecvd->setCrcValidity(esbPacket->isCrcValid());
+        esbRawPacketRecvd->setTimestamp(esbPacket->getTimestamp());
+        esbRawPacketRecvd->setAddress(address);
 
         /* Notification. */
-        msg = packetRecvd.getRaw();
+        message = dynamic_cast<whad::NanoPbMsg*>(esbRawPacketRecvd);
     }
   }
   else if (packet->getPacketType() == GENERIC_PACKET_TYPE) {
-    //msg = Whad::buildPhyPacketMessage((GenericPacket*)packet);
     GenericPacket* genPacket = static_cast<GenericPacket*>(packet);
     
     /* Create PHY packet. */
@@ -116,15 +132,13 @@ Message* Controller::buildMessageFromPacket(Packet* packet) {
     whad::phy::Timestamp pktTimestamp(packet->getTimestamp()/1000, (packet->getTimestamp()%1000)*1000);
 
     /* Created a PHY packet notification. */
-    whad::phy::PacketReceived packetRecvd (
+    message = new whad::phy::PacketReceived(
         2400 + packet->getChannel(),
         packet->getRssi(),
         pktTimestamp,
         phyPacket
     );
-
-    /* Send packet to host. */
-    msg = packetRecvd.getRaw();
   }
-  return msg;
+
+  return message;
 }
