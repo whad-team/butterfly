@@ -1292,15 +1292,15 @@ void Core::processUnifyingInputMessage(whad::unifying::UnifyingMsg uniMsg) {
 }
 
 void Core::processPhyInputMessage(whad::phy::PhyMsg msg) {
-  whad::NanoPbMsg *response = NULL;
+    whad::NanoPbMsg *response = NULL;
 
-  if (this->currentController != this->genericController) {
+    if (this->currentController != this->genericController) {
     this->selectController(GENERIC_PROTOCOL);
-  }
+    }
 
-  switch (msg.getType())
-  {
-    case whad::phy::SetGfskModMsg:
+    switch (msg.getType())
+    {
+        case whad::phy::SetGfskModMsg:
         {
             whad::phy::SetGfskMod query(msg);
 
@@ -1343,7 +1343,7 @@ void Core::processPhyInputMessage(whad::phy::PhyMsg msg) {
         }
         break;
 
-    case whad::phy::SendMsg:
+        case whad::phy::SendMsg:
         {
             whad::phy::SendPacket query(msg);
             whad::phy::Packet packet = query.getPacket();
@@ -1352,13 +1352,13 @@ void Core::processPhyInputMessage(whad::phy::PhyMsg msg) {
         }
         break;
 
-    case whad::phy::GetSupportedFreqsMsg:
+        case whad::phy::GetSupportedFreqsMsg:
         {
             response = new whad::phy::SupportedFreqsResp(SUPPORTED_FREQUENCY_RANGES);
         }
         break;
 
-    case whad::phy::SetFreqMsg:
+        case whad::phy::SetFreqMsg:
         {
             whad::phy::SetFreq query(msg);
 
@@ -1374,7 +1374,7 @@ void Core::processPhyInputMessage(whad::phy::PhyMsg msg) {
         }
         break;
 
-    case whad::phy::SetDatarateMsg:
+        case whad::phy::SetDatarateMsg:
         {
             whad::phy::SetDatarate query(msg);
 
@@ -1431,7 +1431,7 @@ void Core::processPhyInputMessage(whad::phy::PhyMsg msg) {
         }
         break;
 
-    case whad::phy::SetEndiannessMsg:
+        case whad::phy::SetEndiannessMsg:
         {
             whad::phy::SetEndianness query(msg);
             if (query.getEndianness() == whad::phy::PhyBigEndian) {
@@ -1444,7 +1444,7 @@ void Core::processPhyInputMessage(whad::phy::PhyMsg msg) {
         }
         break;
 
-    case whad::phy::SetTxPowerMsg:
+        case whad::phy::SetTxPowerMsg:
         {
             whad::phy::SetTxPower query(msg);
 
@@ -1461,7 +1461,7 @@ void Core::processPhyInputMessage(whad::phy::PhyMsg msg) {
         }
         break;
 
-    case whad::phy::SetPacketSizeMsg:
+        case whad::phy::SetPacketSizeMsg:
         {
             whad::phy::SetPacketSize query(msg);
 
@@ -1475,7 +1475,7 @@ void Core::processPhyInputMessage(whad::phy::PhyMsg msg) {
         }
         break;
 
-    case whad::phy::SetSyncWordMsg:
+        case whad::phy::SetSyncWordMsg:
         {
             whad::phy::SetSyncWord query(msg);
             this->genericController->setPreamble(query.get().get(), query.get().getSize());
@@ -1483,7 +1483,7 @@ void Core::processPhyInputMessage(whad::phy::PhyMsg msg) {
         }
         break;
 
-    case whad::phy::SetSniffModeMsg:
+        case whad::phy::SetSniffModeMsg:
         {
             whad::phy::SniffMode query(msg);
 
@@ -1496,26 +1496,32 @@ void Core::processPhyInputMessage(whad::phy::PhyMsg msg) {
         }
         break;
 
-    case whad::phy::StartMsg:
+        case whad::phy::StartMsg:
         {
             this->genericController->start();
             response = new whad::generic::Success();
         }
         break;
 
-    case whad::phy::StopMsg:
+        case whad::phy::StopMsg:
         {
             this->genericController->stop();
             response = new whad::generic::Success();
         }
         break;
 
-    default:
-        response = new whad::generic::Error();
+        default:
+        {
+            response = new whad::generic::Error();
+        }
         break;
-  }
+    }
 
-  this->pushMessageToQueue(response);
+    /* Push our response message into the TX queue. */
+    this->pushMessageToQueue(response);
+
+    /* Free our message wrapper. */
+    delete response;
 }
 
 #ifdef PA_ENABLED
