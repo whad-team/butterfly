@@ -181,10 +181,8 @@ SRC_FILES += \
 	$(PROJ_DIR)/radio.cpp \
 	$(PROJ_DIR)/controller.cpp \
 	$(PROJ_DIR)/packet.cpp \
-	$(PROJ_DIR)/whad/callbacks/callbacks.cpp
 
 SRC_FILES += \
-	$(PROJ_DIR)/whad/whad_.cpp \
 	$(PROJ_DIR)/controllers/dot15d4controller.cpp \
 	$(PROJ_DIR)/controllers/blecontroller.cpp \
 	$(PROJ_DIR)/controllers/esbcontroller.cpp \
@@ -224,7 +222,6 @@ INC_FOLDERS += \
 	$(SDK_ROOT)/components/libraries/util \
 	$(SDK_ROOT)/components/libraries/bsp \
 	$(PROJ_DIR) \
-	$(PROJ_DIR)/whad/callbacks \
 	$(CONF_DIR) \
 	$(SDK_ROOT)/components/libraries/usbd/class/cdc \
 	$(SDK_ROOT)/components/libraries/balloc \
