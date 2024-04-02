@@ -352,6 +352,11 @@ Dot15d4Packet* Dot15d4Controller::wazabeeDecoder(uint8_t *buffer, uint8_t size,u
 
 void Dot15d4Controller::sendJammingReport(uint32_t timestamp) {
 	//Core::instance->pushMessageToQueue(new JammingReportNotification(timestamp));
+    /* Craft a jammed notification. */
+    whad::zigbee::Jammed jammed(timestamp);
+
+    /* Queue notification. */
+    Core::instance->pushMessageToQueue(jammed.getRaw());
 }
 
 void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
@@ -395,6 +400,9 @@ void Dot15d4Controller::onJam(uint32_t timestamp) {
 
 void Dot15d4Controller::onEnergyDetection(uint32_t timestamp, uint8_t value) {
 	//Message* msg = Whad::buildDot15d4EnergyDetectionSampleMessage(value, timestamp);
+    /* Craft a energy detection notification. */
     Message *msg = whad::zigbee::EnergySample(timestamp, value).getRaw();
+
+    /* Enqueue message. */
 	Core::instance->pushMessageToQueue(msg);
 }

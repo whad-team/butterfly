@@ -3,7 +3,6 @@
 #include "packet.h"
 #include "controller.h"
 #include "timer.h"
-#include "whad/whad.h"
 
 #include "sequences/sequenceModule.h"
 

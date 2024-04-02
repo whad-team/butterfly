@@ -178,6 +178,12 @@ bool ESBController::goToNextChannel() {
 
 void ESBController::sendJammingReport(uint32_t timestamp) {
 	//Core::instance->pushMessageToQueue(new JammingReportNotification(timestamp));
+
+    /* Build an ESB Jammed notification. */
+    whad::esb::Jammed jammed(timestamp);
+
+    /* Push notification into our message queue. */
+    Core::instance->pushMessageToQueue(jammed.getRaw());
 }
 
 void ESBController::startAttack(ESBAttack attack) {

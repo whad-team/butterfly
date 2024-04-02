@@ -262,7 +262,11 @@ void GenericController::setEnergyDetectionConfiguration() {
 }
 
 void GenericController::sendJammingReport(uint32_t timestamp) {
-  //Core::instance->pushMessageToQueue(new JammingReportNotification(timestamp));
+    //Core::instance->pushMessageToQueue(new JammingReportNotification(timestamp));
+    /* Craft and enqueue jamming report. */
+    whad::phy::Timestamp ts(timestamp/1000, (timestamp%1000)*1000);
+    whad::phy::Jammed jammed(ts);
+    Core::instance->pushMessageToQueue(jammed.getRaw());
 }
 
 void GenericController::sendEnergyDetectionReport(uint32_t timestamp, uint8_t sample) {
