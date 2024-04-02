@@ -1,4 +1,5 @@
 #include "core.h"
+#include "capabilities.h"
 #include <whad.h>
 
 // Global instance of Core
