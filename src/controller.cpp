@@ -6,6 +6,13 @@ Controller::Controller(Radio *radio) {
 	this->radio = radio;
 }
 
+/**
+ * @brief Add packet to the list of packets to be sent to the host
+ * 
+ * @param[in]   packet      Pointer to a `Packet` object containing the packet
+ *                          information.
+ */
+
 void Controller::addPacket(Packet* packet) {
     /* Build a WHAD notification message from packet. */
     whad::NanoPbMsg *message = buildMessageFromPacket(packet);
@@ -17,6 +24,13 @@ void Controller::addPacket(Packet* packet) {
     delete message;
 }
 
+
+/**
+ * @brief   Send debug message to the host.
+ * 
+ * @param[in]   msg     Pointer to a text string to send as a debug message
+ */
+
 void Controller::sendDebug(const char* msg) {
     /* Craft a verbose message. */
     whad::NanoPbMsg *message = new whad::generic::Verbose(msg);
@@ -27,6 +41,14 @@ void Controller::sendDebug(const char* msg) {
     /* Free the notification wrapper. */
     delete message;
 }
+
+
+/**
+ * @brief   Create a WHAD notification message from a received packet.
+ * 
+ * @param[in]   packet  Pointer to a received `Packet` object.
+ * @retval      Pointer to a `whad::NanoPbMsg` ready to be sent to host
+ */
 
 whad::NanoPbMsg *Controller::buildMessageFromPacket(Packet* packet) {
   whad::NanoPbMsg *message = NULL;
