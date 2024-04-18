@@ -178,10 +178,10 @@ bool ESBController::goToNextChannel() {
 
 void ESBController::sendJammingReport(uint32_t timestamp) {
     /* Build an ESB Jammed notification. */
-    whad::NanoPbMsg *motification = new whad::esb::Jammed jammed(timestamp);
+    whad::NanoPbMsg *notification = new whad::esb::Jammed(timestamp);
 
     /* Push notification into our message queue. */
-    Core::instance->pushMessageToQueue(motification);
+    Core::instance->pushMessageToQueue(notification);
 
     /* Free notification wrapper. */
     delete notification;

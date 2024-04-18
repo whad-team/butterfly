@@ -264,8 +264,8 @@ void GenericController::setEnergyDetectionConfiguration() {
 void GenericController::sendJammingReport(uint32_t timestamp) {
     /* Craft and enqueue jamming report. */
     whad::phy::Timestamp ts(timestamp/1000, (timestamp%1000)*1000);
-    whad::NanoPbMsg *notification = new whad::phy::Jammed jammed(ts);
-    Core::instance->pushMessageToQueue(jammed);
+    whad::NanoPbMsg *notification = new whad::phy::Jammed(ts);
+    Core::instance->pushMessageToQueue(notification);
 
     /* Free notification wrapper. */
     delete notification;
