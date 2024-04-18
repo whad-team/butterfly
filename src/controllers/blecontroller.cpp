@@ -1856,7 +1856,7 @@ void BLEController::sendConnectedReport() {
     );
 
     /* Craft a connected notification, enqueue and free wrapper. */
-    whad::NanoPbMsg *notification = new whad::ble::Connected(0, responderAddr, initiatorAddr);
+    whad::NanoPbMsg *notification = new whad::ble::Connected(1, responderAddr, initiatorAddr);
 	Core::instance->pushMessageToQueue(notification);
     delete notification;
 }
@@ -1893,7 +1893,7 @@ void BLEController::sendSlaveConnectedReport() {
 
     /* Craft a connected notification. */
     whad::NanoPbMsg *notification = new whad::ble::Connected(
-        0,              /* Connection handle */
+        1,              /* Connection handle */
         responderAddr,  /* Responder BD address */
         initiatorAddr   /* Initiator BD address */
     );
