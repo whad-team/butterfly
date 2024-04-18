@@ -1720,7 +1720,7 @@ void BLEController::sendConnectionReport(ConnectionStatus status) {
         case DISCONNECTED:
         {
             /* Craft a disconnected notification. */
-            notification = new whad::ble::Disconnected(1, 0x16);
+            notification = new whad::ble::Disconnected(0, 0x16);
         }
         break;
 
@@ -1856,7 +1856,7 @@ void BLEController::sendConnectedReport() {
     );
 
     /* Craft a connected notification, enqueue and free wrapper. */
-    whad::NanoPbMsg *notification = new whad::ble::Connected(1, responderAddr, initiatorAddr);
+    whad::NanoPbMsg *notification = new whad::ble::Connected(0, responderAddr, initiatorAddr);
 	Core::instance->pushMessageToQueue(notification);
     delete notification;
 }
@@ -1893,7 +1893,7 @@ void BLEController::sendSlaveConnectedReport() {
 
     /* Craft a connected notification. */
     whad::NanoPbMsg *notification = new whad::ble::Connected(
-        1,              /* Connection handle */
+        0,              /* Connection handle */
         responderAddr,  /* Responder BD address */
         initiatorAddr   /* Initiator BD address */
     );
@@ -2141,7 +2141,7 @@ void BLEController::connectionInitiationConnectedSlaveProcessing(BLEPacket *pkt)
 		this->sync = true;
 
 		this->setAnchorPoint(pkt->getTimestamp());
-		pkt->setConnectionHandle(1);
+		pkt->setConnectionHandle(0);
 
 		bsp_board_led_on(0);
 		bsp_board_led_on(1);
@@ -2406,7 +2406,7 @@ void BLEController::roleSimulationProcessing(BLEPacket* pkt) {
 		this->slaveRoleCallback(pkt);
 
 		// Update the connection handle
-		pkt->setConnectionHandle(1);
+		pkt->setConnectionHandle(0);
 	}
 	// If we received the packet after anchorPoint + 2*1250 us in MiTM mode, it's a slave packet in response to our fake master packet
 	else if (relativeTimestamp > 2*1250 && this->controllerState == PERFORMING_MITM) {
