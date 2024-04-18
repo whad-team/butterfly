@@ -1720,7 +1720,7 @@ void BLEController::sendConnectionReport(ConnectionStatus status) {
         case DISCONNECTED:
         {
             /* Craft a disconnected notification. */
-            notification = new whad::ble::Disconnected(0, 0x16);
+            notification = new whad::ble::Disconnected(1, 0x16);
         }
         break;
 
