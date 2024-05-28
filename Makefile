@@ -261,7 +261,7 @@ INC_FOLDERS += \
 	$(WHAD_DIR)/nanopb \
 	$(WHAD_DIR)/protocol \
 	$(WHAD_DIR)/protocol/ble \
-	$(WHAD_DIR)/protocol/zigbee \
+	$(WHAD_DIR)/protocol/dot15d4 \
 	$(WHAD_DIR)/protocol/esb \
 	$(WHAD_DIR)/protocol/phy \
 

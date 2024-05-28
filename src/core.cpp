@@ -27,8 +27,8 @@ void Core::processInputMessage(Message msg) {
                 this->processBLEInputMessage(whad::ble::BleMsg(whadMsg));
                 break;
 
-            case whad::MessageDomain::DomainZigbee:
-                this->processZigbeeInputMessage(whad::zigbee::ZigbeeMsg(whadMsg));
+            case whad::MessageDomain::DomainDot15d4:
+                this->processDot15d4InputMessage(whad::dot15d4::Dot15d4Msg(whadMsg));
                 break;
 
             case whad::MessageDomain::DomainEsb:
@@ -139,18 +139,18 @@ void Core::processDiscoveryInputMessage(whad::discovery::DiscoveryMsg msg) {
     delete response;
 }
 
-void Core::processZigbeeInputMessage(whad::zigbee::ZigbeeMsg zigbeeMsg) {
+void Core::processDot15d4InputMessage(whad::dot15d4::Dot15d4Msg dot15d4Msg) {
     whad::NanoPbMsg *response = NULL;
 
     if (this->currentController != this->dot15d4Controller) {
         this->selectController(DOT15D4_PROTOCOL);
     }
 
-    switch (zigbeeMsg.getType())
+    switch (dot15d4Msg.getType())
     {
-        case whad::zigbee::SniffModeMsg:
+        case whad::dot15d4::SniffModeMsg:
         {
-            whad::zigbee::SniffMode query(zigbeeMsg);
+            whad::dot15d4::SniffMode query(dot15d4Msg);
 
             int channel = query.getChannel();
             if (channel >= 11 && channel <= 26) {
@@ -165,9 +165,9 @@ void Core::processZigbeeInputMessage(whad::zigbee::ZigbeeMsg zigbeeMsg) {
         }
         break;
 
-        case whad::zigbee::EnergyDetectionMsg:
+        case whad::dot15d4::EnergyDetectionMsg:
         {
-            whad::zigbee::EnergyDetect query(zigbeeMsg);
+            whad::dot15d4::EnergyDetect query(dot15d4Msg);
 
             int channel = query.getChannel();
             if (channel >= 11 && channel <= 26) {
@@ -181,16 +181,16 @@ void Core::processZigbeeInputMessage(whad::zigbee::ZigbeeMsg zigbeeMsg) {
         }
         break;
 
-        case whad::zigbee::StartMsg:
+        case whad::dot15d4::StartMsg:
         {
             this->currentController->start();
             response = new whad::generic::Success();
         }
         break;
 
-        case whad::zigbee::EndDeviceModeMsg:
+        case whad::dot15d4::EndDeviceModeMsg:
         {
-            whad::zigbee::EndDeviceMode query(zigbeeMsg);
+            whad::dot15d4::EndDeviceMode query(dot15d4Msg);
 
             int channel = query.getChannel();
             if (channel >= 11 && channel <= 26) {
@@ -206,9 +206,9 @@ void Core::processZigbeeInputMessage(whad::zigbee::ZigbeeMsg zigbeeMsg) {
         break;
 
 
-        case whad::zigbee::CoordModeMsg:
+        case whad::dot15d4::CoordModeMsg:
         {
-            whad::zigbee::CoordMode query(zigbeeMsg);
+            whad::dot15d4::CoordMode query(dot15d4Msg);
 
             int channel = query.getChannel();
             if (channel >= 11 && channel <= 26) {
@@ -224,9 +224,9 @@ void Core::processZigbeeInputMessage(whad::zigbee::ZigbeeMsg zigbeeMsg) {
         break;
 
 
-        case whad::zigbee::RouterModeMsg:
+        case whad::dot15d4::RouterModeMsg:
         {
-            whad::zigbee::RouterMode query(zigbeeMsg);
+            whad::dot15d4::RouterMode query(dot15d4Msg);
 
             int channel = query.getChannel();
             if (channel >= 11 && channel <= 26) {
@@ -241,11 +241,11 @@ void Core::processZigbeeInputMessage(whad::zigbee::ZigbeeMsg zigbeeMsg) {
         }
         break;
 
-        case whad::zigbee::SetNodeAddressMsg:
+        case whad::dot15d4::SetNodeAddressMsg:
         {
-            whad::zigbee::SetNodeAddress query(zigbeeMsg);
+            whad::dot15d4::SetNodeAddress query(dot15d4Msg);
 
-            if (query.getAddressType() == whad::zigbee::AddressShort) {
+            if (query.getAddressType() == whad::dot15d4::AddressShort) {
                 uint16_t shortAddress = query.getAddress() & 0xFFFF;
                 this->dot15d4Controller->setShortAddress(shortAddress);
                 response = new whad::generic::Success();
@@ -260,7 +260,7 @@ void Core::processZigbeeInputMessage(whad::zigbee::ZigbeeMsg zigbeeMsg) {
         break;
 
 
-        case whad::zigbee::StopMsg:
+        case whad::dot15d4::StopMsg:
         {
             this->currentController->stop();
             response = new whad::generic::Success();
@@ -268,9 +268,9 @@ void Core::processZigbeeInputMessage(whad::zigbee::ZigbeeMsg zigbeeMsg) {
         break;
 
 
-        case whad::zigbee::SendMsg:
+        case whad::dot15d4::SendMsg:
         {
-            whad::zigbee::SendPdu query(zigbeeMsg);
+            whad::dot15d4::SendPdu query(dot15d4Msg);
 
             int channel = query.getChannel();
             
@@ -296,9 +296,9 @@ void Core::processZigbeeInputMessage(whad::zigbee::ZigbeeMsg zigbeeMsg) {
         break;
 
 
-        case whad::zigbee::SendRawMsg:
+        case whad::dot15d4::SendRawMsg:
         {
-            whad::zigbee::SendRawPdu query(zigbeeMsg);
+            whad::dot15d4::SendRawPdu query(dot15d4Msg);
 
             int channel = query.getChannel();
             uint16_t fcs = (uint16_t)(query.getFcs() & 0xFFFF);

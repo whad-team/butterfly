@@ -73,20 +73,20 @@ whad::NanoPbMsg *Controller::buildMessageFromPacket(Packet* packet) {
     );
   }
   else if (packet->getPacketType() == DOT15D4_PACKET_TYPE) {
-    Dot15d4Packet *zigbeePacket = static_cast<Dot15d4Packet*>(packet);
+    Dot15d4Packet *dot15d4Packet = static_cast<Dot15d4Packet*>(packet);
 
-    /* Craft a ZigBee raw PDU notification. */
-    whad::zigbee::ZigbeePacket packet(
-        zigbeePacket->getChannel(),
-        zigbeePacket->getPacketBuffer()+1,
-        zigbeePacket->getPacketSize()-3,
-        zigbeePacket->getFCS()
+    /* Craft a Dot15d4 raw PDU notification. */
+    whad::dot15d4::Dot15d4Packet packet(
+        dot15d4Packet->getChannel(),
+        dot15d4Packet->getPacketBuffer()+1,
+        dot15d4Packet->getPacketSize()-3,
+        dot15d4Packet->getFCS()
     );
-    packet.addLqi(zigbeePacket->getLQI());
-    packet.addFcsValidity(zigbeePacket->isCrcValid());
-    packet.addRssi(zigbeePacket->getRssi());
-    packet.addTimestamp(zigbeePacket->getTimestamp());
-    message = new whad::zigbee::RawPduReceived(packet);
+    packet.addLqi(dot15d4Packet->getLQI());
+    packet.addFcsValidity(dot15d4Packet->isCrcValid());
+    packet.addRssi(dot15d4Packet->getRssi());
+    packet.addTimestamp(dot15d4Packet->getTimestamp());
+    message = new whad::dot15d4::RawPduReceived(packet);
   }
   else if (packet->getPacketType() == ESB_PACKET_TYPE) {
     ESBPacket *esbPacket = static_cast<ESBPacket*>(packet);

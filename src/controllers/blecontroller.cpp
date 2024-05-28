@@ -2129,6 +2129,9 @@ void BLEController::connectionInitiationAdvertisementProcessing(BLEPacket *pkt) 
 void BLEController::connectionInitiationConnectedProcessing(BLEPacket *pkt) {
 	if (!this->sync) {
 		this->sync = true;
+        
+        /* No empty PDUs. */
+        this->setEmptyTransmitIndicator(false);
 
 		this->controllerState = SIMULATING_MASTER;
 		this->sendConnectedReport();

@@ -35,20 +35,20 @@ const whad_domain_desc_t CAPABILITIES[] = {
       )
   },
   {
-    DOMAIN_ZIGBEE,
+    DOMAIN_DOT15D4,
     (whad_capability_t)(CAP_SNIFF | CAP_INJECT | CAP_JAM | CAP_SIMULATE_ROLE),
     (
-      CMD(zigbee_ZigbeeCommand_Sniff) |
-      CMD(zigbee_ZigbeeCommand_Jam) |
-      CMD(zigbee_ZigbeeCommand_EnergyDetection) |
-      CMD(zigbee_ZigbeeCommand_Send) |
-      CMD(zigbee_ZigbeeCommand_Start) |
-      CMD(zigbee_ZigbeeCommand_Stop) |
-      CMD(zigbee_ZigbeeCommand_SetNodeAddress) |
-      CMD(zigbee_ZigbeeCommand_EndDeviceMode) |
-      CMD(zigbee_ZigbeeCommand_CoordinatorMode) |
-      CMD(zigbee_ZigbeeCommand_RouterMode) |
-      CMD(zigbee_ZigbeeCommand_ManInTheMiddle)
+      CMD(dot15d4_Dot15d4Command_Sniff) |
+      CMD(dot15d4_Dot15d4Command_Jam) |
+      CMD(dot15d4_Dot15d4Command_EnergyDetection) |
+      CMD(dot15d4_Dot15d4Command_Send) |
+      CMD(dot15d4_Dot15d4Command_Start) |
+      CMD(dot15d4_Dot15d4Command_Stop) |
+      CMD(dot15d4_Dot15d4Command_SetNodeAddress) |
+      CMD(dot15d4_Dot15d4Command_EndDeviceMode) |
+      CMD(dot15d4_Dot15d4Command_CoordinatorMode) |
+      CMD(dot15d4_Dot15d4Command_RouterMode) |
+      CMD(dot15d4_Dot15d4Command_ManInTheMiddle)
       )
   },
   {
