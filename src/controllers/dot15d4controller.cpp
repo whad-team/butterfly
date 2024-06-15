@@ -351,7 +351,14 @@ Dot15d4Packet* Dot15d4Controller::wazabeeDecoder(uint8_t *buffer, uint8_t size,u
 }
 
 void Dot15d4Controller::sendJammingReport(uint32_t timestamp) {
-	//Core::instance->pushMessageToQueue(new JammingReportNotification(timestamp));
+    /* Craft a jammed notification. */
+    whad::NanoPbMsg *notification = new whad::dot15d4::Jammed(timestamp);
+
+    /* Queue notification. */
+    Core::instance->pushMessageToQueue(notification);
+
+    /* Free notification wrapper. */
+    delete notification;
 }
 
 void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
@@ -394,6 +401,12 @@ void Dot15d4Controller::onJam(uint32_t timestamp) {
 }
 
 void Dot15d4Controller::onEnergyDetection(uint32_t timestamp, uint8_t value) {
-	Message* msg = Whad::buildDot15d4EnergyDetectionSampleMessage(value, timestamp);
-	Core::instance->pushMessageToQueue(msg);
+    /* Craft a energy detection notification. */
+    whad::NanoPbMsg *notification = new whad::dot15d4::EnergySample(timestamp, value);
+
+    /* Enqueue message. */
+	Core::instance->pushMessageToQueue(notification);
+
+    /* Free notification wrapper. */
+    delete notification;
 }

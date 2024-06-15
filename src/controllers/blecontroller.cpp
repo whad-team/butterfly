@@ -1,5 +1,6 @@
 #include "blecontroller.h"
 #include "../core.h"
+#include <whad.h>
 
 
 int BLEController::channelToFrequency(int channel) {
@@ -1665,51 +1666,109 @@ BLEControllerState BLEController::getState() {
 }
 
 void BLEController::sendInjectionReport(bool status, uint32_t injectionCount) {
-	//Message *msg = Whad::buildBLEInjectedMessage(status, injectionCount, this->accessAddress);
-    Message *msg = whad::ble::Injected(this->accessAddress, injectionCount, status).getRaw();
-	Core::instance->pushMessageToQueue(msg);
+    /* Craft an injection report notification. */
+    whad::NanoPbMsg *notification = new whad::ble::Injected(this->accessAddress, injectionCount, status);
+
+    /* Add notification to our message queue. */
+	Core::instance->pushMessageToQueue(notification);
+
+    /* Free notification wrapper. */
+    delete notification;
 }
 
 void BLEController::sendAdvIntervalReport(uint32_t interval) {
 	//Core::instance->pushMessageToQueue(new AdvIntervalReportNotification(interval));
 }
 void BLEController::sendAccessAddressReport(uint32_t accessAddress, uint32_t timestamp, int32_t rssi) {
-	Message* msg = Whad::buildBLEAccessAddressDiscoveredMessage(accessAddress, timestamp, rssi);
-	Core::instance->pushMessageToQueue(msg);
+    /* Craft an access address report. */
+    whad::NanoPbMsg *notification = new whad::ble::AccessAddressDiscovered(accessAddress, timestamp, rssi);
+
+    /* Add notification to our message queue. */
+	Core::instance->pushMessageToQueue(notification);
+
+    /* Free notification wrapper. */
+    delete notification;
 }
 
 void BLEController::sendExistingConnectionReport(uint32_t accessAddress, uint32_t crcInit, uint8_t *channelMap, uint16_t hopInterval, uint8_t hopIncrement) {
-	Message* msg = Whad::buildBLESynchronizedMessage(accessAddress, crcInit,hopInterval,hopIncrement,channelMap);
-	Core::instance->pushMessageToQueue(msg);
+    /* Craft an existing connection report notification. */
+    whad::ble::ChannelMap chanMap(channelMap);
+    whad::NanoPbMsg *notification = new whad::ble::Synchronized(accessAddress, crcInit, hopInterval, hopIncrement, chanMap);
+
+    /* Add notification to our message queue. */
+	Core::instance->pushMessageToQueue(notification);
+
+    /* Free notification wrapper. */
+    delete notification;
 }
 
 void BLEController::sendConnectionReport(ConnectionStatus status) {
-	if (status == CONNECTION_STARTED) {
-			//Message* msg = Whad::buildBLESynchronizedMessage(this->accessAddress, this->crcInit, this->hopInterval, /this->hopIncrement, this->channelMap);
-            Message *msg = whad::ble::Synchronized(
+    whad::NanoPbMsg *notification = NULL;
+
+    switch (status)
+    {
+        case CONNECTION_STARTED:
+        {
+            /* Craft a synchronization notification. */
+            notification = new whad::ble::Synchronized(
                 this->accessAddress, this->crcInit, this->hopInterval, this->hopIncrement,
                 whad::ble::ChannelMap(this->channelMap)
-            ).getRaw();
-			Core::instance->pushMessageToQueue(msg);
-	}
-	else if (status == DISCONNECTED) {
-		Message* msg = Whad::buildBLEDisconnectedMessage(0x16);
-		Core::instance->pushMessageToQueue(msg);
+            );
+        }
+        break;
 
-	}
-	else if (status == CONNECTION_LOST) {
-		//Message* msg = Whad::buildBLEDesynchronizedMessage(this->accessAddress);
-        Message *msg = whad::ble::Desynchronized(this->accessAddress).getRaw();
-		Core::instance->pushMessageToQueue(msg);
-	}
-	else if (status == ATTACK_SUCCESS && (this->attackStatus.attack == BLE_ATTACK_MITM || this->attackStatus.attack == BLE_ATTACK_MASTER_HIJACKING  || this->attackStatus.attack == BLE_ATTACK_SLAVE_HIJACKING)) {
-		Message* msg = Whad::buildBLEHijackedMessage(true, this->accessAddress);
-		Core::instance->pushMessageToQueue(msg);
-	}
-	else if (status == ATTACK_FAILURE && (this->attackStatus.attack == BLE_ATTACK_MITM || this->attackStatus.attack == BLE_ATTACK_MASTER_HIJACKING  || this->attackStatus.attack == BLE_ATTACK_SLAVE_HIJACKING)) {
-		Message* msg = Whad::buildBLEHijackedMessage(false, this->accessAddress);
-		Core::instance->pushMessageToQueue(msg);
-	}
+        case DISCONNECTED:
+        {
+            /* Craft a disconnected notification. */
+            notification = new whad::ble::Disconnected(0, 0x16);
+        }
+        break;
+
+        case CONNECTION_LOST:
+        {
+            /* Craft a connection lost notification. */
+            notification = new whad::ble::Desynchronized(this->accessAddress);
+        }
+        break;
+
+        case ATTACK_SUCCESS:
+        {
+            if (this->attackStatus.attack == BLE_ATTACK_MITM || 
+                this->attackStatus.attack == BLE_ATTACK_MASTER_HIJACKING  ||
+                this->attackStatus.attack == BLE_ATTACK_SLAVE_HIJACKING)
+            {
+                notification = new whad::ble::Hijacked(this->accessAddress, true);
+            }
+        }
+        break;
+
+        case ATTACK_FAILURE:
+        {
+            if (this->attackStatus.attack == BLE_ATTACK_MITM || 
+                this->attackStatus.attack == BLE_ATTACK_MASTER_HIJACKING  ||
+                this->attackStatus.attack == BLE_ATTACK_SLAVE_HIJACKING)
+            {
+                notification = new whad::ble::Hijacked(this->accessAddress, false);
+            }
+        }
+        break;
+
+        default:
+        {
+            notification = NULL;
+        }
+        break;
+    }
+
+    /* If a notification has to be sent, process it. */
+    if (notification != NULL)
+    {
+        /* Add notification to our message queue. */
+        Core::instance->pushMessageToQueue(notification);
+
+        /* Free notification wrapper. */
+        delete notification;
+    }
 }
 
 
@@ -1757,8 +1816,14 @@ void BLEController::releaseTimers() {
 }
 
 void BLEController::sendTriggeredReport(uint8_t id) {
-	Message *msg = Whad::buildBLETriggeredMessage(id);
-	Core::instance->pushMessageToQueue(msg);
+    /* Craft a triggered notification. */
+    whad::NanoPbMsg *notification = new whad::ble::Triggered(id);
+
+    /* Add notification to our message queue. */
+	Core::instance->pushMessageToQueue(notification);
+
+    /* Free notification wrapper. */
+    delete notification;
 }
 
 void BLEController::sendConnectedReport() {
@@ -1779,9 +1844,23 @@ void BLEController::sendConnectedReport() {
 		this->connectionInitiationData.responder.bytes[5]
 
 	};
-	Message *msg = Whad::buildBLEConnectedMessage(initiator, this->ownRandom, responder, this->connectionInitiationData.responderRandom, this->accessAddress, 0);
-	Core::instance->pushMessageToQueue(msg);
+
+
+    whad::ble::BDAddress initiatorAddr(
+        this->ownRandom?whad::ble::AddressRandom:whad::ble::AddressPublic,
+        initiator
+    );
+    whad::ble::BDAddress responderAddr(
+        this->connectionInitiationData.responderRandom?whad::ble::AddressRandom:whad::ble::AddressPublic,
+        responder
+    );
+
+    /* Craft a connected notification, enqueue and free wrapper. */
+    whad::NanoPbMsg *notification = new whad::ble::Connected(0, responderAddr, initiatorAddr);
+	Core::instance->pushMessageToQueue(notification);
+    delete notification;
 }
+
 void BLEController::sendSlaveConnectedReport() {
 	uint8_t responder[6] = {
 		this->own.bytes[5],
@@ -1812,15 +1891,18 @@ void BLEController::sendSlaveConnectedReport() {
         initiator
     );
 
-	//Message *msg = Whad::buildBLEConnectedMessage(initiator, this->connectionInitiationData.responderRandom, responder, this->ownRandom, this->accessAddress, 1);
-	
-    Message *msg = whad::ble::Connected(
-        1,              /* Connection handle */
+    /* Craft a connected notification. */
+    whad::NanoPbMsg *notification = new whad::ble::Connected(
+        0,              /* Connection handle */
         responderAddr,  /* Responder BD address */
         initiatorAddr   /* Initiator BD address */
-    ).getRaw();
+    );
 
-    Core::instance->pushMessageToQueue(msg);
+    /* Add notification to our message queue. */
+    Core::instance->pushMessageToQueue(notification);
+
+    /* Free notification wrapper. */
+    delete notification;
 }
 
 void BLEController::connect(uint8_t *address, bool random) {
@@ -2047,6 +2129,9 @@ void BLEController::connectionInitiationAdvertisementProcessing(BLEPacket *pkt) 
 void BLEController::connectionInitiationConnectedProcessing(BLEPacket *pkt) {
 	if (!this->sync) {
 		this->sync = true;
+        
+        /* No empty PDUs. */
+        this->setEmptyTransmitIndicator(false);
 
 		this->controllerState = SIMULATING_MASTER;
 		this->sendConnectedReport();
@@ -2059,7 +2144,7 @@ void BLEController::connectionInitiationConnectedSlaveProcessing(BLEPacket *pkt)
 		this->sync = true;
 
 		this->setAnchorPoint(pkt->getTimestamp());
-		pkt->setConnectionHandle(1);
+		pkt->setConnectionHandle(0);
 
 		bsp_board_led_on(0);
 		bsp_board_led_on(1);
@@ -2324,7 +2409,7 @@ void BLEController::roleSimulationProcessing(BLEPacket* pkt) {
 		this->slaveRoleCallback(pkt);
 
 		// Update the connection handle
-		pkt->setConnectionHandle(1);
+		pkt->setConnectionHandle(0);
 	}
 	// If we received the packet after anchorPoint + 2*1250 us in MiTM mode, it's a slave packet in response to our fake master packet
 	else if (relativeTimestamp > 2*1250 && this->controllerState == PERFORMING_MITM) {

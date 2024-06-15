@@ -1,4 +1,4 @@
 [submodule "whad-lib"]
 	path = whad-lib
 	url = git@github.com:whad-team/whad-lib.git
-	branch=zigbee_refactoring
+	branch=main
