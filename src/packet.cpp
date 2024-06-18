@@ -49,7 +49,7 @@ uint8_t *Packet::getPacketBuffer() {
 size_t Packet::getPacketSize() {
 	return this->packetSize;
 }
-uint32_t Packet::getTimestamp() {
+uint64_t Packet::getTimestamp() {
 	return this->timestamp;
 }
 
@@ -260,7 +260,7 @@ void BLEPacket::setConnectionHandle(int connectionHandle) {
 uint32_t BLEPacket::getCrc() {
 		return bytewise_bit_swap(this->crcValue.value);
 }
-uint32_t BLEPacket::getRelativeTimestamp() {
+uint64_t BLEPacket::getRelativeTimestamp() {
 	return this->timestampRelative;
 }
 bool BLEPacket::extractAdvertiserAddress(uint8_t *address, bool *random) {

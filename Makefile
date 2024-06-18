@@ -194,8 +194,8 @@ SRC_FILES += \
 
 # WHAD Library
 WHAD_SRC := $(wildcard $(WHAD_DIR)/nanopb/*.c) \
-	$(wildcard $(WHAD_DIR)/protocol/*.c) \
-	$(wildcard $(WHAD_DIR)/protocol/*/*.c) \
+	$(wildcard $(WHAD_DIR)/whad/protocol/*.c) \
+	$(wildcard $(WHAD_DIR)/whad/protocol/*/*.c) \
 	$(wildcard $(WHAD_DIR)/src/*.c) \
 	$(wildcard $(WHAD_DIR)/src/domains/*.c) \
 	$(wildcard $(WHAD_DIR)/src/cpp/*.cpp) \
@@ -259,11 +259,11 @@ INC_FOLDERS += \
 	$(WHAD_DIR)/inc \
 	$(WHAD_DIR)/inc/cpp \
 	$(WHAD_DIR)/nanopb \
-	$(WHAD_DIR)/protocol \
-	$(WHAD_DIR)/protocol/ble \
-	$(WHAD_DIR)/protocol/dot15d4 \
-	$(WHAD_DIR)/protocol/esb \
-	$(WHAD_DIR)/protocol/phy \
+	$(WHAD_DIR)/whad/protocol \
+	$(WHAD_DIR)/whad/protocol/ble \
+	$(WHAD_DIR)/whad/protocol/dot15d4 \
+	$(WHAD_DIR)/whad/protocol/esb \
+	$(WHAD_DIR)/whad/protocol/phy \
 
 
 # Libraries common to all targets

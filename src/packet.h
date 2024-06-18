@@ -26,7 +26,7 @@ class Packet {
 		uint8_t *packetPointer;
 		size_t packetSize;
 		PacketType packetType;
-		uint32_t timestamp;
+		uint64_t timestamp;
 		int8_t rssi;
 		uint8_t channel;
 		uint8_t source;
@@ -42,7 +42,7 @@ class Packet {
 		uint8_t getSource();
 		uint8_t getChannel();
 		int8_t getRssi();
-		uint32_t getTimestamp();
+		uint64_t getTimestamp();
 		bool isCrcValid();
 };
 
@@ -69,7 +69,7 @@ typedef enum Dot15d4AddressMode {
 class BLEPacket : public Packet {
 	protected:
 		uint32_t accessAddress;
-		uint32_t timestampRelative;
+		uint64_t timestampRelative;
 		int connectionHandle;
 
 	public:
@@ -87,7 +87,7 @@ class BLEPacket : public Packet {
 		int getConnectionHandle();
 		void setConnectionHandle(int connectionHandle);
 		uint32_t getCrc();
-		uint32_t getRelativeTimestamp();
+		uint64_t getRelativeTimestamp();
 
 		bool isAdvertisement();
 		bool isEncryptionRequest();
