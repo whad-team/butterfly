@@ -495,9 +495,9 @@ void ESBController::onPromiscuousPacketProcessing(uint32_t timestamp, uint8_t si
 
         uint8_t* check_ptr = (buffer+byteshift-1);
         if (check_ptr[0] == 0xAA || check_ptr[0] == 0x55) {
-            pkt = new ESBPacket(candidate,size,timestamp,0x00,channel,rssi,crcValue, this->unifying);
+            pkt = new ESBPacket(candidate,size,timestamp,0x00,this->channel,rssi,crcValue, this->unifying);
             if (pkt->getSize() < 32 && pkt->checkCrc()) {
-              croppedPkt = new ESBPacket(candidate,pkt->getSize()+5+2+2,timestamp,0x00,channel,rssi,crcValue,this->unifying);
+              croppedPkt = new ESBPacket(candidate,pkt->getSize()+5+2+2,timestamp,0x00,this->channel,rssi,crcValue,this->unifying);
               this->addPacket(croppedPkt);
               delete croppedPkt;
               break;
