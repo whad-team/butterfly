@@ -1219,8 +1219,8 @@ void Core::processUnifyingInputMessage(whad::unifying::UnifyingMsg uniMsg) {
             {
                 /* Configure our ESB controller accordingly. */
                 this->esbController->setChannel(channel);
-                this->esbController->disableAcknowledgementsSniffing();
-                this->esbController->enableAcknowledgementsTransmission();
+                this->esbController->enableAcknowledgementsSniffing();
+                this->esbController->disableAcknowledgementsTransmission();
 
                 /* Success. */
                 response = new whad::generic::Success();
@@ -1245,8 +1245,8 @@ void Core::processUnifyingInputMessage(whad::unifying::UnifyingMsg uniMsg) {
             {
                 /* Configure our ESB controller accordingly. */
                 this->esbController->setChannel(channel);
-                this->esbController->disableAcknowledgementsSniffing();
-                this->esbController->enableAcknowledgementsTransmission();
+                this->esbController->enableAcknowledgementsSniffing();
+                this->esbController->disableAcknowledgementsTransmission();
 
                 /* Success. */
                 response = new whad::generic::Success();
