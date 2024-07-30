@@ -81,7 +81,7 @@ void Core::processDiscoveryInputMessage(whad::discovery::DiscoveryMsg msg) {
             {
                 whad::discovery::DeviceInfoQuery query(msg);
 
-                if (query.getVersion() <= WHAD_MIN_VERSION)
+                if (query.getVersion() >= WHAD_MIN_VERSION)
                 {
                     /* Craft device ID from unique values. */
                     uint8_t deviceId[16];
