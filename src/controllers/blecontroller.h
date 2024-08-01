@@ -300,6 +300,7 @@ class BLEController : public Controller {
 		bool stopEncryption();
 
 		bool newAdvertisingTransmission();
+		bool rawInject(uint8_t* pdu, size_t size, int channel, uint32_t access_address);
 
 		bool whitelistAdvAddress(bool enable, uint8_t a, uint8_t b, uint8_t c,uint8_t d, uint8_t e, uint8_t f);
 		bool whitelistInitAddress(bool enable, uint8_t a, uint8_t b, uint8_t c,uint8_t d, uint8_t e, uint8_t f);

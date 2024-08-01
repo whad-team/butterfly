@@ -1068,6 +1068,23 @@ void BLEController::setCrcRecoveryConfiguration(uint32_t accessAddress) {
 	this->radio->reload();
 }
 
+bool BLEController::rawInject(uint8_t* pdu, size_t size, int channel, uint32_t access_address) {
+		uint32_t oldAccessAddress = this->accessAddress;
+		uint32_t oldCrcInit = this->crcInit;
+		int oldChannel = this->channel;
+		this->channel = channel;
+		this->setHardwareConfiguration(access_address, access_address == 0x8e89bed6 ? 0x555555 : oldCrcInit);
+
+		this->radio->send(pdu, size, BLEController::channelToFrequency(channel),channel);
+		nrf_delay_us(100 + size * 8);
+		// Restore previous configuration
+		this->accessAddress = oldAccessAddress;
+		this->crcInit = oldCrcInit;
+		this->channel = oldChannel;
+		this->setHardwareConfiguration(this->accessAddress, this->crcInit);
+		return true;
+}
+
 void BLEController::setHardwareConfiguration(uint32_t accessAddress, uint32_t crcInit) {
 	this->accessAddress = accessAddress;
 	this->crcInit = crcInit;
@@ -1733,7 +1750,7 @@ void BLEController::sendConnectionReport(ConnectionStatus status) {
 
         case ATTACK_SUCCESS:
         {
-            if (this->attackStatus.attack == BLE_ATTACK_MITM || 
+            if (this->attackStatus.attack == BLE_ATTACK_MITM ||
                 this->attackStatus.attack == BLE_ATTACK_MASTER_HIJACKING  ||
                 this->attackStatus.attack == BLE_ATTACK_SLAVE_HIJACKING)
             {
@@ -1744,7 +1761,7 @@ void BLEController::sendConnectionReport(ConnectionStatus status) {
 
         case ATTACK_FAILURE:
         {
-            if (this->attackStatus.attack == BLE_ATTACK_MITM || 
+            if (this->attackStatus.attack == BLE_ATTACK_MITM ||
                 this->attackStatus.attack == BLE_ATTACK_MASTER_HIJACKING  ||
                 this->attackStatus.attack == BLE_ATTACK_SLAVE_HIJACKING)
             {
@@ -2129,7 +2146,7 @@ void BLEController::connectionInitiationAdvertisementProcessing(BLEPacket *pkt) 
 void BLEController::connectionInitiationConnectedProcessing(BLEPacket *pkt) {
 	if (!this->sync) {
 		this->sync = true;
-        
+
         /* No empty PDUs. */
         this->setEmptyTransmitIndicator(false);
 

@@ -161,7 +161,7 @@ void Core::processDot15d4InputMessage(whad::dot15d4::Dot15d4Msg dot15d4Msg) {
             }
             else {
                 response = new whad::generic::ParameterError();
-            }            
+            }
         }
         break;
 
@@ -177,7 +177,7 @@ void Core::processDot15d4InputMessage(whad::dot15d4::Dot15d4Msg dot15d4Msg) {
             }
             else {
                 response = new whad::generic::ParameterError();
-            }           
+            }
         }
         break;
 
@@ -237,7 +237,7 @@ void Core::processDot15d4InputMessage(whad::dot15d4::Dot15d4Msg dot15d4Msg) {
             }
             else {
                 response = new whad::generic::ParameterError();
-            }            
+            }
         }
         break;
 
@@ -273,7 +273,7 @@ void Core::processDot15d4InputMessage(whad::dot15d4::Dot15d4Msg dot15d4Msg) {
             whad::dot15d4::SendPdu query(dot15d4Msg);
 
             int channel = query.getChannel();
-            
+
             if (channel >= 11 && channel <= 26) {
                 /* Set channel. */
                 this->dot15d4Controller->setChannel(channel);
@@ -314,14 +314,14 @@ void Core::processDot15d4InputMessage(whad::dot15d4::Dot15d4Msg dot15d4Msg) {
                 memcpy(packet+1, query.getPdu().getBytes(), size);
                 memcpy(packet+1+size, &fcs, 2);
                 this->dot15d4Controller->send(packet, size+3, true);
-                free(packet);        
+                free(packet);
 
                 /* Success. */
                 response = new whad::generic::Success();
             }
             else {
                 response = new whad::generic::ParameterError();
-            }            
+            }
         }
         break;
 
@@ -371,7 +371,7 @@ void Core::processBLEInputMessage(whad::ble::BleMsg bleMsg) {
         case whad::ble::ReactiveJamMsg:
         {
             whad::ble::ReactiveJam query(bleMsg);
-            
+
             this->bleController->setChannel(query.getChannel());
             this->bleController->setReactiveJammerConfiguration(query.getPattern(), query.getPatternLength(), query.getPosition());
             response = new whad::generic::Success();
@@ -404,7 +404,7 @@ void Core::processBLEInputMessage(whad::ble::BleMsg bleMsg) {
         case whad::ble::SniffAAMsg:
         {
             whad::ble::SniffAccessAddress query(bleMsg);
-            
+
             this->bleController->setChannel(0);
             this->bleController->setMonitoredChannels(query.getChannelMap().getChannelMapBuf());
             this->bleController->sniffAccessAddresses();
@@ -415,7 +415,7 @@ void Core::processBLEInputMessage(whad::ble::BleMsg bleMsg) {
         case whad::ble::SniffActConnMsg:
         {
             whad::ble::SniffActiveConn query(bleMsg);
-            
+
             this->bleController->setChannel(0);
             this->bleController->setMonitoredChannels(query.getChannels().getChannelMapBuf());
 
@@ -457,7 +457,7 @@ void Core::processBLEInputMessage(whad::ble::BleMsg bleMsg) {
         case whad::ble::ScanModeMsg:
         {
             whad::ble::ScanMode query(bleMsg);
-            
+
             this->bleController->startScanning(query.isActiveModeEnabled());
             response = new whad::generic::Success();
         }
@@ -529,6 +529,22 @@ void Core::processBLEInputMessage(whad::ble::BleMsg bleMsg) {
                 break;
 
                 case whad::ble::DirectionUnknown:
+                {
+                  /* TODO: we use conn handle as channel for raw injection, insert a channel field into protocol ? */
+                  if (this->bleController->rawInject(
+                      query.getPdu().getBytes(),
+                      query.getPdu().getSize(),
+                      query.getConnHandle(),
+                      query.getAccessAddress()
+                    )) {
+                    response = new whad::generic::Success();
+                  }
+                  else {
+                      response = new whad::generic::Error();
+                  }
+                  break;
+
+                }
                 default:
                 {
                     response = new whad::generic::ParameterError();
@@ -541,7 +557,7 @@ void Core::processBLEInputMessage(whad::ble::BleMsg bleMsg) {
         case whad::ble::HijackMasterMsg:
         {
             this->bleController->startAttack(BLE_ATTACK_MASTER_HIJACKING);
-            response = new whad::generic::Success();            
+            response = new whad::generic::Success();
         }
         break;
 
@@ -671,7 +687,7 @@ void Core::processBLEInputMessage(whad::ble::BleMsg bleMsg) {
         case whad::ble::PrepareSeqMsg:
         {
             /* TODO: Implement pattern-based sequence. */
-            
+
             SequenceDirection direction = BLE_TO_SLAVE;
             Trigger* trigger = NULL;
             int numberOfPackets = 0;
@@ -784,7 +800,7 @@ void Core::processBLEInputMessage(whad::ble::BleMsg bleMsg) {
             }
             else {
             response = new whad::generic::ParameterError();
-            }            
+            }
         }
         break;
 
@@ -917,7 +933,7 @@ void Core::processESBInputMessage(whad::esb::EsbMsg esbMsg) {
             this->esbController->stop();
 
             /* Success. */
-            response = new whad::generic::Success();            
+            response = new whad::generic::Success();
         }
         break;
 
@@ -938,7 +954,7 @@ void Core::processESBInputMessage(whad::esb::EsbMsg esbMsg) {
             else {
                 /* Error while sending packet. */
                 response = new whad::generic::Error();
-            }            
+            }
         }
         break;
 
@@ -967,7 +983,7 @@ void Core::processESBInputMessage(whad::esb::EsbMsg esbMsg) {
                 );
 
                 /* Success. */
-                response = new whad::generic::Success();            
+                response = new whad::generic::Success();
             }
             else
             {
@@ -1089,7 +1105,7 @@ void Core::processUnifyingInputMessage(whad::unifying::UnifyingMsg uniMsg) {
             {
                 /* Parameter error (invalid channel). */
                 response = new whad::generic::ParameterError();
-            }            
+            }
         }
         break;
 
@@ -1100,7 +1116,7 @@ void Core::processUnifyingInputMessage(whad::unifying::UnifyingMsg uniMsg) {
             this->esbController->start();
 
             /* Success. */
-            response = new whad::generic::Success();            
+            response = new whad::generic::Success();
         }
         break;
 
@@ -1270,7 +1286,7 @@ void Core::processUnifyingInputMessage(whad::unifying::UnifyingMsg uniMsg) {
             this->esbController->setChannel(5);
 
             /* Success. */
-            response = new whad::generic::Success();            
+            response = new whad::generic::Success();
         }
         break;
 
@@ -1370,7 +1386,7 @@ void Core::processPhyInputMessage(whad::phy::PhyMsg msg) {
             }
             else {
                 response = new whad::generic::ParameterError();
-            }            
+            }
         }
         break;
 
