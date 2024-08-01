@@ -1292,7 +1292,7 @@ void BLEController::followConnection(uint16_t hopInterval, uint8_t hopIncrement,
 
 bool BLEController::checkSynchronization() {
 	if (this->sync) {
-		// this->sendConnectionReport(CONNECTION_STARTED);
+		this->sendConnectionReport(CONNECTION_STARTED);
 	}
 	else {
 		this->releaseTimers();
