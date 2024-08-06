@@ -282,15 +282,38 @@ void GenericController::send(uint8_t* data, size_t size) {
 // Reception callback
 void GenericController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
   uint8_t preamble[this->preambleSize];
+  bool little = false;
   if (this->endianness == GENERIC_ENDIANNESS_BIG) {
+    little = false;
     memcpy(preamble, this->preamble, this->preambleSize);
   }
   else {
+    little = true;
     for (int i=0;i<this->preambleSize;i++) {
       preamble[i] = this->preamble[this->preambleSize - 1 - i];
     }
   }
-  GenericPacket *pkt = new GenericPacket(buffer,size,timestamp,0x00,channel,rssi,crcValue, preamble, this->preambleSize);
+  uint32_t deviation = 0;
+  uint32_t datarate = 0;
+  if (this->phy == GENERIC_PHY_1MBPS_ESB) {
+    deviation = 170000;
+    datarate = 1000000;
+  }
+  else if (this->phy == GENERIC_PHY_1MBPS_BLE) {
+    deviation = 250000;
+    datarate = 1000000;
+  }
+  else if (this->phy == GENERIC_PHY_2MBPS_ESB) {
+    deviation = 320000;
+    datarate = 2000000;
+
+  }
+  else if (this->phy == GENERIC_PHY_2MBPS_BLE) {
+    deviation = 500000;
+    datarate = 2000000;
+
+  }
+  GenericPacket *pkt = new GenericPacket(buffer,size,timestamp,0x00,channel,rssi,crcValue, preamble, this->preambleSize, deviation, datarate, whad::phy::ModulationGFSK, little);
   this->addPacket(pkt);
   delete pkt;
 }

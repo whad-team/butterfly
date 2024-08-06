@@ -8,7 +8,7 @@ Controller::Controller(Radio *radio) {
 
 /**
  * @brief Add packet to the list of packets to be sent to the host
- * 
+ *
  * @param[in]   packet      Pointer to a `Packet` object containing the packet
  *                          information.
  */
@@ -27,7 +27,7 @@ void Controller::addPacket(Packet* packet) {
 
 /**
  * @brief   Send debug message to the host.
- * 
+ *
  * @param[in]   msg     Pointer to a text string to send as a debug message
  */
 
@@ -37,7 +37,7 @@ void Controller::sendDebug(const char* msg) {
 
 	/* Add notification to our message queue. */
     Core::instance->pushMessageToQueue(message);
-    
+
     /* Free the notification wrapper. */
     delete message;
 }
@@ -45,7 +45,7 @@ void Controller::sendDebug(const char* msg) {
 
 /**
  * @brief   Create a WHAD notification message from a received packet.
- * 
+ *
  * @param[in]   packet  Pointer to a received `Packet` object.
  * @retval      Pointer to a `whad::NanoPbMsg` ready to be sent to host
  */
@@ -120,7 +120,7 @@ whad::NanoPbMsg *Controller::buildMessageFromPacket(Packet* packet) {
 
         /* Send our RawPacketReceived notification. */
         message = dynamic_cast<whad::NanoPbMsg*>(uniRawPduRecvd);
-    } 
+    }
     else
     {
         whad::esb::RawPacketReceived *esbRawPacketRecvd = NULL;
@@ -146,7 +146,7 @@ whad::NanoPbMsg *Controller::buildMessageFromPacket(Packet* packet) {
   }
   else if (packet->getPacketType() == GENERIC_PACKET_TYPE) {
     GenericPacket* genPacket = static_cast<GenericPacket*>(packet);
-    
+
     /* Create PHY packet. */
     whad::phy::Packet phyPacket(genPacket->getPacketBuffer(), genPacket->getPacketSize());
 
@@ -158,7 +158,12 @@ whad::NanoPbMsg *Controller::buildMessageFromPacket(Packet* packet) {
         2400 + packet->getChannel(),
         packet->getRssi(),
         pktTimestamp,
-        phyPacket
+        phyPacket,
+				genPacket->getSyncword(),
+				genPacket->getEndianness(),
+				genPacket->getDatarate(),
+				genPacket->getDeviation(),
+				genPacket->getModulation()
     );
   }
 

@@ -5,6 +5,7 @@
 #include "stdint.h"
 #include "stddef.h"
 #include "string.h"
+#include "whad.h"
 
 #define LLID_CONTINUE 1
 #define LLID_START 		2
@@ -171,7 +172,20 @@ class MosartPacket : public Packet {
 };
 
 class GenericPacket : public Packet {
+	protected:
+		uint32_t deviation;
+		uint32_t datarate;
+		whad::phy::ModulationType modulation;
+		whad::phy::SyncWord syncword;
+		whad::phy::Endianness endianness;
+
 	public:
-		GenericPacket(uint8_t *packetBuffer, size_t packetSize, uint32_t timestamp, uint8_t source, uint8_t channel, int8_t rssi,CrcValue crcValue, uint8_t* preamble, size_t preambleSize);
+		GenericPacket(uint8_t *packetBuffer, size_t packetSize, uint32_t timestamp, uint8_t source, uint8_t channel, int8_t rssi, CrcValue crcValue, uint8_t* preamble, size_t preambleSize, uint32_t deviation,uint32_t datarate,whad::phy::ModulationType modulation, bool little);
+		uint32_t getDeviation();
+		uint32_t getDatarate();
+		whad::phy::ModulationType getModulation();
+		whad::phy::SyncWord& getSyncword();
+		whad::phy::Endianness getEndianness();
+
 };
 #endif
