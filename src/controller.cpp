@@ -155,7 +155,7 @@ whad::NanoPbMsg *Controller::buildMessageFromPacket(Packet* packet) {
 
     /* Created a PHY packet notification. */
     message = new whad::phy::PacketReceived(
-        2400 + packet->getChannel(),
+        (2400000000 + packet->getChannel()*1000000),
         packet->getRssi(),
         pktTimestamp,
         phyPacket,
