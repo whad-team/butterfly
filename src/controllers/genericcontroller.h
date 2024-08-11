@@ -3,6 +3,7 @@
 #include "../packet.h"
 #include "../controller.h"
 #include "bsp.h"
+#include "whad.h"
 
 typedef enum GenericAttack {
 	GENERIC_ATTACK_NONE,

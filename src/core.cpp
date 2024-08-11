@@ -939,7 +939,7 @@ void Core::processESBInputMessage(whad::esb::EsbMsg esbMsg) {
 
         /* Send raw packet message. */
         case whad::esb::SendRawMsg:
-        {
+        {   
             /* Wrap our esbMsg into a SendPacketRaw message. */
             whad::esb::SendPacketRaw query(esbMsg);
 
@@ -947,13 +947,22 @@ void Core::processESBInputMessage(whad::esb::EsbMsg esbMsg) {
             if (channel >= 0 && channel <= 100) {
                 this->esbController->setChannel(channel);
             }
-            if (this->esbController->send(query.getPacket().getBytes(), query.getPacket().getSize(), query.getRetrCount())) {
-                /* Success. */
-                response = new whad::generic::Success();
+
+            if (query.getPacket().getSize() > 0)
+            {
+                if (this->esbController->send(query.getPacket().getBytes(), query.getPacket().getSize(), query.getRetrCount())) {
+                    /* Success. */
+                    response = new whad::generic::Success();
+                }
+                else {
+                    /* Error while sending packet. */
+                    response = new whad::generic::Error();
+                }
             }
-            else {
-                /* Error while sending packet. */
-                response = new whad::generic::Error();
+            else
+            {
+                /* Error while sending packet, we can't send nothing. */
+                response = new whad::generic::ParameterError();
             }
         }
         break;
