@@ -953,9 +953,10 @@ void BLEController::sniffAccessAddresses() {
 }
 
 void BLEController::setAccessAddressDiscoveryConfiguration(uint8_t preamble) {
-	uint8_t two_bytes_preamble[] = {preamble, 0x00};
+	uint8_t two_bytes_preamble[] = {preamble, 0xff};
   this->radio->setPreamble(two_bytes_preamble, 2);
-	this->radio->setPrefixes();
+	this->radio->setPrefixes(0xa8,0x1f,0x9f,0xaf, 0xa9,0x00,0xFF);
+	//this->radio->setPrefixes();
   this->radio->setMode(MODE_NORMAL);
   this->radio->setFastRampUpTime(true);
   this->radio->setEndianness(LITTLE);
