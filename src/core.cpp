@@ -594,13 +594,27 @@ void Core::processBLEInputMessage(whad::ble::BleMsg bleMsg) {
                 response = new whad::generic::Success();
             }
             else {
-                this->bleController->advertise(
-                    query.getAdvData(), query.getAdvDataLength(),
-                    query.getScanRsp(), query.getScanRspLength(),
-                    true,
-                    100);
-                this->bleController->start();
-                response = new whad::generic::Success();
+                /* Make sure we have at least some data to advertise. */
+                if (query.getAdvDataLength() == 0)
+                {
+                    /* Parameter error ! */
+                    response = new whad::generic::ParameterError();
+                }
+                else
+                {
+                    /* Configure device with the required advertising data. */
+                    this->bleController->advertise(
+                        query.getAdvData(), query.getAdvDataLength(),
+                        query.getScanRsp(), query.getScanRspLength(),
+                        true,
+                        100);
+
+                    /* Start advertising. */
+                    this->bleController->start();
+
+                    /* Success. */
+                    response = new whad::generic::Success();
+                }
             }
         }
         break;
