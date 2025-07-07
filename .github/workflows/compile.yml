@@ -1,0 +1,30 @@
+name: C/C++ compilation CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install Toolchain
+      run: |
+        mkdir .toolchain
+        wget https://developer.arm.com/-/media/Files/downloads/gnu/14.3.rel1/binrel/arm-gnu-toolchain-14.3.rel1-x86_64-arm-none-eabi.tar.xz -o .toolchain/arm-gnu-toolchain-14.3.rel1-x86_64-arm-none-eabi.tar.xz 
+        tar xf .toolchain/arm-gnu-toolchain-14.3.rel1-x86_64-arm-none-eabi.tar.xz -C .toolchain
+    - name: Install SDK
+      run: |
+        mkdir .sdk
+        wget https://nsscprodmedia.blob.core.windows.net/prod/software-and-other-downloads/sdks/nrf5/binaries/nrf5_sdk_17.1.0_ddde560.zip
+        unzip nrf5_sdk_17.1.0_ddde560.zip -d .sdk
+        rm -rf nrf5_sdk_17.1.0_ddde560.zip
+        rm -rf .sdk/nRF5_SDK_17.1.0_ddde560/components/toolchain/gcc/Makefile.posix
+        echo -ne "GNU_INSTALL_ROOT ?= $(pwd)/.toolchain/arm-gnu-toolchain-14.3.rel1-x86_64-arm-none-eabi/bin/\nGNU_VERSION ?= 14.3.1\nGNU_PREFIX ?= arm-none-eabi\n" > .sdk/nRF5_SDK_17.1.0_ddde560/components/toolchain/gcc/Makefile.posix
+    - name: make
+      run: make SDK_ROOT=$(pwd)/.sdk/nRF5_SDK_17.1.0_ddde560
