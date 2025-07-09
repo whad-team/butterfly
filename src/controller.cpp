@@ -144,6 +144,22 @@ whad::NanoPbMsg *Controller::buildMessageFromPacket(Packet* packet) {
         message = dynamic_cast<whad::NanoPbMsg*>(esbRawPacketRecvd);
     }
   }
+  else if (packet->getPacketType() == ANT_PACKET_TYPE) {
+    ANTPacket *antPacket = static_cast<ANTPacket*>(packet);
+
+    whad::ant::Packet pkt(antPacket->getPacketBuffer(), antPacket->getPacketSize() - 2);
+
+     whad::ant::RawPacketReceived *antMessage = new whad::ant::RawPacketReceived(
+        antPacket->getChannel(), // rf_channel
+        antPacket->getSource(), // channel_number
+        pkt
+    );
+    antMessage->setRssi(antPacket->getRssi());
+    antMessage->setTimestamp(antPacket->getTimestamp());
+    antMessage->setCrcValidity(antPacket->isCrcValid());
+    antMessage->setCrc(antPacket->getCrc());
+    message = antMessage;
+  }
   else if (packet->getPacketType() == GENERIC_PACKET_TYPE) {
     GenericPacket* genPacket = static_cast<GenericPacket*>(packet);
 

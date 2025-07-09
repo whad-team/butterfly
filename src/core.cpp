@@ -39,6 +39,10 @@ void Core::processInputMessage(Message msg) {
                 this->processUnifyingInputMessage(whad::unifying::UnifyingMsg(whadMsg));
                 break;
 
+            case whad::MessageDomain::DomainAnt:
+                this->processANTInputMessage(whad::ant::AntMsg(whadMsg));
+                break;
+
             case whad::MessageDomain::DomainPhy:
                 this->processPhyInputMessage(whad::phy::PhyMsg(whadMsg));
                 break;
@@ -137,6 +141,71 @@ void Core::processDiscoveryInputMessage(whad::discovery::DiscoveryMsg msg) {
 
     /* Free our message wrapper. */
     delete response;
+}
+
+void Core::processANTInputMessage(whad::ant::AntMsg antMsg) {
+    whad::NanoPbMsg *response = NULL;
+
+    if (this->currentController != this->antController) {
+        this->selectController(ANT_PROTOCOL);
+    }
+
+    switch (antMsg.getType())
+    {
+        case whad::ant::SniffMsg:
+        {
+            whad::ant::Sniff query(antMsg);
+
+            int rf_channel = query.getRFChannel();
+            uint8_t network_key[8];
+            for (int i=0; i<8; i++) {
+                network_key[i] = query.getNetworkKey()[7-i];
+            }
+            
+            if (rf_channel >= 0 && rf_channel <= 100) {
+                this->antController->setRFChannel(rf_channel);
+                
+                if (
+                    this->antController->useNetwork(0) && 
+                    this->antController->setNetworkKey(0, network_key)
+                ) {
+                    response = new whad::generic::Success();
+                }
+                else {
+                    response = new whad::generic::ParameterError();
+                }
+            }
+            else {
+                response = new whad::generic::ParameterError();
+            }
+        }
+        break;
+
+        case whad::ant::StartMsg:
+        {
+            this->currentController->start();
+            response = new whad::generic::Success();
+        }
+        break;
+
+
+        case whad::ant::StopMsg:
+        {
+            this->currentController->stop();
+            response = new whad::generic::Success();
+        }
+        break;
+
+        default:
+            response = new whad::generic::Error();
+            break;
+    }
+
+    /* Push our response message into the TX queue. */
+    this->pushMessageToQueue(response);
+
+    /* Free our message wrapper. */
+    delete response;        
 }
 
 void Core::processDot15d4InputMessage(whad::dot15d4::Dot15d4Msg dot15d4Msg) {
@@ -1677,51 +1746,51 @@ void Core::init() {
 }
 
 bool Core::selectController(Protocol controller) {
-  //this->getLedModule()->on(LED2);
+    this->getLedModule()->on(LED2);
 	if (controller == BLE_PROTOCOL) {
-    this->getLedModule()->setColor(BLUE);
+        this->getLedModule()->setColor(BLUE);
 		this->radio->disable();
 		this->currentController = this->bleController;
 		this->radio->setController(this->currentController);
 		return true;
 	}
 	else if (controller == DOT15D4_PROTOCOL) {
-    this->getLedModule()->setColor(GREEN);
+        this->getLedModule()->setColor(GREEN);
 		this->radio->disable();
 		this->currentController = this->dot15d4Controller;
 		this->radio->setController(this->currentController);
 		return true;
 	}
 	else if (controller == ESB_PROTOCOL) {
-    this->getLedModule()->setColor(PURPLE);
+        this->getLedModule()->setColor(PURPLE);
 		this->radio->disable();
 		this->currentController = this->esbController;
 		this->radio->setController(this->currentController);
 		return true;
 	}
 	else if (controller == ANT_PROTOCOL) {
-    this->getLedModule()->setColor(RED);
+        this->getLedModule()->setColor(RED);
 		this->radio->disable();
 		this->currentController = this->antController;
 		this->radio->setController(this->currentController);
 		return true;
 	}
 	else if (controller == MOSART_PROTOCOL) {
-    this->getLedModule()->setColor(YELLOW);
+        this->getLedModule()->setColor(YELLOW);
 		this->radio->disable();
 		this->currentController = this->mosartController;
 		this->radio->setController(this->currentController);
 		return true;
 	}
 	else if (controller == GENERIC_PROTOCOL) {
-    this->getLedModule()->setColor(CYAN);
+        this->getLedModule()->setColor(CYAN);
 		this->radio->disable();
 		this->currentController = this->genericController;
 		this->radio->setController(this->currentController);
 		return true;
 	}
 	else {
-    //this->getLedModule()->off(LED2);
+        this->getLedModule()->off(LED2);
 		this->radio->disable();
 		this->currentController = NULL;
 		this->radio->setController(NULL);

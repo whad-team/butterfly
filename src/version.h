@@ -3,9 +3,9 @@
 
 #define VERSION_MAJOR 1
 #define VERSION_MINOR 0
-#define VERSION_REVISION 2
+#define VERSION_REVISION 3
 
-#define WHAD_MIN_VERSION 0x0002
+#define WHAD_MIN_VERSION 0x0003
 
 #define FIRMWARE_AUTHOR "Romain Cayre"
 #define FIRMWARE_URL    "https://github.com/whad-team/butterfly"

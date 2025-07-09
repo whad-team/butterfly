@@ -76,6 +76,7 @@ class Core {
 		void processESBInputMessage(whad::esb::EsbMsg esbMsg);
 		void processUnifyingInputMessage(whad::unifying::UnifyingMsg uniMsg);
 		void processPhyInputMessage(whad::phy::PhyMsg msg);
+		void processANTInputMessage(whad::ant::AntMsg msg);
 
 		bool selectController(Protocol controller);
 

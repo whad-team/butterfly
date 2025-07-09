@@ -615,9 +615,12 @@ ANTPacket::ANTPacket(uint8_t *packetBuffer, size_t packetSize, uint32_t timestam
 	}
 	this->packetPointer[2+packetSize] = (uint8_t)((crcValue.value & 0xFF00) >> 8);
 	this->packetPointer[2+packetSize+1] = (uint8_t)(crcValue.value & 0xFF);
-
 }
 
+
+uint16_t ANTPacket::getCrc() {
+	return ((this->packetPointer[this->getPacketSize()-2] << 8) | this->packetPointer[this->getPacketSize()-1]);
+}
 
 uint16_t ANTPacket::getDeviceNumber() {
 	return ((this->packetPointer[3] << 8) | this->packetPointer[2]);

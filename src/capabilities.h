@@ -82,6 +82,34 @@ const whad_domain_desc_t CAPABILITIES[] = {
 
       )
   },
+  {
+    DOMAIN_ANT,
+    (whad_capability_t)(discovery_Capability_Sniff | discovery_Capability_Inject | discovery_Capability_Jam | discovery_Capability_SimulateRole),
+    (
+      CMD(ant_ANTCommand_SetDeviceNumber) |
+      CMD(ant_ANTCommand_SetDeviceType) |
+      CMD(ant_ANTCommand_SetTransmissionType) |
+      CMD(ant_ANTCommand_SetChannelPeriod) |
+      CMD(ant_ANTCommand_SetNetworkKey) |
+      CMD(ant_ANTCommand_AssignChannel) |
+      CMD(ant_ANTCommand_UnassignChannel) |
+      CMD(ant_ANTCommand_OpenChannel) |
+      CMD(ant_ANTCommand_CloseChannel) |
+      CMD(ant_ANTCommand_SetRFChannel) |
+      CMD(ant_ANTCommand_Sniff) |
+      CMD(ant_ANTCommand_Jam) |
+      // CMD(ant_ANTCommand_Send) |
+      CMD(ant_ANTCommand_SendRaw) |
+      CMD(ant_ANTCommand_MasterMode) |
+      CMD(ant_ANTCommand_SlaveMode) |
+      CMD(ant_ANTCommand_Start) |
+      CMD(ant_ANTCommand_Stop) |
+      CMD(ant_ANTCommand_ListChannels) |
+      CMD(ant_ANTCommand_ListNetworks)
+
+
+      )
+  },
   {DOMAIN_PHY,
   (whad_capability_t)(discovery_Capability_Sniff | discovery_Capability_Inject | discovery_Capability_Jam | discovery_Capability_NoRawData),
   (

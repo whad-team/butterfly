@@ -8,71 +8,85 @@
 #define PREAMBLE_ANT_PLUS   0xc5a6
 #define PREAMBLE_ANT_FS     0xa33b
 
+#define NETWORK_KEY_SIZE    8
 #define TIMESTAMP_REPORTS_NB 10
-// Attack specific definitions
-typedef enum AntAttack {
-	ANT_ATTACK_NONE,
-	ANT_ATTACK_JAMMING,
-	ANT_ATTACK_MASTER_HIJACKING
-} AntAttack;
 
-typedef struct AntAttackStatus {
-	AntAttack attack;
-	bool running;
-	bool successful;
-	uint32_t lastTimestamps[TIMESTAMP_REPORTS_NB];
-	uint32_t currentTimestamp;
-  uint8_t payload[64];
-  size_t size;
-} AntAttackStatus;
+#define MAX_CHANNELS 8
+#define MAX_NETWORKS 4
 
+typedef enum ANTChannelType {
+    BIDIRECTIONAL_TRANSMIT_CHANNEL = 0, 
+    BIDIRECTIONAL_RECEIVE_CHANNEL = 1, 
+
+    SHARED_BIDIRECTIONAL_TRANSMIT_CHANNEL = 2, 
+    SHARED_BIDIRECTIONAL_RECEIVE_CHANNEL = 3, 
+
+    TRANSMIT_ONLY_CHANNEL = 4, 
+    RECEIVE_ONLY_CHANNEL = 5, 
+} ANTChannelType;
+
+typedef enum ANTMode {
+    MASTER = 0, 
+    SLAVE = 1
+} ANTMode;
+
+typedef struct ANTNetwork {
+    uint8_t networkKey[NETWORK_KEY_SIZE];
+    uint16_t preamble;
+} ANTNetwork;
+
+typedef struct ANTChannel {
+    bool enabled;
+
+    int rfChannel;
+
+    uint16_t deviceNumber;
+    uint8_t deviceType;
+    uint8_t transmissionType;
+    uint8_t networkIndex;
+
+    ANTChannelType type;
+    ANTMode mode;
+} ANTChannel;
 
 class ANTController : public Controller {
   protected:
 		TimerModule *timerModule;
 
-		int channel;
-    uint16_t preamble;
-    AntAttackStatus attackStatus;
+		int rfChannel;
+        
+        ANTChannel channels[MAX_CHANNELS];
+        ANTNetwork networks[MAX_NETWORKS];
 
 		uint16_t deviceNumber;
 		uint8_t deviceType;
-
-		bool sendingResponse;
-
-		Timer *masterTimer;
-		Timer *slaveTimer;
+		uint8_t transmissionType;
+        
+        uint8_t networkKey[NETWORK_KEY_SIZE];
+		uint16_t preamble;
+        uint8_t selectedNetwork;
 
 	public:
 		ANTController(Radio* radio);
-    void start();
-    void stop();
+		void start();
+		void stop();
 
-		void releaseTimers();
+		int getRFChannel();
+		void setRFChannel(int rfChannel);
 
-		void setFilter(uint16_t preamble, uint16_t deviceNumber, uint8_t deviceType);
+        uint16_t getDeviceNumber();
+        void setDeviceNumber(uint16_t deviceNumber);
+        uint8_t getDeviceType();
+        void setDeviceType(uint8_t deviceType);
+        uint8_t getTransmissionType();
+        void setTransmissionType(uint8_t transmissionType);
+        bool setNetworkKey(uint8_t networkIndex, uint8_t *networkKey);
+        bool useNetwork(uint8_t networkIndex);
 
-		uint32_t calculateMasterInterval();
-		bool transmitCallback();
-
-		int getChannel();
-		void setChannel(int channel);
-
-    void startAttack(AntAttack attack);
-
-    void setAttackPayload(uint8_t *payload, size_t size);
-		void sendResponsePacket(uint8_t *payload, size_t size);
-
-    void setJammerConfiguration();
 		void setHardwareConfiguration();
 
-    void sendJammingReport(uint32_t timestamp);
-    void send(uint8_t* data, size_t size);
-
-		bool checkFilter(ANTPacket* pkt);
-
-    // Reception callback
-    void onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi);
+    	// Reception callback
+    	void onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi);
 		void onJam(uint32_t timestamp);
 		void onMatch(uint8_t *buffer, size_t size);
 
