@@ -164,6 +164,8 @@ class ANTPacket : public Packet {
 		uint16_t getCrc();
 		uint16_t getDeviceNumber();
 		uint8_t getDeviceType();
+		uint8_t getTransmissionType();
+
 };
 
 class MosartPacket : public Packet {

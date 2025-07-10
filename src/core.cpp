@@ -157,18 +157,53 @@ void Core::processANTInputMessage(whad::ant::AntMsg antMsg) {
             whad::ant::Sniff query(antMsg);
 
             int rf_channel = query.getRFChannel();
+            uint16_t device_number = query.getDeviceNumber();
+            uint8_t device_type = query.getDeviceType();
+            uint8_t transmission_type = query.getTransmissionType();
+
             uint8_t network_key[8];
             for (int i=0; i<8; i++) {
                 network_key[i] = query.getNetworkKey()[7-i];
             }
             
             if (rf_channel >= 0 && rf_channel <= 100) {
-                this->antController->setRFChannel(rf_channel);
+                this->antController->closeChannel(0);
                 
-                if (
-                    this->antController->useNetwork(0) && 
-                    this->antController->setNetworkKey(0, network_key)
-                ) {
+                if (!this->antController->setMode(0, SNIFFER)) {
+                    response = new whad::generic::ParameterError();
+                    break;
+                }
+                if (!this->antController->setChannelType(0, RECEIVE_ONLY_CHANNEL)) {
+                    response = new whad::generic::ParameterError();
+                    break;
+                }
+                
+                if (!this->antController->setDeviceNumber(0, device_number)) {
+                    response = new whad::generic::ParameterError();
+                    break;
+                }
+                if (!this->antController->setDeviceType(0, device_type)) {
+                    response = new whad::generic::ParameterError();
+                    break;
+                }
+                if (!this->antController->setTransmissionType(0, transmission_type)) {
+                    response = new whad::generic::ParameterError();
+                    break;
+                }
+                if (!this->antController->setNextSync(0, AS_SOON_AS_POSSIBLE)) {
+                    response = new whad::generic::ParameterError();
+                    break;
+                }
+                
+                if (!this->antController->setNetworkKey(0, network_key)) {
+                    response = new whad::generic::ParameterError();
+                    break;
+                }
+                if (!this->antController->assignNetwork(0, 0)) {
+                    response = new whad::generic::ParameterError();
+                    break;
+                }
+                if (this->antController->openChannel(0)) {
                     response = new whad::generic::Success();
                 }
                 else {

@@ -630,6 +630,10 @@ uint8_t ANTPacket::getDeviceType() {
 	return this->packetPointer[4];
 }
 
+uint8_t ANTPacket::getTransmissionType() {
+	return this->packetPointer[5];
+}
+
 GenericPacket::GenericPacket(uint8_t *packetBuffer, size_t packetSize, uint32_t timestamp, uint8_t source, uint8_t channel, int8_t rssi, CrcValue crcValue, uint8_t *preamble, size_t preambleSize, uint32_t deviation,uint32_t datarate,whad::phy::ModulationType modulation, bool little) : Packet(GENERIC_PACKET_TYPE, packetBuffer, packetSize+preambleSize, timestamp, source, channel, rssi, crcValue) {
 	for (size_t i=0;i<preambleSize;i++) {
 		this->packetPointer[i] = preamble[i];

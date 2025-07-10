@@ -2,59 +2,260 @@
 #include "../core.h"
 
 ANTController::ANTController(Radio *radio) : Controller(radio) {
+    for (int i=0;i<MAX_CHANNELS;i++) {
+        this->channels[i].enabled = false;
+        this->channels[i].mode = UNKNOWN_MODE;
+        this->channels[i].type = UNKNOWN_TYPE;
+        this->channels[i].rfChannel = 57;
+        this->channels[i].deviceNumber = 0;
+        this->channels[i].deviceType = 0;
+        this->channels[i].transmissionType = 0;
+        this->channels[i].networkIndex = UNASSIGNED;
+    }
+    for (int i=0; i < MAX_NETWORKS; i++) {
+        memset(this->networks[i].networkKey, 0, NETWORK_KEY_SIZE);
+        this->networks[i].preamble = 0x0000;
+    }
     this->rfChannel = 57;
-    this->preamble = PREAMBLE_ANT_FS;
-    
-    this->deviceNumber = 0;
-    this->deviceType = 0;
-    this->transmissionType = 0;
 	this->timerModule = Core::instance->getTimerModule();
+    this->schedulingTimer = NULL;
 }
     
 void ANTController::start() {
-
-    this->setHardwareConfiguration();
+    uint8_t activeChannel = 0xFF;
+    for (int i=0;i<MAX_CHANNELS;i++) {
+        if (this->channels[i].enabled) {
+            activeChannel = i;
+            break;
+        }
+    }
+    if (activeChannel != 0xFF) {
+        this->setActiveChannel(activeChannel);
+        this->setHardwareConfiguration();
+        this->startSchedulingTimer();
+    }
 }
 
 
 void ANTController::stop() {
+    this->releaseTimers();
     this->radio->disable();
 }
 
 
-int ANTController::getRFChannel() {
+bool ANTController::schedulerTask() {
+    bsp_board_led_invert(0);
+    uint32_t now = this->timerModule->getTimestamp(); 
+    uint32_t minNextSync = 0xFFFFFFFF;
+    uint32_t minChannel = 0;
+
+    for (int i=0;i<MAX_CHANNELS;i++) {
+        if (this->channels[i].enabled ) {
+            if (this->getNextSync(i) == AS_SOON_AS_POSSIBLE) {
+                minChannel = i;
+                break;
+            }
+            if (this->getNextSync(i) > now && this->getNextSync(i) <= minNextSync) {
+                minNextSync = this->getNextSync(i);
+                minChannel = i;
+            }
+        }
+    }
+    if (minChannel != this->activeChannel) {
+        this->setActiveChannel(minChannel);
+        this->setHardwareConfiguration();
+    }
+    return true;
+}
+
+void ANTController::startSchedulingTimer() {
+    if (this->schedulingTimer == NULL) {
+        this->schedulingTimer = TimerModule::instance->getTimer();
+    }
+    this->schedulingTimer->setMode(REPEATED);
+    this->schedulingTimer->setCallback((ControllerCallback)&ANTController::schedulerTask, this);
+    this->schedulingTimer->update(SCHEDULING_TICK_US);
+    this->schedulingTimer->start();
+}
+
+
+void ANTController::releaseTimers() {
+	if (this->schedulingTimer != NULL) {
+		this->schedulingTimer->stop();
+		this->schedulingTimer->release();
+		this->schedulingTimer = NULL;
+	}
+}
+
+int ANTController::getActiveRFChannel() {
     return this->rfChannel;
 }
 
-void ANTController::setRFChannel(int rfChannel) {
+void ANTController::setActiveRFChannel(int rfChannel) {
   this->rfChannel = rfChannel;
   this->radio->fastFrequencyChange(rfChannel, rfChannel);
 }
 
-uint16_t ANTController::getDeviceNumber() {
-    return this->deviceNumber;
-}
+bool ANTController::setNextSync(uint8_t channelIndex, uint32_t nextSync) {
+    if (channelIndex >= MAX_CHANNELS) {
+        return false;
+    }
 
-void ANTController::setDeviceNumber(uint16_t deviceNumber) {
-  this->deviceNumber = deviceNumber; 
-}
-
-
-uint8_t ANTController::getDeviceType() {
-    return this->deviceType;
-}
-
-void ANTController::setDeviceType(uint8_t deviceType) {
-  this->deviceType = deviceType; 
+    this->channels[channelIndex].nextSync = nextSync;
+    return true;
 }
 
 
-uint8_t ANTController::getTransmissionType() {
-    return this->transmissionType;
+
+
+uint32_t ANTController::getNextSync(uint8_t channelIndex) {
+    if (channelIndex >= MAX_CHANNELS) {
+        return 0;
+    }
+    
+    return this->channels[channelIndex].nextSync;
 }
 
-void ANTController::setTransmissionType(uint8_t transmissionType) {
-  this->transmissionType = transmissionType; 
+uint16_t ANTController::getDeviceNumber(uint8_t channelIndex) {
+    if (channelIndex >= MAX_CHANNELS) {
+        return 0;
+    }
+    
+    return this->channels[channelIndex].deviceNumber;
+}
+
+bool ANTController::setDeviceNumber(uint8_t channelIndex, uint16_t deviceNumber) {
+    if (channelIndex >= MAX_CHANNELS) {
+        return false;
+    }
+    
+    this->channels[channelIndex].deviceNumber = deviceNumber;
+    return true;
+}
+
+
+uint8_t ANTController::getDeviceType(uint8_t channelIndex) {
+    if (channelIndex >= MAX_CHANNELS) {
+        return 0;
+    }
+    
+    return this->channels[channelIndex].deviceType;
+}
+
+bool ANTController::setDeviceType(uint8_t channelIndex, uint8_t deviceType) {
+    if (channelIndex >= MAX_CHANNELS) {
+        return false;
+    }
+    
+    this->channels[channelIndex].deviceType = deviceType;
+    return true;
+}
+
+uint8_t ANTController::getTransmissionType(uint8_t channelIndex) {
+    if (channelIndex >= MAX_CHANNELS) {
+        return 0;
+    }
+    
+    return this->channels[channelIndex].transmissionType;
+}
+
+bool ANTController::setTransmissionType(uint8_t channelIndex, uint8_t transmissionType) {
+    if (channelIndex >= MAX_CHANNELS) {
+        return false;
+    }
+    
+    this->channels[channelIndex].transmissionType = transmissionType;
+    return true;
+}
+
+ANTMode ANTController::getMode(uint8_t channelIndex) {
+    if (channelIndex >= MAX_CHANNELS) {
+        return UNKNOWN_MODE;
+    }
+    return this->channels[channelIndex].mode;
+}
+
+
+bool ANTController::setMode(uint8_t channelIndex, ANTMode mode) {
+    if (channelIndex >= MAX_CHANNELS) {
+        return false;
+    }
+    this->channels[channelIndex].mode = mode;
+    return true;
+}
+
+ANTChannelType ANTController::getChannelType(uint8_t channelIndex) {
+    if (channelIndex >= MAX_CHANNELS) {
+        return UNKNOWN_TYPE;
+    }
+    return this->channels[channelIndex].type;
+}
+
+
+bool ANTController::setRFChannel(uint8_t channelIndex, int rfChannel) {
+    if (channelIndex >= MAX_CHANNELS) {
+        return false;
+    }
+    this->channels[channelIndex].rfChannel = rfChannel;
+    return true;
+}
+
+int ANTController::getRFChannel(uint8_t channelIndex) {
+    if (channelIndex >= MAX_CHANNELS) {
+        return 0xFFFFFFFF;
+    }
+    return this->channels[channelIndex].rfChannel;
+}
+
+
+bool ANTController::setChannelType(uint8_t channelIndex, ANTChannelType type) {
+    if (channelIndex >= MAX_CHANNELS) {
+        return false;
+    }
+    this->channels[channelIndex].type = type;
+    return true;
+}
+
+bool ANTController::assignNetwork(uint8_t channelIndex, uint8_t networkIndex) {
+    if (channelIndex >= MAX_CHANNELS) {
+        return false;
+    }
+    if (networkIndex >= MAX_NETWORKS) {
+        return false;
+    }
+    this->channels[channelIndex].networkIndex = networkIndex;
+    return true;
+}
+
+bool ANTController::unassignNetwork(uint8_t channelIndex) {
+    if (channelIndex >= MAX_CHANNELS) {
+        return false;
+    }
+    
+    this->channels[channelIndex].networkIndex = UNASSIGNED;
+    return true;
+}
+
+bool ANTController::openChannel(uint8_t channelIndex) {
+    if (channelIndex >= MAX_CHANNELS) {
+        return false;
+    }
+    if (this->channels[channelIndex].enabled) {
+        return false;
+    }
+    this->channels[channelIndex].enabled = true;
+    return true;
+}
+
+bool ANTController::closeChannel(uint8_t channelIndex) {
+    if (channelIndex >= MAX_CHANNELS) {
+        return false;
+    }
+    if (!this->channels[channelIndex].enabled) {
+        return false;
+    }
+    this->channels[channelIndex].enabled = false;
+    return true;
 }
 
 bool ANTController::setNetworkKey(uint8_t networkIndex, uint8_t *networkKey) {
@@ -69,18 +270,52 @@ bool ANTController::setNetworkKey(uint8_t networkIndex, uint8_t *networkKey) {
     return false;
 }
 
-bool ANTController::useNetwork(uint8_t networkIndex) {
-    if (networkIndex >= MAX_NETWORKS) {
+
+bool ANTController::setActiveChannel(uint8_t channelIndex) {
+    if (channelIndex >= MAX_CHANNELS) {
         return false;
     }
-    this->selectedNetwork = networkIndex;
+    this->activeChannel = channelIndex;
+    this->setActiveRFChannel(this->channels[channelIndex].rfChannel);
     return true;
 }
 
+uint16_t ANTController::getActivePreamble() {
+    uint8_t activeNetwork = this->channels[this->activeChannel].networkIndex;
+    return this->networks[activeNetwork].preamble;   
+}
+
+uint16_t ANTController::getActiveDeviceNumber() {
+    return this->channels[this->activeChannel].deviceNumber;
+}
+
+uint8_t ANTController::getActiveDeviceType() {
+    return this->channels[this->activeChannel].deviceType;
+}
+
+uint8_t ANTController::getActiveTransmissionType() {
+    return this->channels[this->activeChannel].transmissionType;
+}
+
+bool ANTController::checkFilter(ANTPacket *packet) {
+    uint16_t activeDeviceNumber = this->getActiveDeviceNumber();
+    uint8_t activeDeviceType = this->getActiveDeviceType();
+    uint8_t activeTransmissionType = this->getActiveTransmissionType();
+    
+    return (
+        (activeDeviceNumber == 0 || activeDeviceNumber == packet->getDeviceNumber()) &&
+        (activeDeviceType == 0 || activeDeviceType == packet->getDeviceType()) &&
+        (activeTransmissionType == 0 || activeTransmissionType == packet->getTransmissionType())
+    );
+}
+
 void ANTController::setHardwareConfiguration() {
+
+    uint8_t activeNetwork = this->channels[this->activeChannel].networkIndex;
+
     uint8_t preamble[] = {
-            (uint8_t)(this->networks[this->selectedNetwork].preamble & 0xFF),
-            (uint8_t)((this->networks[this->selectedNetwork].preamble & 0xFF00) >> 8)
+            (uint8_t)(this->networks[activeNetwork].preamble & 0xFF),
+            (uint8_t)((this->networks[activeNetwork].preamble & 0xFF00) >> 8)
     };
     this->radio->setPreamble(preamble,2);
     this->radio->setPrefixes();
@@ -121,9 +356,9 @@ void ANTController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer,
         this->rfChannel,
         rssi,
         crcValue,
-        this->networks[this->selectedNetwork].preamble
+        this->getActivePreamble()
     );
-    if (crcValue.validity == VALID_CRC/*&& this->checkFilter(pkt)*/) {
+    if (crcValue.validity == VALID_CRC && this->checkFilter(pkt)) {
         this->addPacket(pkt);
     }
     delete pkt;

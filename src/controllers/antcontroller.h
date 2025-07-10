@@ -14,6 +14,11 @@
 #define MAX_CHANNELS 8
 #define MAX_NETWORKS 4
 
+#define UNASSIGNED 0xFF
+#define AS_SOON_AS_POSSIBLE 0
+
+#define SCHEDULING_TICK_US  1000
+
 typedef enum ANTChannelType {
     BIDIRECTIONAL_TRANSMIT_CHANNEL = 0, 
     BIDIRECTIONAL_RECEIVE_CHANNEL = 1, 
@@ -23,11 +28,15 @@ typedef enum ANTChannelType {
 
     TRANSMIT_ONLY_CHANNEL = 4, 
     RECEIVE_ONLY_CHANNEL = 5, 
+
+    UNKNOWN_TYPE = 0xFF
 } ANTChannelType;
 
 typedef enum ANTMode {
     MASTER = 0, 
-    SLAVE = 1
+    SLAVE = 1, 
+    SNIFFER = 2, 
+    UNKNOWN_MODE = 0xFF
 } ANTMode;
 
 typedef struct ANTNetwork {
@@ -45,6 +54,7 @@ typedef struct ANTChannel {
     uint8_t transmissionType;
     uint8_t networkIndex;
 
+    uint32_t nextSync;
     ANTChannelType type;
     ANTMode mode;
 } ANTChannel;
@@ -58,34 +68,57 @@ class ANTController : public Controller {
         ANTChannel channels[MAX_CHANNELS];
         ANTNetwork networks[MAX_NETWORKS];
 
-		uint16_t deviceNumber;
-		uint8_t deviceType;
-		uint8_t transmissionType;
-        
         uint8_t networkKey[NETWORK_KEY_SIZE];
-		uint16_t preamble;
-        uint8_t selectedNetwork;
+
+        uint8_t activeChannel;
+		Timer *schedulingTimer;
 
 	public:
 		ANTController(Radio* radio);
 		void start();
 		void stop();
 
-		int getRFChannel();
-		void setRFChannel(int rfChannel);
+        bool schedulerTask();
+        void startSchedulingTimer();
+		void releaseTimers();
 
-        uint16_t getDeviceNumber();
-        void setDeviceNumber(uint16_t deviceNumber);
-        uint8_t getDeviceType();
-        void setDeviceType(uint8_t deviceType);
-        uint8_t getTransmissionType();
-        void setTransmissionType(uint8_t transmissionType);
+
+        int getRFChannel(uint8_t channelIndex);
+        bool setRFChannel(uint8_t channelIndex, int rfChannel);
+        uint16_t getDeviceNumber(uint8_t channelIndex);
+        bool setDeviceNumber(uint8_t channelIndex, uint16_t deviceNumber);
+        uint8_t getDeviceType(uint8_t channelIndex);
+        bool setDeviceType(uint8_t channelIndex, uint8_t deviceType);
+        uint8_t getTransmissionType(uint8_t channelIndex);
+        bool setTransmissionType(uint8_t channelIndex, uint8_t transmissionType);
+        ANTMode getMode(uint8_t channelIndex);
+        bool setMode(uint8_t channelIndex, ANTMode mode);
+        ANTChannelType getChannelType(uint8_t channelIndex);
+        bool setChannelType(uint8_t channelIndex, ANTChannelType type);
+        bool assignNetwork(uint8_t channelIndex, uint8_t networkIndex);
+        bool setNextSync(uint8_t channelIndex, uint32_t nextSync);
+        uint32_t getNextSync(uint8_t channelIndex);
+
+        bool unassignNetwork(uint8_t channelIndex);
+        bool openChannel(uint8_t channelIndex);
+        bool closeChannel(uint8_t channelIndex);
+
+        bool setActiveChannel(uint8_t channelIndex);
+        uint16_t getActivePreamble();
+		int getActiveRFChannel();
+        uint16_t getActiveDeviceNumber();
+        uint8_t getActiveDeviceType();
+        uint8_t getActiveTransmissionType();
+
+		void setActiveRFChannel(int rfChannel);
+
         bool setNetworkKey(uint8_t networkIndex, uint8_t *networkKey);
-        bool useNetwork(uint8_t networkIndex);
 
 		void setHardwareConfiguration();
 
-    	// Reception callback
+        bool checkFilter(ANTPacket* packet);
+
+        // Reception callback
     	void onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi);
 		void onJam(uint32_t timestamp);
 		void onMatch(uint8_t *buffer, size_t size);
