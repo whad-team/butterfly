@@ -116,6 +116,26 @@ uint32_t ANTController::getNextSync(uint8_t channelIndex) {
     return this->channels[channelIndex].nextSync;
 }
 
+bool ANTController::setChannelPeriod(uint8_t channelIndex, uint32_t channelPeriod) {
+    if (channelIndex >= MAX_CHANNELS) {
+        return false;
+    }
+
+    this->channels[channelIndex].channelPeriod = channelPeriod;
+    return true;
+}
+
+
+
+
+uint32_t ANTController::getChannelPeriod(uint8_t channelIndex) {
+    if (channelIndex >= MAX_CHANNELS) {
+        return 0;
+    }
+    
+    return this->channels[channelIndex].channelPeriod;
+}
+
 uint16_t ANTController::getDeviceNumber(uint8_t channelIndex) {
     if (channelIndex >= MAX_CHANNELS) {
         return 0;

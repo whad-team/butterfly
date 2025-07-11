@@ -52,8 +52,10 @@ typedef struct ANTChannel {
     uint16_t deviceNumber;
     uint8_t deviceType;
     uint8_t transmissionType;
+
     uint8_t networkIndex;
 
+    uint32_t channelPeriod;
     uint32_t nextSync;
     ANTChannelType type;
     ANTMode mode;
@@ -98,6 +100,8 @@ class ANTController : public Controller {
         bool assignNetwork(uint8_t channelIndex, uint8_t networkIndex);
         bool setNextSync(uint8_t channelIndex, uint32_t nextSync);
         uint32_t getNextSync(uint8_t channelIndex);
+        bool setChannelPeriod(uint8_t channelIndex, uint32_t channelPeriod);
+        uint32_t getChannelPeriod(uint8_t channelIndex);
 
         bool unassignNetwork(uint8_t channelIndex);
         bool openChannel(uint8_t channelIndex);
