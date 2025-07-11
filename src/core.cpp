@@ -158,7 +158,7 @@ void Core::processANTInputMessage(whad::ant::AntMsg antMsg) {
             uint32_t channel_number = query.getChannelNumber();
             uint32_t device_number = query.getDeviceNumber();
 
-            if (channel_number < MAX_CHANNELS || device_number <= 0xFFFF) {
+            if (channel_number < MAX_CHANNELS && device_number <= 0xFFFF) {
                 if (
                     this->antController->setDeviceNumber(
                         (uint8_t)(channel_number & 0xFF), 
@@ -182,7 +182,7 @@ void Core::processANTInputMessage(whad::ant::AntMsg antMsg) {
             uint32_t channel_number = query.getChannelNumber();
             uint32_t device_type = query.getDeviceType();
 
-            if (channel_number < MAX_CHANNELS || device_type <= 0xFF) {
+            if (channel_number < MAX_CHANNELS && device_type <= 0xFF) {
                 if (
                     this->antController->setDeviceType(
                         (uint8_t)(channel_number & 0xFF), 
@@ -206,7 +206,7 @@ void Core::processANTInputMessage(whad::ant::AntMsg antMsg) {
             uint32_t channel_number = query.getChannelNumber();
             uint32_t transmission_type = query.getTransmissionType();
 
-            if (channel_number < MAX_CHANNELS || transmission_type <= 0xFF) {
+            if (channel_number < MAX_CHANNELS && transmission_type <= 0xFF) {
                 if (
                     this->antController->setTransmissionType(
                         (uint8_t)(channel_number & 0xFF), 
@@ -275,6 +275,169 @@ void Core::processANTInputMessage(whad::ant::AntMsg antMsg) {
             }
         }
         break;
+        case whad::ant::AssignChannelMsg:
+        {
+            whad::ant::AssignChannel query(antMsg);
+            uint32_t channel_number = query.getChannelNumber();
+            uint32_t network_number = query.getNetworkNumber();
+            whad::ant::ChannelType channel_type = query.getChannelType();
+            ANTChannelType ctype = UNKNOWN_TYPE;
+
+            if (channel_type == whad::ant::ReceiveOnlyChannel) {
+                ctype = RECEIVE_ONLY_CHANNEL;
+            }
+            else if (channel_type == whad::ant::TransmitOnlyChannel) {
+                ctype = TRANSMIT_ONLY_CHANNEL;
+            }
+            else if (channel_type == whad::ant::BidirectionalReceiveChannel) {
+                ctype = BIDIRECTIONAL_RECEIVE_CHANNEL;
+            }
+            else if (channel_type == whad::ant::BidirectionalTransmitChannel) {
+                ctype = BIDIRECTIONAL_TRANSMIT_CHANNEL;
+            }
+            else if (channel_type == whad::ant::SharedBidirectionalReceiveChannel) {
+                ctype = SHARED_BIDIRECTIONAL_RECEIVE_CHANNEL;
+            }
+            else if (channel_type == whad::ant::SharedBidirectionalTransmitChannel) {
+                ctype = SHARED_BIDIRECTIONAL_TRANSMIT_CHANNEL;
+            }
+            
+
+            if (channel_number < MAX_CHANNELS && network_number < MAX_NETWORKS) {
+                if (
+                    this->antController->setChannelType(
+                        (uint8_t)(channel_number & 0xFF), 
+                        ctype
+                    ) &&
+                    this->antController->assignNetwork(
+                        (uint8_t)(channel_number & 0xFF), 
+                        (uint8_t)(network_number & 0xFF)
+                    )
+                ) {
+                    response = new whad::generic::Success();
+                }
+                else {
+                    response = new whad::generic::Error();
+                }
+            }
+            else {
+                response = new whad::generic::ParameterError();
+            }
+        }
+        break;     
+        case whad::ant::UnassignChannelMsg:
+        {
+            whad::ant::UnassignChannel query(antMsg);
+            uint32_t channel_number = query.getChannelNumber();
+            
+
+            if (channel_number < MAX_CHANNELS) {
+                if (
+                    this->antController->setChannelType(
+                        (uint8_t)(channel_number & 0xFF), 
+                        UNKNOWN_TYPE
+                    ) &&
+                    this->antController->assignNetwork(
+                        (uint8_t)(channel_number & 0xFF), 
+                        UNASSIGNED
+                    )
+                ) {
+                    response = new whad::generic::Success();
+                }
+                else {
+                    response = new whad::generic::Error();
+                }
+            }
+            else {
+                response = new whad::generic::ParameterError();
+            }
+        }
+        break;        
+        case whad::ant::OpenChannelMsg:
+        {
+            whad::ant::OpenChannel query(antMsg);
+            uint32_t channel_number = query.getChannelNumber();
+            
+
+            if (channel_number < MAX_CHANNELS) {
+                if (
+                    this->antController->openChannel(
+                        (uint8_t)(channel_number & 0xFF)
+                    )
+                ) {
+                    response = new whad::generic::Success();
+                }
+                else {
+                    response = new whad::generic::Error();
+                }
+            }
+            else {
+                response = new whad::generic::ParameterError();
+            }
+        }
+        break;        
+        case whad::ant::CloseChannelMsg:
+        {
+            whad::ant::CloseChannel query(antMsg);
+            uint32_t channel_number = query.getChannelNumber();
+            
+
+            if (channel_number < MAX_CHANNELS) {
+                if (
+                    this->antController->closeChannel(
+                        (uint8_t)(channel_number & 0xFF)
+                    )
+                ) {
+                    response = new whad::generic::Success();
+                }
+                else {
+                    response = new whad::generic::Error();
+                }
+            }
+            else {
+                response = new whad::generic::ParameterError();
+            }
+        }
+        break;        
+
+        case whad::ant::SetRFChannelMsg:
+        {
+            whad::ant::SetRFChannel query(antMsg);
+            uint32_t channel_number = query.getChannelNumber();
+            uint32_t rf_channel = query.getRFChannel();
+            
+
+            if (channel_number < MAX_CHANNELS && rf_channel <= 100) {
+                if (
+                    this->antController->setRFChannel(
+                        (uint8_t)(channel_number & 0xFF), 
+                        rf_channel
+                    )
+                ) {
+                    response = new whad::generic::Success();
+                }
+                else {
+                    response = new whad::generic::Error();
+                }
+            }
+            else {
+                response = new whad::generic::ParameterError();
+            }
+        }
+        break;        
+
+        case whad::ant::ListChannelsMsg:
+        {
+            response = new whad::ant::AvailableChannels(MAX_CHANNELS);
+        }
+        break;        
+
+        case whad::ant::ListNetworksMsg:
+        {
+            response = new whad::ant::AvailableNetworks(MAX_NETWORKS);
+        }
+        break;
+
         case whad::ant::SniffMsg:
         {
             whad::ant::Sniff query(antMsg);
