@@ -256,7 +256,18 @@ void ESBController::start() {
     this->setPromiscuousConfiguration();
   }
   else {
-    if (this->channel == 0xFF) {
+    if (
+      this->filter.bytes[0] == 0xBB &&
+      this->filter.bytes[1] == 0x0A &&
+      this->filter.bytes[2] == 0xDC &&
+      this->filter.bytes[3] == 0xA5 &&
+      this->filter.bytes[4] == 0x75 &&
+      this->channel == 0xFF
+    ) {
+      this->channel = 5;
+      this->startPairingSniffing();
+    }
+    else if (this->channel == 0xFF) {
       this->channel = 0;
       this->setFollowMode(true);
       this->setAutofind(true);
@@ -264,17 +275,6 @@ void ESBController::start() {
     else {
       this->setFollowMode(false);
       this->setAutofind(false);
-    }
-
-    if (
-      this->filter.bytes[0] == 0xBB &&
-      this->filter.bytes[1] == 0x0A &&
-      this->filter.bytes[2] == 0xDC &&
-      this->filter.bytes[3] == 0xA5 &&
-      this->filter.bytes[4] == 0x75
-    ) {
-      this->channel = 5;
-      this->startPairingSniffing();
     }
 
     this->setFollowConfiguration(this->filter.bytes);
