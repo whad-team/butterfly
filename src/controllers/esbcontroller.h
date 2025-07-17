@@ -39,6 +39,7 @@ typedef struct ESBRetransmitBuffer {
 typedef struct ESBAcknowledgementBuffer {
 	uint8_t buffer[255];
 	size_t size;
+	uint8_t retransmissionCount;
 	bool available;
 } ESBAcknowledgementBuffer;
 

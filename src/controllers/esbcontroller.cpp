@@ -410,6 +410,7 @@ bool ESBController::send(uint8_t *data, size_t size, int retransmission_count) {
       for (size_t i=0;i<payload_size;i++) {
         this->preparedAck.buffer[2+i] = (data[7+i] << 1) | (data[7+i+1] >> 7);
       }
+      this->preparedAck.retransmissionCount = retransmission_count;
       this->preparedAck.available = true;
       return true;
     }
@@ -471,9 +472,15 @@ ESBPacket* ESBController::buildPseudoPacketFromPayload(uint32_t timestamp, uint8
 void ESBController::sendAck(uint8_t pid) {
 
   if (this->preparedAck.available) {
+    this->preparedAck.buffer[1] = (uint8_t)((pid & 0x3)<<1 | (1 & this->preparedAck.buffer[1]));
+    nrf_delay_us(160);
     this->radio->send(this->preparedAck.buffer, this->preparedAck.size, this->channel, 0x00);
-    nrf_delay_us(700);
-    this->preparedAck.available = false;
+    nrf_delay_us(1500);
+    this->preparedAck.retransmissionCount--;
+    if (this->preparedAck.retransmissionCount <= 0) {
+      this->preparedAck.available = false;
+      this->preparedAck.retransmissionCount = 0;
+    }
   }
   else {
     uint8_t payload[2] = {0x00, (uint8_t)((pid & 0x3)<<1 | 1)};
