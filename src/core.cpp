@@ -526,6 +526,11 @@ void Core::processANTInputMessage(whad::ant::AntMsg antMsg) {
                     response = new whad::generic::Error();
                     break;
                 }
+
+                if (!this->antController->setChannelPeriod(0, 32768)) {
+                    response = new whad::generic::Error();
+                    break;
+                }
                 
                 if (!this->antController->setDeviceNumber(0, device_number)) {
                     response = new whad::generic::Error();
