@@ -1,5 +1,6 @@
 #ifndef ANTCONTROLLER_H
 #define ANTCONTROLLER_H
+#include <queue>
 #include "../packet.h"
 #include "../controller.h"
 #include "../timer.h"
@@ -11,13 +12,17 @@
 #define NETWORK_KEY_SIZE    8
 #define TIMESTAMP_REPORTS_NB 10
 
-#define MAX_CHANNELS 8
+#define MAX_CHANNELS 4
 #define MAX_NETWORKS 4
 
 #define UNASSIGNED 0xFF
 #define AS_SOON_AS_POSSIBLE 0
 
-#define SCHEDULING_TICK_US  1000
+#define SCHEDULING_TICK_US  200
+
+typedef struct TXPacket {
+    uint8_t packet[17];
+} TXPacket;
 
 typedef enum ANTChannelType {
     BIDIRECTIONAL_TRANSMIT_CHANNEL = 0, 
@@ -56,7 +61,11 @@ typedef struct ANTChannel {
     uint8_t networkIndex;
 
     uint32_t channelPeriod;
+    Timer *masterTimer;
     uint32_t nextSync;
+
+    TXPacket latestBroadcast;
+    std::queue<TXPacket> transmitQueue;
     ANTChannelType type;
     ANTMode mode;
 } ANTChannel;
@@ -80,10 +89,20 @@ class ANTController : public Controller {
 		void start();
 		void stop();
 
-        bool schedulerTask();
-        void startSchedulingTimer();
-		void releaseTimers();
+        void releaseTimers();
 
+        bool channelManagementCallback(uint8_t channelIndex);
+
+        bool channel0Callback();
+        bool channel1Callback();
+        bool channel2Callback();
+        bool channel3Callback();
+
+        bool startChannelTimer(uint8_t channelIndex);
+
+        bool addPacketToTransmitQueue(uint8_t channelIndex, uint8_t *packet);
+        bool availablePacketsToTransmit(uint8_t channelIndex);
+        TXPacket getPacketFromTransmitQueue(uint8_t channelIndex);
 
         int getRFChannel(uint8_t channelIndex);
         bool setRFChannel(uint8_t channelIndex, int rfChannel);
@@ -106,6 +125,7 @@ class ANTController : public Controller {
         bool unassignNetwork(uint8_t channelIndex);
         bool openChannel(uint8_t channelIndex);
         bool closeChannel(uint8_t channelIndex);
+        bool isChannelOpen(uint8_t channelIndex);
 
         bool setActiveChannel(uint8_t channelIndex);
         uint16_t getActivePreamble();

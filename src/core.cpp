@@ -152,6 +152,69 @@ void Core::processANTInputMessage(whad::ant::AntMsg antMsg) {
 
     switch (antMsg.getType())
     {
+        case whad::ant::MasterModeMsg:
+        {
+            whad::ant::MasterMode query(antMsg);
+            uint32_t channel_number = query.getChannelNumber();
+
+            if (channel_number < MAX_CHANNELS) {
+                if (this->antController->setMode(channel_number, MASTER)) {
+                    response = new whad::generic::Success();
+                }
+                else {
+                    response = new whad::generic::Error();
+                }
+            }
+            else {
+                response = new whad::generic::ParameterError();
+            }
+        }
+        break;
+        case whad::ant::SlaveModeMsg:
+        {
+            whad::ant::SlaveMode query(antMsg);
+            uint32_t channel_number = query.getChannelNumber();
+
+            if (channel_number < MAX_CHANNELS) {
+                if (this->antController->setMode(channel_number, SLAVE)) {
+                    response = new whad::generic::Success();
+                }
+                else {
+                    response = new whad::generic::Error();
+                }
+            }
+            else {
+                response = new whad::generic::ParameterError();
+            }
+        }
+        break;
+        case whad::ant::SendRawMsg:
+        {
+            whad::ant::SendPacketRaw query(antMsg);
+            uint32_t channel_number = query.getChannelNumber();
+            uint32_t rf_channel = query.getRFChannel();
+            uint8_t packet[17];
+            memcpy(packet, query.getPacket().getBytes(), 17);
+            if (channel_number < MAX_CHANNELS) {
+                if (
+                    this->antController->isChannelOpen((uint8_t)(channel_number & 0xFF)) &&
+                    
+                    this->antController->addPacketToTransmitQueue(
+                        (uint8_t)(channel_number & 0xFF), 
+                        packet
+                    )
+                ) {
+                    response = new whad::generic::Success();
+                }
+                else {
+                    response = new whad::generic::Error();
+                }
+            }
+            else {
+                response = new whad::generic::ParameterError();
+            }
+        }
+        break;
         case whad::ant::SetDeviceNumberMsg:
         {
             whad::ant::SetDeviceNumber query(antMsg);

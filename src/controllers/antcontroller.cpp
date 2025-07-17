@@ -11,6 +11,7 @@ ANTController::ANTController(Radio *radio) : Controller(radio) {
         this->channels[i].deviceType = 0;
         this->channels[i].transmissionType = 0;
         this->channels[i].networkIndex = UNASSIGNED;
+        this->channels[i].masterTimer = NULL;
     }
     for (int i=0; i < MAX_NETWORKS; i++) {
         memset(this->networks[i].networkKey, 0, NETWORK_KEY_SIZE);
@@ -20,19 +21,86 @@ ANTController::ANTController(Radio *radio) : Controller(radio) {
 	this->timerModule = Core::instance->getTimerModule();
     this->schedulingTimer = NULL;
 }
-    
-void ANTController::start() {
-    uint8_t activeChannel = 0xFF;
-    for (int i=0;i<MAX_CHANNELS;i++) {
-        if (this->channels[i].enabled) {
-            activeChannel = i;
-            break;
-        }
+
+
+bool ANTController::addPacketToTransmitQueue(uint8_t channelIndex, uint8_t *packet) {
+    if (channelIndex >= MAX_CHANNELS) {
+        return false;
     }
-    if (activeChannel != 0xFF) {
-        this->setActiveChannel(activeChannel);
-        this->setHardwareConfiguration();
-        this->startSchedulingTimer();
+    TXPacket pkt;
+    memcpy(pkt.packet, packet, 16);
+    this->channels[channelIndex].transmitQueue.push(pkt);
+    return true;
+}
+
+bool ANTController::availablePacketsToTransmit(uint8_t channelIndex) {
+    if (channelIndex >= MAX_CHANNELS) {
+        return false;
+    }
+    return !this->channels[channelIndex].transmitQueue.empty();
+}
+
+TXPacket ANTController::getPacketFromTransmitQueue(uint8_t channelIndex) {
+    TXPacket pkt = this->channels[channelIndex].transmitQueue.front();
+    this->channels[channelIndex].transmitQueue.pop();
+    return pkt;
+}
+
+bool ANTController::channelManagementCallback(uint8_t channelIndex) {
+    // Get the timestamp
+    uint32_t now = this->timerModule->getTimestamp(); 
+
+    if (channelIndex >= MAX_CHANNELS) return false;
+    // Do nothing if channel is not enabled
+    if (!this->channels[channelIndex].enabled) {
+        return false;
+    }
+    // if so, reconfigure radio to match our configuration
+    this->setActiveChannel(channelIndex);
+    this->setHardwareConfiguration();
+
+
+    if (this->channels[channelIndex].mode == SNIFFER) {} // do nothing
+    else if (this->channels[channelIndex].mode == MASTER) {
+
+        // then, transmit our main packet
+        if (this->availablePacketsToTransmit(channelIndex)) {
+            // first case: we have pending packets to transmit
+            TXPacket packet = this->getPacketFromTransmitQueue(channelIndex);
+            memcpy(this->channels[channelIndex].latestBroadcast.packet, packet.packet, 16);
+            this->radio->send(packet.packet + 2, 14, this->rfChannel, this->rfChannel);            
+        }
+        else {
+            // second case: we have no pending packets, transmit latest broadcast
+            this->radio->send(this->channels[this->activeChannel].latestBroadcast.packet + 2, 14, this->rfChannel, this->rfChannel);
+        }
+
+    }
+    return true;
+}
+
+bool ANTController::channel0Callback() {
+    return this->channelManagementCallback(0);
+}
+
+bool ANTController::channel1Callback() {
+    return this->channelManagementCallback(1);
+}
+
+bool ANTController::channel2Callback() {
+    return this->channelManagementCallback(2);
+}
+bool ANTController::channel3Callback() {
+    return this->channelManagementCallback(3);
+}
+
+void ANTController::start() {
+    for (int i=0; i < MAX_CHANNELS; i++) {
+        if (this->channels[i].enabled) {
+            this->startChannelTimer(i);
+            this->setActiveChannel(i);
+        }
+        nrf_delay_us(50000);
     }
 }
 
@@ -42,49 +110,42 @@ void ANTController::stop() {
     this->radio->disable();
 }
 
-
-bool ANTController::schedulerTask() {
-    bsp_board_led_invert(0);
-    uint32_t now = this->timerModule->getTimestamp(); 
-    uint32_t minNextSync = 0xFFFFFFFF;
-    uint32_t minChannel = 0;
-
-    for (int i=0;i<MAX_CHANNELS;i++) {
-        if (this->channels[i].enabled ) {
-            if (this->getNextSync(i) == AS_SOON_AS_POSSIBLE) {
-                minChannel = i;
-                break;
-            }
-            if (this->getNextSync(i) > now && this->getNextSync(i) <= minNextSync) {
-                minNextSync = this->getNextSync(i);
-                minChannel = i;
-            }
-        }
+bool ANTController::startChannelTimer(uint8_t channelIndex) {
+    if (channelIndex >= MAX_CHANNELS) {
+        return false;
     }
-    if (minChannel != this->activeChannel) {
-        this->setActiveChannel(minChannel);
-        this->setHardwareConfiguration();
+
+    if (this->channels[channelIndex].masterTimer == NULL) {
+        this->channels[channelIndex].masterTimer = TimerModule::instance->getTimer();
     }
+    this->channels[channelIndex].masterTimer->setMode(REPEATED);
+    if (channelIndex == 0) {
+        this->channels[channelIndex].masterTimer->setCallback((ControllerCallback)&ANTController::channel0Callback, this);
+    }
+    else if (channelIndex == 1) {
+        this->channels[channelIndex].masterTimer->setCallback((ControllerCallback)&ANTController::channel1Callback, this);
+    }
+    else if (channelIndex == 2) {
+        this->channels[channelIndex].masterTimer->setCallback((ControllerCallback)&ANTController::channel2Callback, this);
+    }
+    else if (channelIndex == 3) {
+        this->channels[channelIndex].masterTimer->setCallback((ControllerCallback)&ANTController::channel3Callback, this);
+    }
+    this->channels[channelIndex].masterTimer->update((int)((this->channels[channelIndex].channelPeriod * 1000000.0)/32768.0));
+    this->channels[channelIndex].masterTimer->start();
     return true;
-}
-
-void ANTController::startSchedulingTimer() {
-    if (this->schedulingTimer == NULL) {
-        this->schedulingTimer = TimerModule::instance->getTimer();
-    }
-    this->schedulingTimer->setMode(REPEATED);
-    this->schedulingTimer->setCallback((ControllerCallback)&ANTController::schedulerTask, this);
-    this->schedulingTimer->update(SCHEDULING_TICK_US);
-    this->schedulingTimer->start();
 }
 
 
 void ANTController::releaseTimers() {
-	if (this->schedulingTimer != NULL) {
-		this->schedulingTimer->stop();
-		this->schedulingTimer->release();
-		this->schedulingTimer = NULL;
-	}
+    for (int i=0 ; i < MAX_CHANNELS; i++) {
+        if (this->channels[i].masterTimer != NULL) {
+            this->channels[i].masterTimer->stop();
+		    this->channels[i].masterTimer->release();
+	    	this->channels[i].masterTimer = NULL;
+
+        }
+    }
 }
 
 int ANTController::getActiveRFChannel() {
@@ -278,6 +339,13 @@ bool ANTController::closeChannel(uint8_t channelIndex) {
     return true;
 }
 
+bool ANTController::isChannelOpen(uint8_t channelIndex) {
+    if (channelIndex >= MAX_CHANNELS) {
+        return false;
+    }
+    return this->channels[channelIndex].enabled;
+}
+
 bool ANTController::setNetworkKey(uint8_t networkIndex, uint8_t *networkKey) {
     if (networkIndex >= MAX_NETWORKS) {
         return false;
@@ -379,6 +447,23 @@ void ANTController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer,
         this->getActivePreamble()
     );
     if (crcValue.validity == VALID_CRC && this->checkFilter(pkt)) {
+
+        if (this->channels[activeChannel].mode == MASTER) {
+            if (!pkt->isBroadcast()) {
+                nrf_delay_us(1400);
+                uint8_t acknowledgement[16];
+                memcpy(acknowledgement, this->channels[this->activeChannel].latestBroadcast.packet, 16);
+                acknowledgement[6] = (
+                    (1 << 7) | // type ack/burst
+                    (1 << 6) | // ack=True
+                    (pkt->isEnd() << 5) | // end=True
+                    ((1 - pkt->getCount()) << 4) | // count=1
+                    (0 << 3) | // slot=False
+                     2
+                );
+                this->radio->send(acknowledgement + 2, 14, this->rfChannel, this->rfChannel);
+            }
+        }
         this->addPacket(pkt);
     }
     delete pkt;
