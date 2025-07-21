@@ -1,5 +1,6 @@
 #include "dot15d4controller.h"
 #include "../core.h"
+#include <stdlib.h>
 
 static uint8_t SYMBOL_TO_CHIP_MAPPING[16][4] = {
 	{0x60, 0x77,0xae, 0x6c},
@@ -22,6 +23,87 @@ static uint8_t SYMBOL_TO_CHIP_MAPPING[16][4] = {
 
 int Dot15d4Controller::channelToFrequency(int channel) {
 	return 5+5*(channel-11);
+}
+
+Timer *timer = nullptr;
+
+void Dot15d4Controller::enableHopping()
+{
+	this->hopping = true;
+	this->activate_hopping_timer = true;
+
+	if (this->channelMap.getChannelMap() == 0)
+	{
+		this->channelMap = whad::dot15d4::ChannelMap((uint16_t)(0x1 << (this->channel - 11)));
+	}
+		
+	timer = TimerModule::instance->getTimer();
+	this->asn = whad::dot15d4::ASN();
+
+}
+
+void Dot15d4Controller::disableHopping()
+{
+	this->hopping = false;
+	this->activate_hopping_timer = false;
+	timer->release();
+}
+
+LedModule led = LedModule();
+
+bool Dot15d4Controller::frequencyHop()
+{
+	this->asn.incrementASN();
+	int channelOffset = getChannelOffset();
+	int activeChan = 11 + this->channelMap.getActiveChannel((channelOffset + this->asn.getASN()) % this->channelMap.getNumberOfActiveChannels());
+	if(this->getChannel()!=activeChan){
+		setChannel(activeChan);		
+	}
+	return true;
+}
+
+int Dot15d4Controller::getChannelOffset()
+{
+	whad_dot15d4_superframes_t *superframes = this->superframes.getSuperframes();
+	if (superframes == nullptr)
+	{
+		return 0;
+	}
+	
+	int max_sf_iters = 1000;
+	while (superframes != nullptr && max_sf_iters-- > 0)
+	{
+		whad_dot15d4_superframe_t *curr = superframes->superframe;
+		if (!curr || !curr->links )
+		{
+			superframes = superframes->next;
+			continue;
+		}
+		int slot = this->asn.getASN() % curr->size;
+		int max_link_iters = 1000;
+		whad_dot15d4_link_t *link = curr->links->first;
+		while (link != nullptr && max_link_iters-- > 0){
+			if (link->join_slot == slot)
+			{
+				return link->offset;
+			}
+			link = link->next;
+		}
+
+		superframes = superframes->next;
+	}
+	return 0;
+}
+
+int duration = 10000;
+bool Dot15d4Controller::startHoppingTimer(){
+	frequencyHop();
+	timer->setMode(REPEATED);
+	timer->update(duration);
+    timer->setCallback((ControllerCallback)&Dot15d4Controller::frequencyHop, this);
+	timer->start();
+	
+	return true;
 }
 
 void Dot15d4Controller::onMatch(uint8_t *buffer, size_t size) {
@@ -359,6 +441,10 @@ void Dot15d4Controller::sendJammingReport(uint32_t timestamp) {
     /* Free notification wrapper. */
     delete notification;
 }
+uint64_t first_asn = 0;
+uint32_t first_asn_ts = 0;
+uint64_t second_asn = 0;
+uint32_t second_asn_ts = 0;
 
 void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
 	Dot15d4Packet* pkt = NULL;
@@ -373,6 +459,44 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
         crcValue.value = ((crcValue.value & 0xff00) >> 8) | ((crcValue.value & 0xff) << 8);
 
 		pkt = new Dot15d4Packet(buffer,1+buffer[0]-2,timestamp,RECEIVER,this->channel,rssi,crcValue, (uint8_t)(lqi > 63 ? 255 : lqi*4));
+	}
+	
+	if(this->hopping){
+		if (pkt->isWiHARTAdvertisement()){
+			if (second_asn == 0){
+				//getting three first adv in order to get the avg of the duration of a slot ~=10ms
+				if(first_asn == 0){
+					first_asn = pkt->extractASN();
+					first_asn_ts = timestamp;
+				}else{
+					second_asn = pkt->extractASN();
+					second_asn_ts = timestamp;
+				}
+			}else{
+				this->channelMap.setChannelMap(pkt->extractChannelMap());
+				if(this->asn.getASN()!= 0 and pkt->extractASN()==this->asn.getASN()){
+					timer->update(duration, timestamp - pkt->getPacketSize() / 250 - 5);
+				}else{
+					if(this->asn.getASN()== 0){						
+						this->asn.setASN(pkt->extractASN());
+						if(this->activate_hopping_timer){
+							duration = (timestamp - second_asn_ts) / (pkt->extractASN()- second_asn);
+							this->activate_hopping_timer = false;
+							timer->setMode(SINGLE_SHOT);
+							timer->update(duration - pkt->getPacketSize() / 250 - 5);
+							timer->setCallback((ControllerCallback)&Dot15d4Controller::startHoppingTimer, this);
+							timer->start();
+						}
+					}else{
+						ledManager.setColor(RED);
+						ledManager.on(LED2);
+						timer->update(duration, timestamp - pkt->getPacketSize() / 250 - 5);
+						this->asn.setASN(pkt->extractASN());
+					}
+				}
+			}
+		}
+				
 	}
 
 	if (pkt != NULL) {

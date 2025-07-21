@@ -1,6 +1,7 @@
 #include "core.h"
 #include "capabilities.h"
 #include <whad.h>
+#include "timer.h"
 
 // Global instance of Core
 Core* Core::instance = NULL;
@@ -185,6 +186,54 @@ void Core::processDot15d4InputMessage(whad::dot15d4::Dot15d4Msg dot15d4Msg) {
         {
             this->currentController->start();
             response = new whad::generic::Success();
+        }
+        break;
+
+        case whad::dot15d4::HoppingMsg:
+        {
+            whad::dot15d4::HopMode query(dot15d4Msg);
+
+            if (query.getHopMode()) {
+                this->dot15d4Controller->enableHopping();
+            } else {
+                this->dot15d4Controller->disableHopping();
+            }
+            
+            response = new whad::generic::Success();
+        }
+        break;
+
+        case whad::dot15d4::AddLinksMsg:
+        {
+            whad::dot15d4::AddLinks query(dot15d4Msg, this->dot15d4Controller->superframes.getSuperframes());
+            response = new whad::generic::Success();   
+        }
+        break;
+
+        case whad::dot15d4::DeleteLinkMsg:
+        {
+            //TODO
+        }
+        break;
+
+        case whad::dot15d4::WriteModifySuperframeMsg:
+        {
+            this->dot15d4Controller->superframes.writeModifySuperframe(&dot15d4Msg);	        
+            response = new whad::generic::Success();
+        }
+        break;
+
+        case whad::dot15d4::DeleteSuperframe:
+        {
+            //TODO
+        }
+        break;
+
+        case whad::dot15d4::ChannelMapMsg:
+        {
+            whad::dot15d4::ChannelMap query(dot15d4Msg);
+            this->dot15d4Controller->channelMap = query;
+            response = new whad::generic::Success();   
         }
         break;
 

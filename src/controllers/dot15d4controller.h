@@ -37,6 +37,8 @@ class Dot15d4Controller : public Controller {
 		bool autoAcknowledgement;
 		uint16_t shortAddress;
 		uint64_t extendedAddress;
+		bool hopping = false;
+		bool activate_hopping_timer = false;
 	public:
 		static int channelToFrequency(int channel);
 		Dot15d4Controller(Radio* radio);
@@ -61,6 +63,17 @@ class Dot15d4Controller : public Controller {
 
 		void startAttack(Dot15d4Attack attack);
 		void sendJammingReport(uint32_t timestamp);
+
+		whad::dot15d4::ChannelMap channelMap = whad::dot15d4::ChannelMap((uint16_t) (0x1 << (channel - 11)));
+		whad::dot15d4::ASN asn;
+		whad::dot15d4::Superframes superframes = whad::dot15d4::Superframes();
+
+		bool frequencyHop();
+		int getChannelOffset();
+
+		void enableHopping();
+        void disableHopping();
+		bool startHoppingTimer();
 
 		Dot15d4Packet* wazabeeDecoder(uint8_t *buffer, uint8_t size, uint32_t timestamp, CrcValue crcValue, uint8_t rssi);
 

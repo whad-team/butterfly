@@ -1,4 +1,5 @@
 #include "packet.h"
+#include "led.h"
 
 Packet::Packet(PacketType packetType,uint8_t *packetBuffer, size_t packetSize, uint32_t timestamp, uint8_t source, uint8_t channel, int8_t rssi, CrcValue crcValue) {
 	this->packetType = packetType;
@@ -527,6 +528,19 @@ Dot15d4AddressMode Dot15d4Packet::extractDestinationAddressMode() {
 	}
 }
 
+Dot15d4AddressMode Dot15d4Packet::extractSourceAddressMode() {
+	uint8_t mode = ((this->packetPointer[2] & 0xC0) >> 6);
+	if (mode == 2) {
+		return ADDR_SHORT;
+	}
+	else if (mode == 3) {
+		return ADDR_EXTENDED;
+	}
+	else {
+		return ADDR_NONE;
+	}
+}
+
 uint16_t Dot15d4Packet::extractShortDestinationAddress() {
 	return (this->packetPointer[6] | (this->packetPointer[7] << 8));
 }
@@ -546,6 +560,56 @@ uint64_t Dot15d4Packet::extractExtendedDestinationAddress() {
 
 uint8_t Dot15d4Packet::extractSequenceNumber() {
 	return this->packetPointer[3];
+}
+
+uint64_t Dot15d4Packet::extractASN(){
+
+	if (this->isWiHARTAdvertisement()) {
+		int asn_index = 11; //if both addresses are short
+		//check if address is short or long
+		if(extractSourceAddressMode() == ADDR_EXTENDED){
+			asn_index +=6; 
+		} 
+		if(extractDestinationAddressMode() == ADDR_EXTENDED){
+			asn_index +=6; 
+		}
+
+		return ((uint64_t) (this->packetPointer[asn_index]) << 32 |
+				((uint64_t) (this->packetPointer[asn_index+1]) << 24 ) |
+				((uint64_t) (this->packetPointer[asn_index+2]) << 16) |
+				((uint64_t) (this->packetPointer[asn_index+3]) << 8) |
+				((uint64_t) (this->packetPointer[asn_index+4]) ) );
+	}
+	else {
+		return (uint64_t) 0; //not an adv
+	}
+}
+
+bool Dot15d4Packet::isWiHARTAdvertisement(){
+	int DLspecifier = 10;
+	if(extractSourceAddressMode() == ADDR_EXTENDED){
+		DLspecifier +=6; 
+	} 
+	if(extractDestinationAddressMode() == ADDR_EXTENDED){
+		DLspecifier +=6; 
+	}
+	return (this->packetPointer[DLspecifier] & 0x07 )==0x01;
+}
+
+uint16_t Dot15d4Packet::extractChannelMap(){
+	if (this->isWiHARTAdvertisement()) {
+		int channel_map_index = 18; //if both addresses are short
+		//check if address is short or long
+		if(this->packetPointer[2] & (0x1<<6)){
+			channel_map_index +=6; //source addres is 8 byte long
+		}
+		if(this->packetPointer[2] & (0x1<<2)){
+			channel_map_index +=6; //dest addres is 8 byte long
+		}
+		return (this->packetPointer[channel_map_index]|
+				(this->packetPointer[channel_map_index+1]<<8));
+	}
+	else return 0xFFFF; //not an adv
 }
 
 uint32_t Dot15d4Packet::getFCS() {

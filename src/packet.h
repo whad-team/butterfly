@@ -134,8 +134,12 @@ class Dot15d4Packet : public Packet {
 		uint8_t extractSequenceNumber();
 		uint8_t getLQI();
 		Dot15d4AddressMode extractDestinationAddressMode();
+		Dot15d4AddressMode extractSourceAddressMode();
 		uint16_t extractShortDestinationAddress();
 		uint64_t extractExtendedDestinationAddress();
+		uint64_t extractASN();
+		uint16_t extractChannelMap();
+		bool isWiHARTAdvertisement();
 		uint32_t getFCS();
 
 };
