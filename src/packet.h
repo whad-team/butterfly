@@ -166,6 +166,7 @@ class ANTPacket : public Packet {
 		uint8_t getDeviceType();
 		uint8_t getTransmissionType();
 		bool isBroadcast();
+		bool isAck();
 		bool isEnd();
 		uint8_t getCount();
 

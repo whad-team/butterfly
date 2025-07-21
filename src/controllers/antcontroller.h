@@ -65,8 +65,15 @@ typedef struct ANTChannel {
     uint32_t nextSync;
 
     TXPacket latestBroadcast;
-    std::queue<TXPacket> transmitQueue;
-    ANTChannelType type;
+    TXPacket latestAck;
+
+	bool incomingBurst;
+	bool outgoingBurst;
+
+	std::queue<TXPacket> transmitQueue;
+	std::queue<TXPacket> burstQueue;
+
+	ANTChannelType type;
     ANTMode mode;
 } ANTChannel;
 
@@ -82,8 +89,7 @@ class ANTController : public Controller {
         uint8_t networkKey[NETWORK_KEY_SIZE];
 
         uint8_t activeChannel;
-		Timer *schedulingTimer;
-
+		Timer *burstTimer;
 	public:
 		ANTController(Radio* radio);
 		void start();
@@ -100,9 +106,17 @@ class ANTController : public Controller {
 
         bool startChannelTimer(uint8_t channelIndex);
 
+		bool burstTimerCallback();
+		void startBurstTimer();
+		void releaseBurstTimer();
+
         bool addPacketToTransmitQueue(uint8_t channelIndex, uint8_t *packet);
         bool availablePacketsToTransmit(uint8_t channelIndex);
         TXPacket getPacketFromTransmitQueue(uint8_t channelIndex);
+
+		bool addPacketToBurstQueue(uint8_t channelIndex, uint8_t *packet);
+        bool isBurstReady(uint8_t channelIndex);
+        TXPacket getPacketFromBurstQueue(uint8_t channelIndex);
 
         int getRFChannel(uint8_t channelIndex);
         bool setRFChannel(uint8_t channelIndex, int rfChannel);
@@ -134,6 +148,7 @@ class ANTController : public Controller {
         uint8_t getActiveDeviceType();
         uint8_t getActiveTransmissionType();
 
+        void sendChannelEvent(uint8_t channelIndex, whad::ant::ChannelEventCode event);
 		void setActiveRFChannel(int rfChannel);
 
         bool setNetworkKey(uint8_t networkIndex, uint8_t *networkKey);

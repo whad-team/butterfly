@@ -639,6 +639,9 @@ bool ANTPacket::isBroadcast() {
 bool ANTPacket::isEnd() {
 	return (this->packetPointer[6] & 0x20) == 0x20;
 }
+bool ANTPacket::isAck() {
+	return (this->packetPointer[6] & 0x40) == 0x40;
+}
 
 
 uint8_t ANTPacket::getCount() {

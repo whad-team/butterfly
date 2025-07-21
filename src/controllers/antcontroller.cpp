@@ -12,14 +12,86 @@ ANTController::ANTController(Radio *radio) : Controller(radio) {
         this->channels[i].transmissionType = 0;
         this->channels[i].networkIndex = UNASSIGNED;
         this->channels[i].masterTimer = NULL;
-    }
+        this->channels[i].incomingBurst = false;
+        this->channels[i].outgoingBurst = false;
+
+	}
     for (int i=0; i < MAX_NETWORKS; i++) {
         memset(this->networks[i].networkKey, 0, NETWORK_KEY_SIZE);
         this->networks[i].preamble = 0x0000;
     }
     this->rfChannel = 57;
 	this->timerModule = Core::instance->getTimerModule();
-    this->schedulingTimer = NULL;
+	this->burstTimer = NULL;
+}
+
+
+void ANTController::sendChannelEvent(uint8_t channelIndex, whad::ant::ChannelEventCode event) {
+    /* Craft an injection report notification. */
+    whad::NanoPbMsg *notification = new whad::ant::ChannelEvent(channelIndex, event);
+
+    /* Add notification to our message queue. */
+	Core::instance->pushMessageToQueue(notification);
+
+    /* Free notification wrapper. */
+    delete notification;
+
+}
+
+bool ANTController::burstTimerCallback() {
+	if (this->isBurstReady(this->activeChannel)) {
+		TXPacket next = this->getPacketFromBurstQueue(this->activeChannel);
+		this->radio->send(next.packet + 2, 14, this->rfChannel, this->rfChannel);
+		return true;
+	}
+	else if (this->channels[this->activeChannel].incomingBurst) {
+		this->radio->send(this->channels[this->activeChannel].latestAck.packet + 2, 14, this->rfChannel, this->rfChannel);
+		return true;
+	}
+	return false;
+}
+
+void ANTController::startBurstTimer() {
+    if (this->burstTimer == NULL) {
+        this->burstTimer = TimerModule::instance->getTimer();
+    }
+    this->burstTimer->setMode(SINGLE_SHOT);
+	this->burstTimer->setCallback((ControllerCallback)&ANTController::burstTimerCallback, this);
+    this->burstTimer->update(1500);
+    this->burstTimer->start();
+
+
+}
+
+void ANTController::releaseBurstTimer() {
+	if (this->burstTimer != NULL) {
+		this->burstTimer->stop();
+		this->burstTimer->release();
+		this->burstTimer = NULL;
+	}
+}
+bool ANTController::addPacketToBurstQueue(uint8_t channelIndex, uint8_t *packet) {
+    if (channelIndex >= MAX_CHANNELS) {
+        return false;
+    }
+    TXPacket pkt;
+    memcpy(pkt.packet, packet, 16);
+    this->channels[channelIndex].burstQueue.push(pkt);
+	if ((packet[6] & 0x20) == 0x20) {
+		this->channels[channelIndex].outgoingBurst = true;
+        this->sendChannelEvent(channelIndex, whad::ant::TransferTxStart);
+	}
+    return true;
+}
+
+bool ANTController::isBurstReady(uint8_t channelIndex) {
+	return this->channels[channelIndex].outgoingBurst && !this->channels[channelIndex].burstQueue.empty();
+}
+
+TXPacket ANTController::getPacketFromBurstQueue(uint8_t channelIndex) {
+    TXPacket pkt = this->channels[channelIndex].burstQueue.front();
+    this->channels[channelIndex].burstQueue.pop();
+    return pkt;
 }
 
 
@@ -29,7 +101,28 @@ bool ANTController::addPacketToTransmitQueue(uint8_t channelIndex, uint8_t *pack
     }
     TXPacket pkt;
     memcpy(pkt.packet, packet, 16);
-    this->channels[channelIndex].transmitQueue.push(pkt);
+	if ((packet[6] & 0x80) != 0) {
+		// This is an ack/burst
+		if ((packet[6] & 0x20) == 0x20) {
+			// This is an end packet
+			if (this->channels[channelIndex].burstQueue.empty()) {
+				// No outgoing burst pending, it's a normal ack, add it to the transmit queue 
+				this->channels[channelIndex].transmitQueue.push(pkt);
+			}
+			else {
+				// This is the end of a burst, add it to the burst queue
+				this->addPacketToBurstQueue(channelIndex, packet);
+			}
+		}
+		else {
+			// This is part of a burst, add it to the burst queue
+			this->addPacketToBurstQueue(channelIndex, packet);
+		}
+	}
+	else {
+		// This is a broadcast packet, add it to the transmit queue
+		this->channels[channelIndex].transmitQueue.push(pkt);
+	}
     return true;
 }
 
@@ -62,19 +155,39 @@ bool ANTController::channelManagementCallback(uint8_t channelIndex) {
 
     if (this->channels[channelIndex].mode == SNIFFER) {} // do nothing
     else if (this->channels[channelIndex].mode == MASTER) {
-
         // then, transmit our main packet
-        if (this->availablePacketsToTransmit(channelIndex)) {
+		if (this->isBurstReady(channelIndex)) {
+			// A burst is ready to transmit, go
+            TXPacket burstPacket = this->getPacketFromBurstQueue(channelIndex);
+			this->radio->send(burstPacket.packet + 2, 14, this->rfChannel, this->rfChannel);
+
+		}
+		else if (this->availablePacketsToTransmit(channelIndex)) {
             // first case: we have pending packets to transmit
             TXPacket packet = this->getPacketFromTransmitQueue(channelIndex);
-            memcpy(this->channels[channelIndex].latestBroadcast.packet, packet.packet, 16);
-            this->radio->send(packet.packet + 2, 14, this->rfChannel, this->rfChannel);            
-        }
-        else {
+			// This is a broadcast packet, update latestBroadcast and send it
+			if ((packet.packet[6] & 0x80) == 0) {
+				memcpy(this->channels[channelIndex].latestBroadcast.packet, packet.packet, 16);
+				this->radio->send(packet.packet + 2, 14, this->rfChannel, this->rfChannel);
+			}
+			else {
+				// This is an ack: transmit it and update the next broadcast
+				memcpy(this->channels[channelIndex].latestAck.packet, packet.packet, 16);
+				memcpy(this->channels[channelIndex].latestBroadcast.packet, packet.packet, 16);
+				this->channels[channelIndex].latestBroadcast.packet[6] &= ~0x80;
+				this->radio->send(packet.packet + 2, 14, this->rfChannel, this->rfChannel);
+			}
+		}
+		else {
             // second case: we have no pending packets, transmit latest broadcast
             this->radio->send(this->channels[this->activeChannel].latestBroadcast.packet + 2, 14, this->rfChannel, this->rfChannel);
         }
-
+    }
+	
+    this->channels[activeChannel].incomingBurst = false;
+    if (this->channels[activeChannel].outgoingBurst && this->channels[activeChannel].burstQueue.empty()) {
+        this->sendChannelEvent(activeChannel, whad::ant::TransferTxFailed);
+        this->channels[activeChannel].outgoingBurst = false;
     }
     return true;
 }
@@ -429,7 +542,6 @@ void ANTController::setHardwareConfiguration() {
     this->radio->reload();
 }
 
-
 /* ******************** Events Callbacks ******************** */
 
 void ANTController::onMatch(uint8_t *buffer, size_t size) {}
@@ -448,21 +560,39 @@ void ANTController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer,
     );
     if (crcValue.validity == VALID_CRC && this->checkFilter(pkt)) {
 
-        if (this->channels[activeChannel].mode == MASTER) {
-            if (!pkt->isBroadcast()) {
-                nrf_delay_us(1400);
-                uint8_t acknowledgement[16];
-                memcpy(acknowledgement, this->channels[this->activeChannel].latestBroadcast.packet, 16);
-                acknowledgement[6] = (
-                    (1 << 7) | // type ack/burst
-                    (1 << 6) | // ack=True
-                    (pkt->isEnd() << 5) | // end=True
-                    ((1 - pkt->getCount()) << 4) | // count=1
-                    (0 << 3) | // slot=False
-                     2
-                );
-                this->radio->send(acknowledgement + 2, 14, this->rfChannel, this->rfChannel);
-            }
+        if (this->channels[this->activeChannel].mode == MASTER) {
+			if (!pkt->isBroadcast()) {
+				
+				if (!this->channels[this->activeChannel].outgoingBurst) {
+					memcpy(this->channels[this->activeChannel].latestAck.packet, this->channels[this->activeChannel].latestBroadcast.packet, 16);
+					this->channels[this->activeChannel].latestAck.packet[6] = (
+						(1 << 7) | // type ack/burst
+						(1 << 6) | // ack=True
+						(pkt->isEnd() << 5) | // end=True
+						((1 - pkt->getCount()) << 4) | // count=1
+						(0 << 3) | // slot=False
+						2
+					);
+					this->channels[this->activeChannel].incomingBurst = true;
+                    if (!pkt->isAck()) {
+					    this->startBurstTimer();
+                    }
+				}
+				else {
+					if (this->channels[this->activeChannel].outgoingBurst) {
+                        if (!pkt->isEnd()) {
+                            this->channels[this->activeChannel].incomingBurst = false;
+                            this->channels[this->activeChannel].outgoingBurst = true;
+                            this->startBurstTimer();
+                        }
+                        else {
+                            this->channels[this->activeChannel].incomingBurst = false;
+                            this->channels[this->activeChannel].outgoingBurst = false;
+                            this->sendChannelEvent(this->activeChannel, whad::ant::TransferTxCompleted);
+                        }
+					}
+				}
+			}
         }
         this->addPacket(pkt);
     }
