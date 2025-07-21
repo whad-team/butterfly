@@ -488,8 +488,6 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
 							timer->start();
 						}
 					}else{
-						ledManager.setColor(RED);
-						ledManager.on(LED2);
 						timer->update(duration, timestamp - pkt->getPacketSize() / 250 - 5);
 						this->asn.setASN(pkt->extractASN());
 					}
