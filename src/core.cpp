@@ -2,6 +2,7 @@
 #include "capabilities.h"
 #include <whad.h>
 #include "timer.h"
+#include "led.h"
 
 // Global instance of Core
 Core* Core::instance = NULL;
@@ -205,27 +206,29 @@ void Core::processDot15d4InputMessage(whad::dot15d4::Dot15d4Msg dot15d4Msg) {
 
         case whad::dot15d4::AddLinksMsg:
         {
-            whad::dot15d4::AddLinks query(dot15d4Msg, this->dot15d4Controller->superframes.getSuperframes());
+            this->dot15d4Controller->superframes.addLinks(dot15d4Msg);
             response = new whad::generic::Success();   
         }
         break;
 
         case whad::dot15d4::DeleteLinkMsg:
-        {
-            //TODO
+        { 
+            this->dot15d4Controller->superframes.deleteLink(dot15d4Msg);
+            response = new whad::generic::Success();
         }
         break;
 
         case whad::dot15d4::WriteModifySuperframeMsg:
         {
-            this->dot15d4Controller->superframes.writeModifySuperframe(&dot15d4Msg);	        
+            this->dot15d4Controller->superframes.writeModifySuperframe(dot15d4Msg);	        
             response = new whad::generic::Success();
         }
         break;
 
         case whad::dot15d4::DeleteSuperframe:
         {
-            //TODO
+            this->dot15d4Controller->superframes.deleteSuperframe(dot15d4Msg);	   
+            response = new whad::generic::Success();
         }
         break;
 
