@@ -74,6 +74,7 @@ class Dot15d4Controller : public Controller {
 		void enableHopping();
         void disableHopping();
 		bool startHoppingTimer();
+		bool searchActiveChannel();
 
 		Dot15d4Packet* wazabeeDecoder(uint8_t *buffer, uint8_t size, uint32_t timestamp, CrcValue crcValue, uint8_t rssi);
 

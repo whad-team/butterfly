@@ -32,11 +32,13 @@ void Dot15d4Controller::enableHopping()
 	this->hopping = true;
 	this->activate_hopping_timer = true;
 
-	if (this->channelMap.getChannelMap() == 0)
-	{
-		this->channelMap = whad::dot15d4::ChannelMap((uint16_t)(0x1 << (this->channel - 11)));
-	}
-		
+	this->channelMap.setChannelMap((uint16_t)(0xffff - (0x1<<15)));
+	Timer *t_initial_hop = TimerModule::instance->getTimer();
+	t_initial_hop->setMode(REPEATED);
+	t_initial_hop->update(1000000);
+	t_initial_hop->setCallback((ControllerCallback)&Dot15d4Controller::searchActiveChannel, this);
+	t_initial_hop->start();
+	
 	timer = TimerModule::instance->getTimer();
 	this->asn = whad::dot15d4::ASN();
 
@@ -50,6 +52,12 @@ void Dot15d4Controller::disableHopping()
 }
 
 LedModule led = LedModule();
+
+bool Dot15d4Controller::searchActiveChannel(){
+	setChannel((getChannel()-11 + 1)%15 + 11);
+	led.toggle(LED1);
+	return activate_hopping_timer;
+}
 
 bool Dot15d4Controller::frequencyHop()
 {
@@ -493,8 +501,13 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
 					}
 				}
 			}
-		}
-				
+		}else{
+			if(this->activate_hopping_timer == false){ //we have already activated the timer
+				//update timer duration
+				timer->update(duration, timestamp - pkt->getPacketSize() / 250 - 10);
+			}
+
+		}				
 	}
 
 	if (pkt != NULL) {
