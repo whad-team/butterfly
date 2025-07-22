@@ -52,6 +52,14 @@ size_t Packet::getPacketSize() {
 uint64_t Packet::getTimestamp() {
 	return this->timestamp;
 }
+void Packet::updateTimestamp(uint64_t timestamp) {
+	this->timestamp = timestamp;
+	this->payload[1] = (uint8_t)(timestamp & 0x000000FF);
+	this->payload[2] = (uint8_t)((timestamp & 0x0000FF00) >> 8);
+	this->payload[3] = (uint8_t)((timestamp & 0x00FF0000) >> 16);
+	this->payload[4] = (uint8_t)((timestamp & 0xFF000000) >> 24);
+}
+
 
 uint8_t Packet::getSource() {
 	return this->source;
@@ -632,6 +640,10 @@ uint8_t ANTPacket::getDeviceType() {
 
 uint8_t ANTPacket::getTransmissionType() {
 	return this->packetPointer[5];
+}
+
+bool ANTPacket::isSlot() {
+	return (this->packetPointer[6] & 0x08) == 0x08;
 }
 bool ANTPacket::isBroadcast() {
 	return (this->packetPointer[6] & 0x80) == 0;

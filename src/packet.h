@@ -44,6 +44,7 @@ class Packet {
 		uint8_t getChannel();
 		int8_t getRssi();
 		uint64_t getTimestamp();
+		void updateTimestamp(uint64_t timestamp);
 		bool isCrcValid();
 };
 
@@ -168,6 +169,7 @@ class ANTPacket : public Packet {
 		bool isBroadcast();
 		bool isAck();
 		bool isEnd();
+		bool isSlot();
 		uint8_t getCount();
 
 };

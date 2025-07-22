@@ -62,8 +62,10 @@ typedef struct ANTChannel {
 
     uint32_t channelPeriod;
     Timer *masterTimer;
-    uint32_t nextSync;
+    bool synced;
+    uint32_t lastSync;
 
+    uint32_t packetCountSinceSync;
     TXPacket latestBroadcast;
     TXPacket latestAck;
 
@@ -96,6 +98,7 @@ class ANTController : public Controller {
 		void stop();
 
         void releaseTimers();
+        void releaseTimer(uint32_t channelIndex);
 
         bool channelManagementCallback(uint8_t channelIndex);
 
@@ -105,9 +108,11 @@ class ANTController : public Controller {
         bool channel3Callback();
 
         bool startChannelTimer(uint8_t channelIndex);
+        bool startChannelTimer(uint8_t channelIndex, uint32_t timestamp);
 
 		bool burstTimerCallback();
 		void startBurstTimer();
+        void startSlotBurstTimer();
 		void releaseBurstTimer();
 
         bool addPacketToTransmitQueue(uint8_t channelIndex, uint8_t *packet);
@@ -131,8 +136,8 @@ class ANTController : public Controller {
         ANTChannelType getChannelType(uint8_t channelIndex);
         bool setChannelType(uint8_t channelIndex, ANTChannelType type);
         bool assignNetwork(uint8_t channelIndex, uint8_t networkIndex);
-        bool setNextSync(uint8_t channelIndex, uint32_t nextSync);
-        uint32_t getNextSync(uint8_t channelIndex);
+        bool setLastSync(uint8_t channelIndex, uint32_t lastSync);
+        uint32_t getLastSync(uint8_t channelIndex);
         bool setChannelPeriod(uint8_t channelIndex, uint32_t channelPeriod);
         uint32_t getChannelPeriod(uint8_t channelIndex);
 

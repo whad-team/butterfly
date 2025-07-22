@@ -12,6 +12,8 @@ ANTController::ANTController(Radio *radio) : Controller(radio) {
         this->channels[i].transmissionType = 0;
         this->channels[i].networkIndex = UNASSIGNED;
         this->channels[i].masterTimer = NULL;
+        this->channels[i].packetCountSinceSync = 0;
+        
         this->channels[i].incomingBurst = false;
         this->channels[i].outgoingBurst = false;
 
@@ -59,8 +61,16 @@ void ANTController::startBurstTimer() {
 	this->burstTimer->setCallback((ControllerCallback)&ANTController::burstTimerCallback, this);
     this->burstTimer->update(1500);
     this->burstTimer->start();
+}
 
-
+void ANTController::startSlotBurstTimer() {
+    if (this->burstTimer == NULL) {
+        this->burstTimer = TimerModule::instance->getTimer();
+    }
+    this->burstTimer->setMode(SINGLE_SHOT);
+	this->burstTimer->setCallback((ControllerCallback)&ANTController::burstTimerCallback, this);
+    this->burstTimer->update(1900);
+    this->burstTimer->start();
 }
 
 void ANTController::releaseBurstTimer() {
@@ -154,6 +164,22 @@ bool ANTController::channelManagementCallback(uint8_t channelIndex) {
 
 
     if (this->channels[channelIndex].mode == SNIFFER) {} // do nothing
+    else if (this->channels[channelIndex].mode == SLAVE) {
+        this->setLastSync(activeChannel, now);
+        if (!this->channels[channelIndex].synced) {
+            bsp_board_led_invert(0);
+            this->sendChannelEvent(activeChannel, whad::ant::RxFail);
+        }
+        else {
+            if (this->channels[channelIndex].outgoingBurst && this->channels[channelIndex].burstQueue.empty()) {
+                this->sendChannelEvent(activeChannel, whad::ant::TransferTxFailed);
+            }
+            if (this->channels[channelIndex].packetCountSinceSync == 0) {
+                this->channels[channelIndex].synced = false;
+            }
+            this->channels[channelIndex].packetCountSinceSync = 0;
+        }
+    }
     else if (this->channels[channelIndex].mode == MASTER) {
         // then, transmit our main packet
 		if (this->isBurstReady(channelIndex)) {
@@ -210,6 +236,17 @@ bool ANTController::channel3Callback() {
 void ANTController::start() {
     for (int i=0; i < MAX_CHANNELS; i++) {
         if (this->channels[i].enabled) {
+            this->channels[i].synced = false;
+            uint8_t defaultPacket[17] = {
+                0xa6, 0xc5,
+                (uint8_t)(this->getDeviceNumber(i) & 0xFF), (uint8_t)(this->getDeviceNumber(i) >> 8), 
+                (uint8_t)(this->getDeviceType(i) & 0xFF), 
+                (uint8_t)(this->getTransmissionType(i) & 0xFF),
+                0xd2, 0x00, 0x00, 0x0e, 0x64, 0x27, 0xf3, 0x76, 0x51, 0x00, 0x00
+            };
+            memcpy(this->channels[i].latestBroadcast.packet, defaultPacket, 17);
+            memcpy(this->channels[i].latestAck.packet, defaultPacket, 17);
+            
             this->startChannelTimer(i);
             this->setActiveChannel(i);
         }
@@ -249,6 +286,41 @@ bool ANTController::startChannelTimer(uint8_t channelIndex) {
     return true;
 }
 
+bool ANTController::startChannelTimer(uint8_t channelIndex, uint32_t timestamp) {
+    if (channelIndex >= MAX_CHANNELS) {
+        return false;
+    }
+
+    if (this->channels[channelIndex].masterTimer == NULL) {
+        this->channels[channelIndex].masterTimer = TimerModule::instance->getTimer();
+    }
+    this->channels[channelIndex].masterTimer->setMode(REPEATED);
+    if (channelIndex == 0) {
+        this->channels[channelIndex].masterTimer->setCallback((ControllerCallback)&ANTController::channel0Callback, this);
+    }
+    else if (channelIndex == 1) {
+        this->channels[channelIndex].masterTimer->setCallback((ControllerCallback)&ANTController::channel1Callback, this);
+    }
+    else if (channelIndex == 2) {
+        this->channels[channelIndex].masterTimer->setCallback((ControllerCallback)&ANTController::channel2Callback, this);
+    }
+    else if (channelIndex == 3) {
+        this->channels[channelIndex].masterTimer->setCallback((ControllerCallback)&ANTController::channel3Callback, this);
+    }
+    this->channels[channelIndex].masterTimer->update((int)((this->channels[channelIndex].channelPeriod * 1000000.0)/32768.0), timestamp);
+    this->channels[channelIndex].masterTimer->start();
+    return true;
+}
+
+
+void ANTController::releaseTimer(uint32_t channelIndex) {
+    if (this->channels[channelIndex].masterTimer != NULL) {
+        this->channels[channelIndex].masterTimer->stop();
+        this->channels[channelIndex].masterTimer->release();
+        this->channels[channelIndex].masterTimer = NULL;
+
+    }
+}
 
 void ANTController::releaseTimers() {
     for (int i=0 ; i < MAX_CHANNELS; i++) {
@@ -270,24 +342,24 @@ void ANTController::setActiveRFChannel(int rfChannel) {
   this->radio->fastFrequencyChange(rfChannel, rfChannel);
 }
 
-bool ANTController::setNextSync(uint8_t channelIndex, uint32_t nextSync) {
+bool ANTController::setLastSync(uint8_t channelIndex, uint32_t lastSync) {
     if (channelIndex >= MAX_CHANNELS) {
         return false;
     }
 
-    this->channels[channelIndex].nextSync = nextSync;
+    this->channels[channelIndex].lastSync = lastSync;
     return true;
 }
 
 
 
 
-uint32_t ANTController::getNextSync(uint8_t channelIndex) {
+uint32_t ANTController::getLastSync(uint8_t channelIndex) {
     if (channelIndex >= MAX_CHANNELS) {
         return 0;
     }
     
-    return this->channels[channelIndex].nextSync;
+    return this->channels[channelIndex].lastSync;
 }
 
 bool ANTController::setChannelPeriod(uint8_t channelIndex, uint32_t channelPeriod) {
@@ -559,10 +631,9 @@ void ANTController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer,
         this->getActivePreamble()
     );
     if (crcValue.validity == VALID_CRC && this->checkFilter(pkt)) {
-
+        
         if (this->channels[this->activeChannel].mode == MASTER) {
 			if (!pkt->isBroadcast()) {
-				
 				if (!this->channels[this->activeChannel].outgoingBurst) {
 					memcpy(this->channels[this->activeChannel].latestAck.packet, this->channels[this->activeChannel].latestBroadcast.packet, 16);
 					this->channels[this->activeChannel].latestAck.packet[6] = (
@@ -593,6 +664,69 @@ void ANTController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer,
 					}
 				}
 			}
+        }
+        else if (this->channels[this->activeChannel].mode == SLAVE) {
+            if (!this->channels[this->activeChannel].synced) {
+                this->releaseTimer(this->activeChannel);
+                int period = (int)((this->channels[this->activeChannel].channelPeriod * 1000000.0)/32768.0);
+                nrf_delay_us(period - 1500);
+                this->startChannelTimer(this->activeChannel);
+                this->channels[this->activeChannel].synced = true;
+            }
+            else {
+                this->channels[this->activeChannel].packetCountSinceSync++;
+                if (!pkt->isBroadcast() && !pkt->isAck()) {
+                    memcpy(this->channels[this->activeChannel].latestAck.packet, this->channels[this->activeChannel].latestBroadcast.packet, 16);
+					this->channels[this->activeChannel].latestAck.packet[6] = (
+						(1 << 7) | // type ack/burst
+						(1 << 6) | // ack=True
+						(pkt->isEnd() << 5) | // end=True
+						((1 - pkt->getCount()) << 4) | // count=1
+						(0 << 3) | // slot=False
+						2
+					);
+                    if (!pkt->isAck()) {
+                        this->channels[this->activeChannel].outgoingBurst = false;
+                        this->channels[this->activeChannel].incomingBurst = true;
+                        if (pkt->isSlot()) {
+					        this->startSlotBurstTimer();
+                        }
+                        else {
+                            this->startBurstTimer();
+                        }
+                    }
+                }
+                else {
+                    if (this->isBurstReady(this->activeChannel)) {
+                        this->channels[this->activeChannel].outgoingBurst = true;
+                        this->channels[this->activeChannel].incomingBurst = false;
+                        if (pkt->isSlot()) {
+					        this->startSlotBurstTimer();
+                            this->sendChannelEvent(activeChannel, whad::ant::TransferTxStart);
+                        }
+                        else {
+                            this->startBurstTimer();
+                        }
+                    }
+                    else if (this->availablePacketsToTransmit(this->activeChannel)) {
+                        TXPacket packet = this->getPacketFromTransmitQueue(this->activeChannel);
+                        memcpy(this->channels[this->activeChannel].latestAck.packet, packet.packet, 16);
+                        this->channels[this->activeChannel].outgoingBurst = false;
+                        this->channels[this->activeChannel].incomingBurst = true;
+                        if (pkt->isSlot()) {
+					        this->startSlotBurstTimer();
+                        }
+                        else {
+                            this->startBurstTimer();
+                        }
+                    }
+                    else if (this->channels[this->activeChannel].outgoingBurst && pkt->isEnd()) {
+                        this->sendChannelEvent(activeChannel, whad::ant::TransferTxCompleted);
+                        this->channels[this->activeChannel].outgoingBurst = false;
+                    }
+                }
+            }
+            pkt->updateTimestamp(pkt->getTimestamp() - this->channels[this->activeChannel].lastSync);
         }
         this->addPacket(pkt);
     }

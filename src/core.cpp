@@ -543,12 +543,7 @@ void Core::processANTInputMessage(whad::ant::AntMsg antMsg) {
                 if (!this->antController->setTransmissionType(0, transmission_type)) {
                     response = new whad::generic::Error();
                     break;
-                }
-                if (!this->antController->setNextSync(0, AS_SOON_AS_POSSIBLE)) {
-                    response = new whad::generic::Error();
-                    break;
-                }
-                
+                }                
                 if (!this->antController->setNetworkKey(0, network_key)) {
                     response = new whad::generic::Error();
                     break;
