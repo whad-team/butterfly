@@ -585,7 +585,7 @@ uint64_t Dot15d4Packet::extractASN(){
 	}
 }
 
-bool Dot15d4Packet::isWiHARTAdvertisement(){
+uint8_t Dot15d4Packet::extractWiHARTPacketType(){
 	int DLspecifier = 10;
 	if(extractSourceAddressMode() == ADDR_EXTENDED){
 		DLspecifier +=6; 
@@ -593,7 +593,27 @@ bool Dot15d4Packet::isWiHARTAdvertisement(){
 	if(extractDestinationAddressMode() == ADDR_EXTENDED){
 		DLspecifier +=6; 
 	}
-	return (this->packetPointer[DLspecifier] & 0x07 )==0x01;
+	return this->packetPointer[DLspecifier];
+}
+
+bool Dot15d4Packet::isWiHARTAcknowledgement(){
+	return (extractWiHARTPacketType() & 0x07 )==0x00;
+}
+
+bool Dot15d4Packet::isWiHARTAdvertisement(){
+	return (extractWiHARTPacketType() & 0x07 )==0x01;
+}
+
+bool Dot15d4Packet::isWiHARTKeepAlive(){
+	return (extractWiHARTPacketType() & 0x07 )==0x02;
+}
+
+bool Dot15d4Packet::isWiHARTDisconnect(){
+	return (extractWiHARTPacketType() & 0x07 )==0x03;
+}
+
+bool Dot15d4Packet::isWiHARTData(){
+	return (extractWiHARTPacketType() & 0x07 )==0x07;
 }
 
 uint16_t Dot15d4Packet::extractChannelMap(){

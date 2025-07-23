@@ -483,7 +483,7 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
 			}else{
 				this->channelMap.setChannelMap(pkt->extractChannelMap());
 				if(this->asn.getASN()!= 0 and pkt->extractASN()==this->asn.getASN()){
-					timer->update(duration, timestamp - pkt->getPacketSize() / 250 - 5);
+					timer->update(duration, timestamp - pkt->getPacketSize() * 8 * 1000 / 250 - 5);
 				}else{
 					if(this->asn.getASN()== 0){						
 						this->asn.setASN(pkt->extractASN());
@@ -491,20 +491,22 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
 							duration = (timestamp - second_asn_ts) / (pkt->extractASN()- second_asn);
 							this->activate_hopping_timer = false;
 							timer->setMode(SINGLE_SHOT);
-							timer->update(duration - pkt->getPacketSize() / 250 - 5);
+							timer->update(duration - pkt->getPacketSize() * 8 * 1000 / 250 - 5);
 							timer->setCallback((ControllerCallback)&Dot15d4Controller::startHoppingTimer, this);
 							timer->start();
 						}
 					}else{
-						timer->update(duration, timestamp - pkt->getPacketSize() / 250 - 5);
+						timer->update(duration, timestamp - pkt->getPacketSize() * 8 * 1000 / 250 - 5);
 						this->asn.setASN(pkt->extractASN());
 					}
 				}
 			}
 		}else{
 			if(this->activate_hopping_timer == false){ //we have already activated the timer
-				//update timer duration
-				timer->update(duration, timestamp - pkt->getPacketSize() / 250 - 10);
+				//update timer duration if the pkt is not an ack
+				if(pkt->isWiHARTAcknowledgement()==false){
+					timer->update(duration, timestamp - pkt->getPacketSize() * 8 * 1000 / 250 - 5);
+				}
 			}
 
 		}				

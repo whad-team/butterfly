@@ -139,7 +139,13 @@ class Dot15d4Packet : public Packet {
 		uint64_t extractExtendedDestinationAddress();
 		uint64_t extractASN();
 		uint16_t extractChannelMap();
+		uint8_t extractWiHARTPacketType();
+
+		bool isWiHARTAcknowledgement();
 		bool isWiHARTAdvertisement();
+		bool isWiHARTKeepAlive();
+		bool isWiHARTDisconnect();
+		bool isWiHARTData();
 		uint32_t getFCS();
 
 };
