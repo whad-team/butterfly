@@ -62,7 +62,14 @@ bool Dot15d4Controller::searchActiveChannel(){
 bool Dot15d4Controller::frequencyHop()
 {
 	this->asn.incrementASN();
-	int channelOffset = getChannelOffset();
+	channelOffset = getChannelOffset();
+	if (channelOffset==CHANNEL_OFFSET_NOT_DEFINED){
+		//no known links found => discover other links
+		known_link = false;
+		channelOffset = (this->asn.getASN() / this->superframes.getMaximumSuperframeSize()) % this->channelMap.getNumberOfActiveChannels();
+	}else{
+		known_link = true;
+	}
 	int activeChan = 11 + this->channelMap.getActiveChannel((channelOffset + this->asn.getASN()) % this->channelMap.getNumberOfActiveChannels());
 	if(this->getChannel()!=activeChan){
 		setChannel(activeChan);		
@@ -70,12 +77,16 @@ bool Dot15d4Controller::frequencyHop()
 	return true;
 }
 
+
+/**
+ * Returns the channel offset if a link corresponds to the present ASN else returns CHANNEL_OFFSET_NOT_DEFINED
+ */
 int Dot15d4Controller::getChannelOffset()
 {
 	whad_dot15d4_superframes_t *superframes = this->superframes.getSuperframes();
 	if (superframes == nullptr)
 	{
-		return 0;
+		return CHANNEL_OFFSET_NOT_DEFINED;
 	}
 	
 	int max_sf_iters = 1000;
@@ -100,7 +111,7 @@ int Dot15d4Controller::getChannelOffset()
 
 		superframes = superframes->next;
 	}
-	return 0;
+	return CHANNEL_OFFSET_NOT_DEFINED;
 }
 
 int duration = 10000;
@@ -116,6 +127,17 @@ bool Dot15d4Controller::startHoppingTimer(){
 
 void Dot15d4Controller::onMatch(uint8_t *buffer, size_t size) {
 
+}
+
+void Dot15d4Controller::sendDiscoveryMessage(uint16_t src, uint16_t dst, uint16_t slot, uint16_t offset){
+ 	/* Create a discovery message. */
+    whad::NanoPbMsg *message = new whad::dot15d4::Discovery(src, dst, slot, offset);
+
+	/* Add notification to our message queue. */
+    Core::instance->pushMessageToQueue(message);
+
+    /* Free the notification wrapper. */
+    delete message;
 }
 
 Dot15d4Controller::Dot15d4Controller(Radio *radio) : Controller(radio) {
@@ -510,6 +532,12 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
 			}
 
 		}				
+	}
+
+	if(!known_link){
+		if(pkt->extractDestinationAddressMode()==ADDR_SHORT && pkt->extractSourceAddressMode()==ADDR_SHORT){
+			sendDiscoveryMessage(pkt->extractShortSourceAddress(), pkt->extractShortDestinationAddress(), this->asn.getASN()%this->superframes.getMaximumSuperframeSize(), this->channelOffset);
+		}
 	}
 
 	if (pkt != NULL) {

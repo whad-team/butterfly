@@ -545,6 +545,23 @@ uint16_t Dot15d4Packet::extractShortDestinationAddress() {
 	return (this->packetPointer[6] | (this->packetPointer[7] << 8));
 }
 
+uint16_t Dot15d4Packet::extractShortSourceAddress() {
+	switch (extractDestinationAddressMode())
+	{
+	case ADDR_SHORT:
+		return (this->packetPointer[8] | (this->packetPointer[9] << 8));
+		break;
+		
+	case ADDR_EXTENDED:
+		return (this->packetPointer[14] | (this->packetPointer[15] << 8));
+		break;
+
+	default:
+		return ADDR_NONE;
+		break;
+	}
+}
+
 uint64_t Dot15d4Packet::extractExtendedDestinationAddress() {
 	return (
 					(uint64_t)(this->packetPointer[6]) |
@@ -556,6 +573,34 @@ uint64_t Dot15d4Packet::extractExtendedDestinationAddress() {
 					((uint64_t)(this->packetPointer[12]) << 48) |
 					((uint64_t)(this->packetPointer[13]) << 56)
 	);
+}
+
+uint64_t Dot15d4Packet::extractExtendedSourceAddress() {
+	switch (extractDestinationAddressMode())
+	{
+	case ADDR_SHORT:
+		return ((uint64_t)(this->packetPointer[8]) |
+					((uint64_t)(this->packetPointer[9]) << 8) |
+					((uint64_t)(this->packetPointer[10]) << 16) |
+					((uint64_t)(this->packetPointer[11]) << 24) |
+					((uint64_t)(this->packetPointer[12]) << 32) |
+					((uint64_t)(this->packetPointer[13]) << 40) |
+					((uint64_t)(this->packetPointer[14]) << 48) |
+					((uint64_t)(this->packetPointer[15]) << 56));
+		
+	case ADDR_EXTENDED:
+		return ((uint64_t)(this->packetPointer[14]) |
+					((uint64_t)(this->packetPointer[15]) << 8) |
+					((uint64_t)(this->packetPointer[16]) << 16) |
+					((uint64_t)(this->packetPointer[17]) << 24) |
+					((uint64_t)(this->packetPointer[18]) << 32) |
+					((uint64_t)(this->packetPointer[19]) << 40) |
+					((uint64_t)(this->packetPointer[20]) << 48) |
+					((uint64_t)(this->packetPointer[21]) << 56));
+
+	default:
+		return ADDR_NONE;
+	}
 }
 
 uint8_t Dot15d4Packet::extractSequenceNumber() {

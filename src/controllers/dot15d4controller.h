@@ -4,6 +4,8 @@
 #include "../controller.h"
 #include "bsp.h"
 
+#define CHANNEL_OFFSET_NOT_DEFINED 0xFFFF
+
 // Attack specific definitions
 typedef enum Dot15d4Attack {
 	DOT15D4_ATTACK_NONE,
@@ -31,6 +33,7 @@ typedef enum Dot15d4ControllerState {
 class Dot15d4Controller : public Controller {
   protected:
 		int channel;
+		int channelOffset;
     Dot15d4AttackStatus attackStatus;
 		Dot15d4ControllerState controllerState;
 		bool started;
@@ -39,6 +42,7 @@ class Dot15d4Controller : public Controller {
 		uint64_t extendedAddress;
 		bool hopping = false;
 		bool activate_hopping_timer = false;
+		bool known_link = true;
 	public:
 		static int channelToFrequency(int channel);
 		Dot15d4Controller(Radio* radio);
@@ -63,6 +67,7 @@ class Dot15d4Controller : public Controller {
 
 		void startAttack(Dot15d4Attack attack);
 		void sendJammingReport(uint32_t timestamp);
+		void sendDiscoveryMessage(uint16_t src, uint16_t dst, uint16_t slot, uint16_t offset);
 
 		whad::dot15d4::ChannelMap channelMap = whad::dot15d4::ChannelMap((uint16_t) (0x1 << (channel - 11)));
 		whad::dot15d4::ASN asn;

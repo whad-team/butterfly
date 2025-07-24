@@ -136,7 +136,9 @@ class Dot15d4Packet : public Packet {
 		Dot15d4AddressMode extractDestinationAddressMode();
 		Dot15d4AddressMode extractSourceAddressMode();
 		uint16_t extractShortDestinationAddress();
+		uint16_t extractShortSourceAddress();
 		uint64_t extractExtendedDestinationAddress();
+		uint64_t extractExtendedSourceAddress();
 		uint64_t extractASN();
 		uint16_t extractChannelMap();
 		uint8_t extractWiHARTPacketType();
