@@ -67,7 +67,7 @@ class Dot15d4Controller : public Controller {
 
 		void startAttack(Dot15d4Attack attack);
 		void sendJammingReport(uint32_t timestamp);
-		void sendDiscoveryMessage(uint16_t src, uint16_t dst, uint16_t slot, uint16_t offset);
+		void sendDiscoveredCommunicationMessage(uint16_t src, uint16_t dst, uint16_t slot, uint16_t offset);
 
 		whad::dot15d4::ChannelMap channelMap = whad::dot15d4::ChannelMap((uint16_t) (0x1 << (channel - 11)));
 		whad::dot15d4::ASN asn;
