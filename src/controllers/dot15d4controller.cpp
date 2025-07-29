@@ -531,14 +531,14 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
 				}
 			}
 
-		}				
-	}
+		}	
 
-	if(!known_link){
-		if(pkt->extractDestinationAddressMode()==ADDR_SHORT && pkt->extractSourceAddressMode()==ADDR_SHORT){
-			led.toggle(LED2);
-			sendDiscoveredCommunicationMessage(pkt->extractShortSourceAddress(), pkt->extractShortDestinationAddress(), this->asn.getASN()%this->superframes.getMaximumSuperframeSize(), this->channelOffset);
-		}
+		if(!known_link && !pkt->isWiHARTAcknowledgement()){
+			if(pkt->extractDestinationAddressMode()==ADDR_SHORT && pkt->extractSourceAddressMode()==ADDR_SHORT){
+				led.toggle(LED2);
+				sendDiscoveredCommunicationMessage(pkt->extractShortSourceAddress(), pkt->extractShortDestinationAddress(), this->asn.getASN()%this->superframes.getMaximumSuperframeSize(), this->channelOffset);
+			}
+		}			
 	}
 
 	if (pkt != NULL) {
