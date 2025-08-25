@@ -74,6 +74,8 @@ bool Dot15d4Controller::frequencyHop()
 	if(this->getChannel()!=activeChan){
 		setChannel(activeChan);		
 	}
+	//Execute scheduled function if existing
+	this->runScheduledSlot(this->asn.getASN());
 	return true;
 }
 
@@ -140,6 +142,38 @@ void Dot15d4Controller::sendDiscoveredCommunicationMessage(uint16_t src, uint16_
     delete message;
 }
 
+
+int Dot15d4Controller::getTaskCount(){
+	return task_count;
+}
+
+/* Adds a task (function) to execute at the corresponding slot with the corresponding parameters*/
+void Dot15d4Controller::addScheduledTask(uint64_t slot, TaskFunc func, void* param) {
+    if (task_count >= MAX_TASKS) return;
+    // Insert task
+    task_list[task_count] = {slot, func, param};
+    task_count++;
+}
+
+/*Runs the tasks corresponding to the actual asn*/
+void Dot15d4Controller::runScheduledSlot(uint64_t current_slot) {
+	for(int i = task_count - 1; i >=0; i--){
+		led.toggle(LED2);
+		sendDebug(("t:"+std::to_string(task_list[i].slot)+"c:"+std::to_string(current_slot)).c_str());
+		if (task_list[i].slot == current_slot){
+			//Execute the scheduled function
+			task_list[i].function(task_list[i].param);
+			//Shifting other functions
+			for(int j = i+1; j < task_count; j++){
+				task_list[j - 1] = task_list[j];
+			}
+			//Decrement counter
+			task_count--;
+		}
+	}
+}
+
+
 Dot15d4Controller::Dot15d4Controller(Radio *radio) : Controller(radio) {
 	this->channel = 11;
 	this->autoAcknowledgement = false;
@@ -168,6 +202,34 @@ void Dot15d4Controller::setChannel(int channel) {
     this->channel = channel;
     this->radio->fastFrequencyChange(Dot15d4Controller::channelToFrequency(channel),channel);
 }
+
+const uint16_t TsTxOffset = 2020; // lower bound fot the sending offset
+const uint16_t TsRxWait = 2200;
+const uint16_t TsRxOffset = 1220; // upper bound for the receivng offset 
+
+/* Sends a packet after a delay corresponding to the documented wirelessHART TsTxOffset*/
+void Dot15d4Controller::sendSlot(void* param){
+			SendTaskArgs* args = static_cast<SendTaskArgs*>(param);
+			Dot15d4Controller* controller = args->controller;
+			whad::dot15d4::SendInSlot* instance = args->instance;
+
+			size_t size = instance->getPdu().getSize();
+			uint8_t *packet = (uint8_t*)malloc(size);
+			packet[0] = size;
+			memcpy(packet+1, instance->getPdu().getBytes(), size);
+
+			nrf_delay_us(TsTxOffset);
+
+			
+			controller->send(packet, size, false);
+			
+			free(packet);
+			
+			controller->sendDebug(("Sending scheduled message on slot:"+std::to_string(controller->asn.getASN())).c_str());
+			
+			delete instance;
+		    delete args;
+		}
 
 void Dot15d4Controller::send(uint8_t *data, size_t size, bool raw) {
 			if (this->attackStatus.attack == DOT15D4_ATTACK_CORRECTION) {
@@ -505,7 +567,7 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
 			}else{
 				this->channelMap.setChannelMap(pkt->extractChannelMap());
 				if(this->asn.getASN()!= 0 and pkt->extractASN()==this->asn.getASN()){
-					timer->update(duration, timestamp - pkt->getPacketSize() * 8 * 1000 / 250 - 5);
+					timer->update(duration, timestamp - pkt->getPacketSize() * 8 * 1000 / 250 - TsRxOffset);
 				}else{
 					if(this->asn.getASN()== 0){						
 						this->asn.setASN(pkt->extractASN());
@@ -513,12 +575,12 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
 							duration = (timestamp - second_asn_ts) / (pkt->extractASN()- second_asn);
 							this->activate_hopping_timer = false;
 							timer->setMode(SINGLE_SHOT);
-							timer->update(duration - pkt->getPacketSize() * 8 * 1000 / 250 - 5);
+							timer->update(duration - pkt->getPacketSize() * 8 * 1000 / 250 - TsRxOffset);
 							timer->setCallback((ControllerCallback)&Dot15d4Controller::startHoppingTimer, this);
 							timer->start();
 						}
 					}else{
-						timer->update(duration, timestamp - pkt->getPacketSize() * 8 * 1000 / 250 - 5);
+						timer->update(duration, timestamp - pkt->getPacketSize() * 8 * 1000 / 250 - TsRxOffset);
 						this->asn.setASN(pkt->extractASN());
 					}
 				}
@@ -527,7 +589,7 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
 			if(this->activate_hopping_timer == false){ //we have already activated the timer
 				//update timer duration if the pkt is not an ack
 				if(pkt->isWiHARTAcknowledgement()==false){
-					timer->update(duration, timestamp - pkt->getPacketSize() * 8 * 1000 / 250 - 5);
+					timer->update(duration, timestamp - pkt->getPacketSize() * 8 * 1000 / 250 - TsRxOffset);
 				}
 			}
 
@@ -535,7 +597,6 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
 
 		if(!known_link && !pkt->isWiHARTAcknowledgement()){
 			if(pkt->extractDestinationAddressMode()==ADDR_SHORT && pkt->extractSourceAddressMode()==ADDR_SHORT){
-				led.toggle(LED2);
 				sendDiscoveredCommunicationMessage(pkt->extractShortSourceAddress(), pkt->extractShortDestinationAddress(), this->asn.getASN()%this->superframes.getMaximumSuperframeSize(), this->channelOffset);
 			}
 		}			

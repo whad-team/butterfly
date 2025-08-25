@@ -377,6 +377,30 @@ void Core::processDot15d4InputMessage(whad::dot15d4::Dot15d4Msg dot15d4Msg) {
         }
         break;
 
+
+        case whad::dot15d4::SendInSlotMsg:
+        {
+            //Initialize the sendInSlot instance and parameters
+            whad::dot15d4::SendInSlot* instance = new whad::dot15d4::SendInSlot(dot15d4Msg);
+            uint64_t slot = instance->getSlot() & 0xFFFFFFFFF; // 40 bits mask
+
+            SendTaskArgs* args = new SendTaskArgs{this->dot15d4Controller, instance };
+            
+            //Schedule the send
+            this->dot15d4Controller->addScheduledTask(slot, Dot15d4Controller::sendSlot, args);
+
+            //returns Success if the buffer of tasks is not full
+            if (this->dot15d4Controller->getTaskCount()<MAX_TASKS){
+                response = new whad::generic::Success();
+            }
+            else{
+                response = new whad::generic::Error();
+            }
+            
+        }
+        break;
+
+
         default:
             response = new whad::generic::Error();
             break;
