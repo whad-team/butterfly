@@ -401,6 +401,28 @@ void Core::processDot15d4InputMessage(whad::dot15d4::Dot15d4Msg dot15d4Msg) {
         break;
 
 
+        case whad::dot15d4::JamModeMsg :
+        {   
+            whad::dot15d4::JamMode query(dot15d4Msg);
+            int channel = query.getChannel();
+            
+            if (this->dot15d4Controller->getHopping()){
+                response = new whad::generic::Success();
+                this->dot15d4Controller->startAttack(DOT15D4_ATTACK_JAMMING);
+            }else{
+                if (channel <=26 and channel >=11){
+                    this->dot15d4Controller->setChannel(query.getChannel());
+                    response = new whad::generic::Success();
+                    this->dot15d4Controller->startAttack(DOT15D4_ATTACK_JAMMING);
+                }
+                else {
+                    response = new whad::generic::Error();
+                }
+            }
+        }
+        break;
+
+
         default:
             response = new whad::generic::Error();
             break;

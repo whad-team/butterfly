@@ -142,6 +142,7 @@ class Dot15d4Packet : public Packet {
 		uint64_t extractASN();
 		uint16_t extractChannelMap();
 		uint8_t extractWiHARTPacketType();
+		int16_t extractTimeAdjustment();
 
 		bool isWiHARTAcknowledgement();
 		bool isWiHARTAdvertisement();

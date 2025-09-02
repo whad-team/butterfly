@@ -20,6 +20,9 @@ static uint8_t SYMBOL_TO_CHIP_MAPPING[16][4] = {
 	{0x08,0x51,0x93,0x1f},
 	{0x78,0x85,0x19,0x31},
 };
+const uint16_t TsTxOffset = 2020; // lower bound fot the sending offset
+const uint16_t TsRxWait = 2200;
+const uint16_t TsRxOffset = 1220; // upper bound for the receivng offset 
 
 int Dot15d4Controller::channelToFrequency(int channel) {
 	return 5+5*(channel-11);
@@ -59,6 +62,11 @@ bool Dot15d4Controller::searchActiveChannel(){
 	return activate_hopping_timer;
 }
 
+uint8_t jamPacket[16] = {
+    0xFF,0xFF,0xFF,0xFF, 0xFF,0xFF,0xFF,0xFF,
+    0xFF,0xFF,0xFF,0xFF, 0xFF,0xFF,0xFF,0xFF
+};
+
 bool Dot15d4Controller::frequencyHop()
 {
 	this->asn.incrementASN();
@@ -73,6 +81,12 @@ bool Dot15d4Controller::frequencyHop()
 	int activeChan = 11 + this->channelMap.getActiveChannel((channelOffset + this->asn.getASN()) % this->channelMap.getNumberOfActiveChannels());
 	if(this->getChannel()!=activeChan){
 		setChannel(activeChan);		
+	}
+	if (this->controllerState == JAMMING){
+		//setJammerConfiguration();
+		nrf_delay_us(TsTxOffset);
+		this->send(jamPacket, sizeof(jamPacket), true);
+		this->send(jamPacket, sizeof(jamPacket), true);
 	}
 	//Execute scheduled function if existing
 	this->runScheduledSlot(this->asn.getASN());
@@ -116,7 +130,7 @@ int Dot15d4Controller::getChannelOffset()
 	return CHANNEL_OFFSET_NOT_DEFINED;
 }
 
-int duration = 10000;
+uint32_t duration = 10000;
 bool Dot15d4Controller::startHoppingTimer(){
 	frequencyHop();
 	timer->setMode(REPEATED);
@@ -203,9 +217,9 @@ void Dot15d4Controller::setChannel(int channel) {
     this->radio->fastFrequencyChange(Dot15d4Controller::channelToFrequency(channel),channel);
 }
 
-const uint16_t TsTxOffset = 2020; // lower bound fot the sending offset
-const uint16_t TsRxWait = 2200;
-const uint16_t TsRxOffset = 1220; // upper bound for the receivng offset 
+bool  Dot15d4Controller::getHopping(){
+	return this->hopping;
+}
 
 /* Sends a packet after a delay corresponding to the documented wirelessHART TsTxOffset*/
 void Dot15d4Controller::sendSlot(void* param){
@@ -218,7 +232,7 @@ void Dot15d4Controller::sendSlot(void* param){
 			packet[0] = size;
 			memcpy(packet+1, instance->getPdu().getBytes(), size);
 
-			nrf_delay_us(TsTxOffset);
+			nrf_delay_us(TsTxOffset + TsRxWait/4);
 
 			
 			controller->send(packet, size, false);
@@ -404,9 +418,10 @@ void Dot15d4Controller::startAttack(Dot15d4Attack attack) {
 		this->attackStatus.successful = false;
 	}
 	else if (attack == DOT15D4_ATTACK_JAMMING) {
-		this->setJammerConfiguration();
+		//this->setJammerConfiguration();
 		this->attackStatus.running = true;
 		this->attackStatus.successful = false;
+		this->controllerState = JAMMING;
 	}
 	else if (attack == DOT15D4_ATTACK_CORRECTION) {
 		this->setWazabeeConfiguration();
@@ -538,6 +553,8 @@ uint32_t first_asn_ts = 0;
 uint64_t second_asn = 0;
 uint32_t second_asn_ts = 0;
 
+uint32_t estimated_start_of_slot;
+
 void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
 	Dot15d4Packet* pkt = NULL;
 
@@ -558,6 +575,7 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
 			if (second_asn == 0){
 				//getting three first adv in order to get the avg of the duration of a slot ~=10ms
 				if(first_asn == 0){
+					NRF_TIMER4->CC[5] = pkt->extractASN() * 10000 - TsTxOffset;
 					first_asn = pkt->extractASN();
 					first_asn_ts = timestamp;
 				}else{
@@ -567,7 +585,7 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
 			}else{
 				this->channelMap.setChannelMap(pkt->extractChannelMap());
 				if(this->asn.getASN()!= 0 and pkt->extractASN()==this->asn.getASN()){
-					timer->update(duration, timestamp - pkt->getPacketSize() * 8 * 1000 / 250 - TsRxOffset);
+					timer->update(duration, timestamp - TsTxOffset);
 				}else{
 					if(this->asn.getASN()== 0){						
 						this->asn.setASN(pkt->extractASN());
@@ -575,21 +593,29 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
 							duration = (timestamp - second_asn_ts) / (pkt->extractASN()- second_asn);
 							this->activate_hopping_timer = false;
 							timer->setMode(SINGLE_SHOT);
-							timer->update(duration - pkt->getPacketSize() * 8 * 1000 / 250 - TsRxOffset);
+							timer->update(duration, timestamp - TsTxOffset);
 							timer->setCallback((ControllerCallback)&Dot15d4Controller::startHoppingTimer, this);
 							timer->start();
 						}
 					}else{
-						timer->update(duration, timestamp - pkt->getPacketSize() * 8 * 1000 / 250 - TsRxOffset);
+						timer->update(duration, timestamp - TsTxOffset);
 						this->asn.setASN(pkt->extractASN());
 					}
 				}
 			}
 		}else{
 			if(this->activate_hopping_timer == false){ //we have already activated the timer
-				//update timer duration if the pkt is not an ack
-				if(pkt->isWiHARTAcknowledgement()==false){
-					timer->update(duration, timestamp - pkt->getPacketSize() * 8 * 1000 / 250 - TsRxOffset);
+				//adjust the time stamp by pkt.time_adjustment if the pkt is an ack
+				if(pkt->isWiHARTAcknowledgement()){
+					if ((timestamp - estimated_start_of_slot) < duration){
+						//make sure that the ack received is for an already received pdu in the same slot
+						timer->update(duration, estimated_start_of_slot + pkt->extractTimeAdjustment());
+					}
+				}
+				else{
+					//update timer timestamp if the pkt is not an ack
+					estimated_start_of_slot = timestamp - TsTxOffset;
+					timer->update(duration, estimated_start_of_slot);
 				}
 			}
 

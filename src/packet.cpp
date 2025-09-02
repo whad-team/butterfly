@@ -645,6 +645,17 @@ bool Dot15d4Packet::isWiHARTAcknowledgement(){
 	return (extractWiHARTPacketType() & 0x07 )==0x00;
 }
 
+int16_t Dot15d4Packet::extractTimeAdjustment(){
+	if(this->isWiHARTAcknowledgement()){
+		return static_cast<int16_t>(
+				static_cast<uint16_t>(this->packetPointer[this->packetSize - 8]<<8) |
+				static_cast<uint16_t>(this->packetPointer[this->packetSize - 7])
+		);
+	}else{
+		return 0;
+	}
+}
+
 bool Dot15d4Packet::isWiHARTAdvertisement(){
 	return (extractWiHARTPacketType() & 0x07 )==0x01;
 }

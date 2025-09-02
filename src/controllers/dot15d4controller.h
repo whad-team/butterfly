@@ -37,6 +37,7 @@ typedef struct Dot15d4AttackStatus {
 
 typedef enum Dot15d4ControllerState {
 	RECEIVING,
+	JAMMING,
 	ENERGY_DETECTION_SCANNING
 } Dot15d4ControllerState;
 
@@ -70,6 +71,8 @@ class Dot15d4Controller : public Controller {
 
 		int getChannel();
 		void setChannel(int channel);
+
+		bool getHopping();
 
 		void enterReceptionMode();
 		void enterEDScanMode();
