@@ -145,9 +145,9 @@ void Dot15d4Controller::onMatch(uint8_t *buffer, size_t size) {
 
 }
 
-void Dot15d4Controller::sendDiscoveredCommunicationMessage(uint16_t src, uint16_t dst, uint16_t slot, uint16_t offset){
+void Dot15d4Controller::sendDiscoveredCommunicationMessage(Dot15d4Packet* pkt, uint16_t slot, uint16_t offset){
  	/* Create a discovery message. */
-    whad::NanoPbMsg *message = new whad::dot15d4::DiscoveredCommunication(src, dst, slot, offset);
+    whad::NanoPbMsg *message = new whad::dot15d4::DiscoveredCommunication(pkt->getPacketBuffer(), pkt->getPacketSize(), slot, offset);
 
 	/* Add notification to our message queue. */
     Core::instance->pushMessageToQueue(message);
@@ -623,7 +623,7 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
 
 		if(!known_link && !pkt->isWiHARTAcknowledgement()){
 			if(pkt->extractDestinationAddressMode()==ADDR_SHORT && pkt->extractSourceAddressMode()==ADDR_SHORT){
-				sendDiscoveredCommunicationMessage(pkt->extractShortSourceAddress(), pkt->extractShortDestinationAddress(), this->asn.getASN()%this->superframes.getMaximumSuperframeSize(), this->channelOffset);
+				sendDiscoveredCommunicationMessage(pkt, this->asn.getASN()%this->superframes.getMaximumSuperframeSize(), this->channelOffset);
 			}
 		}			
 	}

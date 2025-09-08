@@ -85,7 +85,7 @@ class Dot15d4Controller : public Controller {
 
 		void startAttack(Dot15d4Attack attack);
 		void sendJammingReport(uint32_t timestamp);
-		void sendDiscoveredCommunicationMessage(uint16_t src, uint16_t dst, uint16_t slot, uint16_t offset);
+		void sendDiscoveredCommunicationMessage(Dot15d4Packet* pkt, uint16_t slot, uint16_t offset);
 		static void sendSlot(void* param);
 
 		void addScheduledTask(uint64_t slot, TaskFunc func, void* params);
