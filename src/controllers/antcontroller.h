@@ -65,6 +65,8 @@ typedef struct ANTChannel {
     bool synced;
     uint32_t lastSync;
 
+    bool waitingAck;
+    
     uint32_t packetCountSinceSync;
     TXPacket latestBroadcast;
     TXPacket latestAck;
