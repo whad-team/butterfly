@@ -1347,7 +1347,12 @@ extern "C" void RADIO_IRQHandler(void) {
 						}
 						Phy p = Radio::instance->getPhy();
 
+						if (p == DOT15D4_NATIVE) {
+							Radio::instance->currentTimestamp = now - ((bufferSize + 5) * 8 * 4) - 100;
+						}
+						else {
 						Radio::instance->currentTimestamp = now - (Radio::instance->getPreamble().size+bufferSize)  * 4 * (p == BLE_2MBITS || p == ESB_2MBITS ? 1 : 2) - 100;
+						}
 						controller->onReceive(Radio::instance->currentTimestamp,bufferSize,buffer,crcValue, rssi);
 
 						free(buffer);
