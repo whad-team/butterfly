@@ -87,6 +87,7 @@ class Dot15d4Controller : public Controller {
 		void sendJammingReport(uint32_t timestamp);
 		void sendDiscoveredCommunicationMessage(Dot15d4Packet* pkt, uint16_t slot, uint16_t offset);
 		static void sendSlot(void* param);
+		bool sendNow(void);
 
 		void addScheduledTask(uint64_t slot, TaskFunc func, void* params);
 		void runScheduledSlot(uint64_t current_slot);
