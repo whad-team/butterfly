@@ -527,6 +527,10 @@ void Core::processANTInputMessage(whad::ant::AntMsg antMsg) {
                     break;
                 }
 
+                if (!this->antController->setRFChannel(0, rf_channel)) {
+                    response = new whad::generic::Error();
+                    break;
+                }
                 if (!this->antController->setChannelPeriod(0, 32768)) {
                     response = new whad::generic::Error();
                     break;
