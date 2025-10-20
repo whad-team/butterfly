@@ -914,7 +914,7 @@ void Core::processBLEInputMessage(whad::ble::BleMsg bleMsg) {
         case whad::ble::ScanModeMsg:
         {
             whad::ble::ScanMode query(bleMsg);
-
+            this->bleController->setScanningInterval(query.getScanningInterval() * 1000); // scanning interval provided in ms
             this->bleController->startScanning(query.isActiveModeEnabled());
             response = new whad::generic::Success();
         }
@@ -987,18 +987,48 @@ void Core::processBLEInputMessage(whad::ble::BleMsg bleMsg) {
 
                 case whad::ble::DirectionUnknown:
                 {
-                  /* TODO: we use conn handle as channel for raw injection, insert a channel field into protocol ? */
-                  if (this->bleController->rawInject(
-                      query.getPdu().getBytes(),
-                      query.getPdu().getSize(),
-                      query.getConnHandle(),
-                      query.getAccessAddress()
-                    )) {
-                    response = new whad::generic::Success();
-                  }
-                  else {
-                      response = new whad::generic::Error();
-                  }
+                    bool success = false;
+                    if (this->bleController->getState() == SCANNING) {
+                        // If we are in scanning mode, send on every advertising channel
+                        bool channel37 = this->bleController->rawInject(
+                            query.getPdu().getBytes(),
+                            query.getPdu().getSize(),
+                            37,
+                            query.getAccessAddress()
+                        );
+                        bool channel38 = this->bleController->rawInject(
+                            query.getPdu().getBytes(),
+                            query.getPdu().getSize(),
+                            38,
+                            query.getAccessAddress()
+                        );
+                        bool channel39 = this->bleController->rawInject(
+                            query.getPdu().getBytes(),
+                            query.getPdu().getSize(),
+                            39,
+                            query.getAccessAddress()
+                        );
+                        success = (channel37 && channel38 && channel39) ;
+
+                    }
+                    else {
+                        /* TODO: we use conn handle as channel for raw injection, insert a channel field into protocol ? */
+                        success = this->bleController->rawInject(
+                            query.getPdu().getBytes(),
+                            query.getPdu().getSize(),
+                            query.getConnHandle(),
+                            query.getAccessAddress()
+                            );
+                    }
+
+
+                    if (success) {
+                        response = new whad::generic::Success();
+                    }
+                    else {
+                        response = new whad::generic::Error();
+                    }
+
                   break;
 
                 }

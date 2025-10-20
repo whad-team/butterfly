@@ -211,6 +211,7 @@ class BLEController : public Controller {
 		bool follow; // follow mode indicator
 
 		bool activeScanning;
+		uint32_t scanningInterval;
 
 		// Channels related attributes
 		int channel;
@@ -305,6 +306,9 @@ class BLEController : public Controller {
 		bool whitelistAdvAddress(bool enable, uint8_t a, uint8_t b, uint8_t c,uint8_t d, uint8_t e, uint8_t f);
 		bool whitelistInitAddress(bool enable, uint8_t a, uint8_t b, uint8_t c,uint8_t d, uint8_t e, uint8_t f);
 		bool whitelistConnection(bool enable,uint8_t a, uint8_t b, uint8_t c,uint8_t d, uint8_t e, uint8_t f,uint8_t ap, uint8_t bp, uint8_t cp,uint8_t dp, uint8_t ep, uint8_t fp);
+
+
+		void setScanningInterval(uint32_t interval);
 
 		void sendInjectionReport(bool status, uint32_t injectionCount);
 		void sendAdvIntervalReport(uint32_t interval);
