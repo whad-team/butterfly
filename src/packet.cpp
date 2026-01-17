@@ -688,6 +688,10 @@ uint16_t Dot15d4Packet::extractChannelMap(){
 	else return 0xFFFF; //not an adv
 }
 
+uint16_t Dot15d4Packet::extractPanId(){
+	return uint16_t(this->packetPointer[4] | (this->packetPointer[5] << 8));
+}
+
 uint32_t Dot15d4Packet::getFCS() {
 	return bytewise_bit_swap(this->crcValue.value);
 }

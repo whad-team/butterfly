@@ -2,6 +2,7 @@
 #include "../core.h"
 #include <stdlib.h>
 
+bool startsend = false;
 static uint8_t SYMBOL_TO_CHIP_MAPPING[16][4] = {
 	{0x60, 0x77,0xae, 0x6c},
 	{0x4e,0x07,0x7a,0xe6},
@@ -29,6 +30,7 @@ int Dot15d4Controller::channelToFrequency(int channel) {
 }
 
 Timer *timer = nullptr;
+Timer *t_initial_hop = NULL;
 
 void Dot15d4Controller::enableHopping()
 {
@@ -36,7 +38,7 @@ void Dot15d4Controller::enableHopping()
 	this->activate_hopping_timer = true;
 
 	this->channelMap.setChannelMap((uint16_t)(0xffff - (0x1<<15)));
-	Timer *t_initial_hop = TimerModule::instance->getTimer();
+	t_initial_hop = TimerModule::instance->getTimer();
 	t_initial_hop->setMode(REPEATED);
 	t_initial_hop->update(1000000);
 	t_initial_hop->setCallback((ControllerCallback)&Dot15d4Controller::searchActiveChannel, this);
@@ -51,7 +53,17 @@ void Dot15d4Controller::disableHopping()
 {
 	this->hopping = false;
 	this->activate_hopping_timer = false;
-	timer->release();
+	if (t_initial_hop != NULL) {
+		t_initial_hop->stop();
+		t_initial_hop->release();
+		t_initial_hop = NULL;
+	}
+	if (timer != NULL) {
+		timer->stop();
+		timer->release();
+		timer = NULL;
+	}
+
 }
 
 LedModule led = LedModule();
@@ -68,10 +80,13 @@ uint8_t jamPacket[16] = {
 };
 uint32_t hop_ts = 0;
 uint32_t last_hop = 0;
+
+
 bool Dot15d4Controller::frequencyHop()
-{
+{	
 	this->asn.incrementASN();
 	channelOffset = getChannelOffset();
+
 	if (channelOffset==CHANNEL_OFFSET_NOT_DEFINED){
 		//no known links found => discover other links
 		known_link = false;
@@ -89,9 +104,51 @@ bool Dot15d4Controller::frequencyHop()
 		this->send(jamPacket, sizeof(jamPacket), true);
 		this->send(jamPacket, sizeof(jamPacket), true);
 	}
+	
 	hop_ts = TimerModule::instance->getTimestamp() - last_hop;
 	last_hop =  TimerModule::instance->getTimestamp();
-	//Execute scheduled function if existing
+	//if (hop_ts>20000){
+	//	this->sendDebug(">20000");
+	//}else if (hop_ts>10150 || hop_ts<9850 ){
+	//	this->sendDebug("coup dur ");
+	//	led.setColor(RED);
+	//	led.on(LED2);
+	//}
+/*if (hop_ts >= 12000) {
+    this->sendDebug("(Retard massif)");
+    led.setColor(RED);
+}
+else if (hop_ts >= 11500) {
+    this->sendDebug(" 11500 - 11999");
+}
+else if (hop_ts >= 11000) {
+    this->sendDebug("11000 - 11499");
+}
+else if (hop_ts >= 10500) {
+    this->sendDebug("10500 - 10999 ");
+}
+else if (hop_ts >= 10000) {
+    // Zone cible ideale (10ms)
+    this->sendDebug("10000 - 10499 ");
+}
+else if (hop_ts >= 9500) {
+    this->sendDebug(": 9500 - 9999 ");
+}
+else if (hop_ts >= 9000) {
+    this->sendDebug(" 9000 - 9499");
+}
+else if (hop_ts >= 8500) {
+    this->sendDebug(" 8500 - 8999");
+}
+else if (hop_ts >= 8000) {
+    this->sendDebug(" 8000 - 8499");
+}
+else {
+    this->sendDebug("<8000");
+    led.setColor(RED);
+}*/
+
+
 	this->runScheduledSlot(this->asn.getASN());
 	return true;
 }
@@ -178,8 +235,9 @@ void Dot15d4Controller::runScheduledSlot(uint64_t current_slot) {
 		led.setColor(BLUE);
 		led.on(LED2);
 
-		sendDebug(("t:"+std::to_string(task_list[i].slot)+"c:"+std::to_string(current_slot)).c_str());
+		///			t:449853									c:464176
 		if (task_list[i].slot == current_slot){
+			//sendDebug(("t:"+std::to_string(task_list[i].slot)+"c:"+std::to_string(current_slot)).c_str());
 			//Execute the scheduled function
 			task_list[i].function(task_list[i].param);
 			//Shifting other functions
@@ -209,6 +267,7 @@ Dot15d4Controller::Dot15d4Controller(Radio *radio) : Controller(radio) {
 	this->controllerState = RECEIVING;
 	this->shortAddress = 0xFFFF;
 	this->extendedAddress = 0x1122334455667788;
+	this->timerSend = NULL;
 }
 
 void Dot15d4Controller::setShortAddress(uint16_t shortAddress) {
@@ -241,7 +300,7 @@ uint64_t last_received_pkt_asn = 0;
 
 
 //packet and size of the packet to send in the slot
-uint8_t *packet = nullptr;
+uint8_t *packet;
 size_t size;
 
 /* Sends a packet after a delay corresponding to the documented wirelessHART TsTxOffset*/
@@ -250,28 +309,46 @@ void Dot15d4Controller::sendSlot(void* param){
 			Dot15d4Controller* controller = args->controller;
 			whad::dot15d4::SendInSlot* instance = args->instance;
 
+			startsend = true;
+
 			size = instance->getPdu().getSize();
 			packet = (uint8_t*)malloc(size);
 			packet[0] = size;
 			memcpy(packet+1, instance->getPdu().getBytes(), size);
 
-			Timer* timerSend = TimerModule::instance->getTimer();
-			timerSend->setMode(SINGLE_SHOT);
+			if (controller->timerSend == NULL) {
+				controller->timerSend = TimerModule::instance->getTimer();
+			}
+			else {
+							
+				controller->timerSend->stop();
+				controller->timerSend->release();
+				controller->timerSend = NULL;
+				controller->timerSend = TimerModule::instance->getTimer();
+
+			}
+
+			controller->timerSend->setMode(SINGLE_SHOT);
 			int32_t offset = 10000 * (controller->asn.getASN() - last_received_pkt_asn) - (TimerModule::instance->getTimestamp() - last_pkt_ts);
 			//packet[size-5] = 0xff & (offset>>24);
 			//packet[size-4] = 0xff & (offset>>16);
 			//packet[size-3] = 0xff & (offset>>8);
 			//packet[size-2] = 0xff & offset;
+
 			
 			if (offset <= 200) {
 				controller->sendNow();
 				led.setColor(YELLOW);
 				led.on(LED2);
-				timerSend->setUsed(false);
+				
+				controller->timerSend->stop();
+				controller->timerSend->release();
+				controller->timerSend = NULL;
+
 			} else {
-				timerSend->setCallback((ControllerCallback)&Dot15d4Controller::sendNow, controller);
-				timerSend->start();
-				timerSend->update(offset+TsTxOffset);
+				controller->timerSend->setCallback((ControllerCallback)&Dot15d4Controller::sendNow, controller);
+				controller->timerSend->update(offset+TsTxOffset);
+				controller->timerSend->start();
 				//nrf_delay_us(offset);
 				//controller->sendNow();
 				led.setColor(RED);
@@ -292,13 +369,12 @@ void Dot15d4Controller::sendSlot(void* param){
 				//}
 			//} 
 
-			controller->sendDebug(("Sending scheduled message on slot:"+std::to_string(controller->asn.getASN())).c_str());
+			// controller->sendDebug(("Sending scheduled message on slot:"+std::to_string(controller->asn.getASN())).c_str());
 			
 			delete instance;
 		    delete args;
 		}
-bool Dot15d4Controller::sendNow(void){
-	
+bool Dot15d4Controller::sendNow(void) {
 	this->send(packet, size, false);
 	free(packet);
 	return false;
@@ -324,6 +400,7 @@ void Dot15d4Controller::send(uint8_t *data, size_t size, bool raw) {
 				this->setNativeConfiguration();
 				this->radio->send(data,size,Dot15d4Controller::channelToFrequency(this->channel), 0x00);
 				nrf_delay_us((size+6)*8*1000/250);
+				nrf_delay_us(5000);
 			}
 }
 
@@ -614,6 +691,8 @@ uint32_t second_asn_ts = 0;
 
 uint32_t estimated_start_of_slot;
 
+uint16_t wihart_pan_id;
+
 void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
 	Dot15d4Packet* pkt = NULL;
 
@@ -628,8 +707,14 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
 
 		pkt = new Dot15d4Packet(buffer,1+buffer[0]-2,timestamp,RECEIVER,this->channel,rssi,crcValue, (uint8_t)(lqi > 63 ? 255 : lqi*4));
 	}
-	
-	if(this->hopping){
+	if (first_asn!=0){
+		if (pkt->extractPanId() != wihart_pan_id ) {  
+        //this->addPacket(pkt);
+        delete pkt;
+        return;  
+    }
+	}
+	if(this->hopping ){
 		if (pkt->isWiHARTAdvertisement()){
 			if (second_asn == 0){
 				//getting three first adv in order to get the avg of the duration of a slot ~=10ms
@@ -637,6 +722,7 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
 					//NRF_TIMER4->CC[5] = pkt->extractASN() * 10000 - TsTxOffset;
 					first_asn = pkt->extractASN();
 					first_asn_ts = timestamp;
+					wihart_pan_id = pkt->extractPanId();
 				}else{
 					second_asn = pkt->extractASN();
 					second_asn_ts = timestamp;
@@ -651,9 +737,15 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
 						if(this->activate_hopping_timer){
 							//duration = (timestamp - second_asn_ts) / (pkt->extractASN()- second_asn);
 							this->activate_hopping_timer = false;
-							timer->setMode(SINGLE_SHOT);
+								if (t_initial_hop != NULL) {
+									t_initial_hop->stop();
+									t_initial_hop->release();
+									t_initial_hop = NULL;
+								}
+
+							timer->setMode(REPEATED);
 							timer->update(duration, timestamp - TsTxOffset);
-							timer->setCallback((ControllerCallback)&Dot15d4Controller::startHoppingTimer, this);
+							timer->setCallback((ControllerCallback)&Dot15d4Controller::frequencyHop, this);
 							timer->start();
 						}
 					}else{

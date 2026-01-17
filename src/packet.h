@@ -141,6 +141,7 @@ class Dot15d4Packet : public Packet {
 		uint64_t extractExtendedSourceAddress();
 		uint64_t extractASN();
 		uint16_t extractChannelMap();
+		uint16_t extractPanId();
 		uint8_t extractWiHARTPacketType();
 		int16_t extractTimeAdjustment();
 

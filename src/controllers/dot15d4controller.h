@@ -2,6 +2,7 @@
 #define DOT15D4CONTROLLER_H
 #include "../packet.h"
 #include "../controller.h"
+#include "../timer.h"
 #include "bsp.h"
 
 #define CHANNEL_OFFSET_NOT_DEFINED 0xFFFF
@@ -47,6 +48,7 @@ class Dot15d4Controller : public Controller {
 		int channel;
 		int channelOffset;
 
+		Timer *timerSend;
 		Task task_list[MAX_TASKS];
 		int task_count = 0;
 
