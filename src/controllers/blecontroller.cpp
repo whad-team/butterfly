@@ -2504,7 +2504,7 @@ void BLEController::connectionPacketProcessing(BLEPacket *pkt) {
 	}
 
 	// Decide if the packet must be transmitted to host
-	if (pkt->extractPayloadLength() >= 2 || this->emptyTransmitIndicator) {
+	if (pkt->extractPayloadLength() > 0 || this->emptyTransmitIndicator) {
 		this->addPacket(pkt);
 	}
 }
