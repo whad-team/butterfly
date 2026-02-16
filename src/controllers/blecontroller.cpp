@@ -1974,6 +1974,31 @@ bool BLEController::goToNextInitiationChannel() {
 	}
 }
 
+
+static inline uint64_t ccm_get_packet_counter(EncryptionData *d)
+{
+    uint64_t c = 0;
+    for (int i = 0; i < 5; i++) {
+        c |= ((uint64_t)d->pktctr[i]) << (8 * i);
+    }
+    return c;
+}
+
+void ccm_set_packet_counter(EncryptionData *d, uint64_t counter)
+{
+    // CCM n’utilise que 39 bits
+    counter &= 0x7FFFFFFFFFULL;
+
+    d->pktctr[0] = (uint8_t)( counter        & 0xFF);        // LSB
+    d->pktctr[1] = (uint8_t)((counter >> 8 ) & 0xFF);
+    d->pktctr[2] = (uint8_t)((counter >> 16) & 0xFF);
+    d->pktctr[3] = (uint8_t)((counter >> 24) & 0xFF);
+    d->pktctr[4] = (uint8_t)((counter >> 32) & 0x7F);        // bits 0..6
+    d->pktctr[5] = 0;                                        // ignored
+    d->pktctr[6] = 0;                                        // ignored
+    d->pktctr[7] = 0;                                        // ignored
+}
+
 void BLEController::connect(uint8_t *address, bool random,  uint32_t accessAddress,  uint32_t crcInit, uint8_t windowSize, uint16_t windowOffset, uint16_t hopInterval, uint16_t slaveLatency, uint16_t timeout, uint8_t sca, uint8_t hopIncrement, uint8_t *channelMap) {
 	// Configure connection parameters according to provided arguments
 	memcpy(this->connectionInitiationData.responder.bytes, address, 6);
@@ -2001,7 +2026,7 @@ void BLEController::connect(uint8_t *address, bool random,  uint32_t accessAddre
 	this->controllerState = CONNECTION_INITIATION;
 
 	// Configure encryption counter
-	this->encryptionData.counter = 0;
+	ccm_set_packet_counter(&(this->encryptionData),  0);
 
 	// Configure Hardware to monitor advertisements
 	this->setHardwareConfiguration(0x8e89bed6,0x555555);
@@ -2504,7 +2529,8 @@ void BLEController::connectionPacketProcessing(BLEPacket *pkt) {
 	}
 
 	// Decide if the packet must be transmitted to host
-	if (pkt->extractPayloadLength() >= 2 || this->emptyTransmitIndicator) {
+	this->emptyTransmitIndicator  =true;
+	if (pkt->extractPayloadLength() > 0 || this->emptyTransmitIndicator) {
 		this->addPacket(pkt);
 	}
 }

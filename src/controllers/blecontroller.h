@@ -183,13 +183,24 @@ typedef struct AdvertisingData {
 	bool connectable;
 } AdvertisingData;
 
-typedef struct EncryptionData {
+typedef struct __attribute__((packed)) {
+    uint8_t key[16];
+    uint8_t pktctr[8];
+    uint8_t direction;
+    uint8_t iv[8];
+} EncryptionData;
+
+
+
+
+/*typedef struct EncryptionData {
 	uint8_t key[16];
 	uint32_t counter;
+	uint8_t padding;
 	uint32_t direction;
 	uint8_t iv[8];
 } EncryptionData;
-
+*/
 
 class BLEController : public Controller {
 	protected:

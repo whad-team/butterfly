@@ -1200,7 +1200,8 @@ bool Radio::send(uint8_t *data,int size,int frequency, uint8_t channel) {
 	NRF_RADIO->PACKETPTR = (uint32_t)data;
 
 	if (this->encryption) {
-		NRF_RADIO->PACKETPTR = (uint32_t)(this->tmpBuffer);
+		memcpy(this->tmpBuffer, data, size);
+		NRF_RADIO->PACKETPTR = (uint32_t)(this->txBuffer);
 		NRF_CCM->INPTR = (uint32_t)(this->tmpBuffer);
 		NRF_CCM->OUTPTR = (uint32_t)(this->txBuffer);
 		NRF_CCM->MODE = (CCM_MODE_MODE_Encryption << CCM_MODE_MODE_Pos) |
