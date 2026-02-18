@@ -2,6 +2,40 @@
 #include "../core.h"
 #include <whad.h>
 
+/**
+ * Channel Selection Algorithm #2 PRNG primitives.
+ **/
+
+uint16_t mam(uint16_t a, uint16_t b)
+{
+  return (17 * a + b) % (0x10000);
+}
+
+uint16_t permute(uint16_t v)
+{
+  v = (((v & 0xaaaa) >> 1) | ((v & 0x5555) << 1));
+  v = (((v & 0xcccc) >> 2) | ((v & 0x3333) << 2));
+  return (((v & 0xf0f0) >> 4) | ((v & 0x0f0f) << 4));
+}
+
+uint16_t prne(uint16_t counter, uint16_t chanid) {
+  uint16_t prne;
+
+  prne = counter ^ chanid;
+  prne = mam(permute(prne), chanid);
+  prne = mam(permute(prne), chanid);
+  prne = mam(permute(prne), chanid);
+  return prne ^ chanid;
+}
+
+uint16_t unmapped_event_channel_selection(uint16_t counter, uint16_t chanid)
+{
+  return prne(counter, chanid)%37;
+}
+
+/**
+ * BLE controller impl.
+ **/
 
 int BLEController::channelToFrequency(int channel) {
 	int freq = 0;
@@ -31,6 +65,10 @@ BLEController::BLEController(Radio *radio) : Controller(radio) {
 	this->controllerState = IDLE;
 	this->advertisementsTransmitIndicator = true;
 	this->softwareFilterEnabled = false;
+
+    /* Set legacy channel selection algorithm. */
+    this->csa = CSA1;
+    this->csa2_chan_id = 0;
 
 	// Configure arbitrary BD address for now
 	uint8_t oaddr[] = {0x11,	0x22, 0x33, 0x44,	0x55, 0x66};
@@ -401,16 +439,41 @@ void BLEController::findUniqueChannels(uint8_t *firstChannel, uint8_t* secondCha
 
 
 int BLEController::nextChannel() {
-	// This method calculates the next channel using Channel Selection Algorithm #1
-	this->unmappedChannel = (this->lastUnmappedChannel + this->hopIncrement) % 37;
-	this->lastUnmappedChannel = this->unmappedChannel;
-	if (this->channelsInUse[this->unmappedChannel]) {
-		return this->unmappedChannel;
-	}
-	else {
-		int remappingIndex = this->unmappedChannel % this->numUsedChannels;
-		return this->remappingTable[remappingIndex];
-	}
+    switch (this->csa) {
+
+        case CSA2:
+            {
+                // Compute next unmapped channel.
+                this->unmappedChannel = unmapped_event_channel_selection(this->connectionEventCount, this->csa2_chan_id);
+                this->lastUnmappedChannel = this->unmappedChannel;
+
+                // Remap channel if required.
+                if (this->channelsInUse[this->unmappedChannel]) {
+                    return this->unmappedChannel;
+                } else {
+                    // Remapping following Vol 6, Part B, Section 4.5.8.3.4
+                    uint32_t remappingIndex = ((uint32_t)this->numUsedChannels * (uint32_t)prne(this->connectionEventCount, this->csa2_chan_id))/0x10000;
+                    return this->remappingTable[remappingIndex];
+                }
+            }
+            break;
+
+        default:
+        case CSA1:
+            {
+                // This method calculates the next channel using Channel Selection Algorithm #1
+                this->unmappedChannel = (this->lastUnmappedChannel + this->hopIncrement) % 37;
+                this->lastUnmappedChannel = this->unmappedChannel;
+                if (this->channelsInUse[this->unmappedChannel]) {
+                    return this->unmappedChannel;
+                }
+                else {
+                    int remappingIndex = this->unmappedChannel % this->numUsedChannels;
+                    return this->remappingTable[remappingIndex];
+                }
+            }
+            break;
+    }
 }
 
 void BLEController::clearConnectionUpdate() {
@@ -448,6 +511,53 @@ void BLEController::prepareConnectionUpdate(uint16_t instant, uint8_t *channelMa
 	this->connectionUpdate.windowOffset = 0;
 	for (int i=0;i<5;i++) this->connectionUpdate.channelMap[i] = channelMap[i];
 
+}
+
+void BLEController::clearPhyUpdate(void) {
+    this->phyUpdate.type = PHY_UPDATE_NONE;
+    this->phyUpdate.c2p = 0;
+    this->phyUpdate.p2c = 0;
+    this->phyUpdate.instant = 0;
+}
+
+void BLEController::applyPhyUpdate(void) {
+	if (this->phyUpdate.type != PHY_UPDATE_NONE && this->connectionEventCount == this->phyUpdate.instant) {
+        /* Update PHY. */
+        switch (this->phyUpdate.c2p) {
+            // BLE 1M
+            case 1:
+                {
+                    if (this->radio->getPhy() != BLE_1MBITS) {
+                        /* Update PHY in radio. */
+                        this->radio->setPhy(BLE_1MBITS);
+                    }
+                }
+                break;
+
+            // BLE 2M
+            case 2:
+                {
+                    if (this->radio->getPhy() != BLE_2MBITS) {
+                        /* Update PHY in radio. */
+                        this->radio->setPhy(BLE_2MBITS);
+                    }
+                }
+                break;
+
+            default:
+                break;
+        }
+
+        // Clear PHY update.
+        this->clearPhyUpdate();
+	}
+}
+
+void BLEController::preparePhyUpdate(uint16_t instant, uint8_t c2p, uint8_t p2c) {
+    this->phyUpdate.type = PHY_UPDATE_BOTH;
+    this->phyUpdate.c2p = c2p;
+    this->phyUpdate.p2c = p2c;
+    this->phyUpdate.instant = instant;
 }
 
 void BLEController::updateMasterSequenceNumbers(uint8_t sn, uint8_t nesn) {
@@ -523,7 +633,8 @@ bool BLEController::stopConnection() {
 	this->sync = false;
 	// We are not waiting for an update
 	this->clearConnectionUpdate();
-	// If we were simulating slave, exit slave mode
+	this->clearPhyUpdate();
+    // If we were simulating slave, exit slave mode
 	if (this->controllerState == SIMULATING_SLAVE || this->controllerState == PERFORMING_MITM) this->exitSlaveMode();
 	this->masterPayload.transmitted = true;
 	this->slavePayload.transmitted = true;
@@ -576,8 +687,18 @@ bool BLEController::goToNextChannel() {
 		}
 		// If we are still following the connection
 		else {
-			uint32_t now = this->connectionTimer->getLastTimestamp();
+
+            uint32_t now = this->connectionTimer->getLastTimestamp();
 			this->connectionTimer->update(this->hopInterval*1250UL, now);
+
+            // If connection timer is set as single shot, we are waiting for our first
+            // packet. Timer should be changed to repeated and started again.
+			if (this->connectionTimer->getMode() == SINGLE_SHOT) {
+                this->connectionTimer->setMode(REPEATED);
+                this->connectionTimer->start();
+            }
+            
+            // Compute and update lastAnchorPoint.
 			this->lastAnchorPoint = this->lastAnchorPoint + this->hopInterval*1250UL;
 			this->checkAttackSuccess();
 			this->lastPacketCount = this->packetCount;
@@ -586,6 +707,9 @@ bool BLEController::goToNextChannel() {
 
 			// Check if we have a connection update and apply it if necessary
 			this->applyConnectionUpdate();
+
+            // Check if we have a PHY update and apply it if necessary.
+            this->applyPhyUpdate();
 
 			// Go to the next channel
 			int channel = this->nextChannel();
@@ -730,13 +854,16 @@ void BLEController::start() {
 				this->discoveryTimer = NULL;
 			}
 			this->followConnection(
+                this->csa,
 				this->hopInterval,
 				this->hopIncrement,
 				this->channelMap,
 				this->accessAddress,
 				this->crcInit,
 				20,
-				0
+				0,
+                this->hopInterval,
+                0xff
 			);
 	}
 }
@@ -1233,7 +1360,14 @@ bool BLEController::newAdvertisingTransmission() {
 }
 
 
-void BLEController::followConnection(uint16_t hopInterval, uint8_t hopIncrement, uint8_t *channelMap,uint32_t accessAddress,uint32_t crcInit,  int masterSCA,uint16_t latency) {
+void BLEController::followConnection(
+        ChanSelAlg csa, uint16_t hopInterval, uint8_t hopIncrement, uint8_t *channelMap,uint32_t accessAddress,
+        uint32_t crcInit, int masterSCA, uint16_t latency, uint16_t winOffset, uint8_t winSize)
+{
+    // Transmit window starts at transmitDelay + transmitWindowOffset.
+    unsigned long transmitWindow = 1250UL + (winOffset * 1250L);
+    unsigned long transmitWindowEnd = transmitWindow + (winSize * 1250L);
+
 	// We update the parameters needed to follow the connection
 	this->updateHopInterval(hopInterval);
 	this->updateHopIncrement(hopIncrement);
@@ -1261,12 +1395,23 @@ void BLEController::followConnection(uint16_t hopInterval, uint8_t hopIncrement,
 	this->desyncCounter = 0;
 
 
+    // Save current channel selection algorithm.
+    this->csa = csa;
+
+    // Initialize CSA2 counter and channel ID if selected.
+    if (this->csa == CSA2) {
+        this->csa2_chan_id = ((accessAddress & 0xffff0000)>>16) ^ (accessAddress & 0x0000ffff);
+    }
+    
 	// We calculate the first channel
 	this->lastUnmappedChannel = 0;
 	this->channel = this->nextChannel();
 
+
 	// No connection update is expected
 	this->clearConnectionUpdate();
+    this->clearPhyUpdate();
+
 	/*
 	uint8_t reject_ind[] = {0x03,0x02, 0x0d, 0x06};
 	this->setAttackPayload(reject_ind, 4);
@@ -1278,20 +1423,23 @@ void BLEController::followConnection(uint16_t hopInterval, uint8_t hopIncrement,
 
 	// Timers configuration
 	if (this->connectionTimer == NULL) {
+        // First packet will be transmitted no early than window delay (1.25ms) + window offset.
+        // We need to update our timer once our connection synchronized (when in follow mode).
 		this->connectionTimer = this->timerModule->getTimer();
-		this->connectionTimer->setMode(REPEATED);
+		this->connectionTimer->setMode(SINGLE_SHOT);
 		this->connectionTimer->setCallback((ControllerCallback)&BLEController::goToNextChannel, this);
-		this->connectionTimer->update(this->hopInterval * 1250UL - 350);
+		this->connectionTimer->update(transmitWindow - 350);
 	}
 	this->masterSCA = masterSCA;
 	this->slaveSCA = 20;
 
 
 	if (this->timeoutTimer == NULL) {
+        // After transmitWindowEnd, connection is considered as not successfully initiated.
 		this->timeoutTimer = this->timerModule->getTimer();
 		this->timeoutTimer->setMode(SINGLE_SHOT);
 		this->timeoutTimer->setCallback((ControllerCallback)&BLEController::checkSynchronization, this);
-		this->timeoutTimer->update(this->hopInterval * 1250UL);
+		this->timeoutTimer->update(transmitWindowEnd);
 		this->timeoutTimer->start();
 	}
 }
@@ -1308,6 +1456,7 @@ bool BLEController::checkSynchronization() {
 		
         // We are not waiting for an update
 		this->clearConnectionUpdate();
+        this->clearPhyUpdate();
 
 		if (this->controllerState == CONNECTION_INITIATION || this->controllerState == SIMULATING_MASTER) {
 			this->connect(
@@ -2086,6 +2235,7 @@ void BLEController::initializeConnection() {
 	this->mdCount = 0;
 
 	this->clearConnectionUpdate();
+    this->clearPhyUpdate();
 
 	// Timers configuration
 	if (this->connectionTimer == NULL) {
@@ -2229,13 +2379,16 @@ void BLEController::advertisementSniffingProcessing(BLEPacket *pkt) {
 	if (pkt->extractAdvertisementType() == CONNECT_REQ && this->follow) {
 		// Start following the connection
 		this->followConnection(
+            (pkt->extractChSel()==1)?CSA2:CSA1,
 			pkt->extractHopInterval(),
 			pkt->extractHopIncrement(),
 			pkt->extractChannelMap(),
 			pkt->extractAccessAddress(),
 			pkt->extractCrcInit(),
 			pkt->extractSCA(),
-			pkt->extractLatency()
+			pkt->extractLatency(),
+            pkt->extractWindowOffset(),
+            pkt->extractWindowSize()
 		);
 	}
 
@@ -2286,6 +2439,12 @@ void BLEController::connectionManagementProcessing(BLEPacket *pkt) {
 		}
 
 	}
+    // We receive a PHY update
+    else if (pkt->isLinkLayerPhyUpdateInd()) {
+        // prepare a PHY update, will be applied at given instant.
+        this->preparePhyUpdate(pkt->extractInstant(), pkt->extractPhyC2P(), pkt->extractPhyP2C());
+    }
+
 	// We receive a terminate ind ...
 	else if (pkt->isLinkLayerTerminateInd()) {
 		// Close the connection
@@ -2538,13 +2697,16 @@ void BLEController::advertisementPacketProcessing(BLEPacket *pkt) {
 				this->releaseTimers();
 				// Start following the connection
 				this->followConnection(
+                    (pkt->extractChSel()==1)?CSA2:CSA1,
 					pkt->extractHopInterval(),
 					pkt->extractHopIncrement(),
 					pkt->extractChannelMap(),
 					pkt->extractAccessAddress(),
 					pkt->extractCrcInit(),
 					pkt->extractSCA(),
-					pkt->extractLatency()
+					pkt->extractLatency(),
+                    pkt->extractWindowOffset(),
+                    pkt->extractWindowSize()
 				);
 				this->radio->setFastRampUpTime(true);
 				this->radio->reload();
@@ -2654,13 +2816,16 @@ void BLEController::hopIncrementRecoveryProcessing(uint32_t timestamp, uint8_t s
 				this->updateHopIncrement(increment);
 				this->hopInterval++;
 				this->followConnection(
+                    this->csa,
 					this->hopInterval,
 					this->hopIncrement,
 					this->channelMap,
 					this->accessAddress,
 					this->crcInit,
 					20,
-					0
+					0,
+                    this->hopInterval,
+                    0xff
 				);
 
 			}
