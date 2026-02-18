@@ -96,8 +96,10 @@ class BLEPacket : public Packet {
 		bool isReadRequest();
 		bool isLinkLayerConnectionUpdateRequest();
 		bool isLinkLayerChannelMapRequest();
+        bool isLinkLayerPhyUpdateInd();
 		bool isLinkLayerTerminateInd();
 		uint8_t extractLLID();
+        uint8_t extractChSel();
 		uint32_t extractAccessAddress();
 		uint32_t extractCrcInit();
 		uint16_t extractHopInterval();
@@ -105,6 +107,8 @@ class BLEPacket : public Packet {
 		uint16_t extractLatency();
 		uint8_t* extractChannelMap();
 		uint16_t extractInstant();
+        uint8_t extractPhyC2P();
+        uint8_t extractPhyP2C();
 		int extractSCA();
 
 		bool extractAdvertiserAddress(uint8_t *address, bool *random);
