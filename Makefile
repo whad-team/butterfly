@@ -172,6 +172,8 @@ SRC_FILES += \
 	$(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_spis.c \
 	$(SDK_ROOT)/components/libraries/bsp/bsp.c \
 	$(SDK_ROOT)/modules/nrfx/mdk/system_nrf52840.c \
+	$(SDK_ROOT)/components/libraries/usbd/class/nrf_dfu_trigger/app_usbd_nrf_dfu_trigger.c \
+	$(SDK_ROOT)/components/libraries/bootloader/dfu/nrf_dfu_trigger_usb.c \
 	$(PROJ_DIR)/led.cpp \
 	$(PROJ_DIR)/timer.cpp \
 	$(PROJ_DIR)/helpers.cpp \
@@ -206,7 +208,6 @@ WHAD_SRC := $(wildcard $(WHAD_DIR)/nanopb/*.c) \
 	$(wildcard $(WHAD_DIR)/src/cpp/generic/*.cpp)
 SRC_FILES += $(WHAD_SRC)
 
-
 # Include folders common to all targets
 INC_FOLDERS += \
 	$(SDK_ROOT)/components \
@@ -222,6 +223,7 @@ INC_FOLDERS += \
 	$(SDK_ROOT)/components/libraries/timer \
 	$(SDK_ROOT)/components/libraries/util \
 	$(SDK_ROOT)/components/libraries/bsp \
+	$(SDK_ROOT)/components/libraries/block_dev \
 	$(PROJ_DIR) \
 	$(CONF_DIR) \
 	$(SDK_ROOT)/components/libraries/usbd/class/cdc \
@@ -253,6 +255,10 @@ INC_FOLDERS += \
 	$(SDK_ROOT)/modules/nrfx/hal \
 	$(SDK_ROOT)/external/fprintf \
 	$(SDK_ROOT)/components/libraries/log/src \
+	$(SDK_ROOT)/components/libraries/bootloader/dfu \
+	$(SDK_ROOT)/components/libraries/usbd/class/nrf_dfu_trigger \
+
+
 
 # WHAD Lib
 INC_FOLDERS += \
