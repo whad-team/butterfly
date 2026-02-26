@@ -706,6 +706,7 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
         crcValue.value = ((crcValue.value & 0xff00) >> 8) | ((crcValue.value & 0xff) << 8);
 
 		pkt = new Dot15d4Packet(buffer,1+buffer[0]-2,timestamp,RECEIVER,this->channel,rssi,crcValue, (uint8_t)(lqi > 63 ? 255 : lqi*4));
+		//pkt = new Dot15d4Packet(buffer,1+buffer[0]-2,timestamp-last_hop,RECEIVER,this->channel,rssi,crcValue, (uint8_t)(lqi > 63 ? 255 : lqi*4));
 	}
 	if (first_asn!=0){
 		if (pkt->extractPanId() != wihart_pan_id ) {  
@@ -760,7 +761,7 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
 				if(pkt->isWiHARTAcknowledgement()){
 					if ((timestamp - estimated_start_of_slot) < duration){
 						//make sure that the ack received is for an already received pdu in the same slot
-						timer->update(duration, estimated_start_of_slot + pkt->extractTimeAdjustment());
+						//timer->update(duration, estimated_start_of_slot + pkt->extractTimeAdjustment());
 					}
 				}
 				else{
