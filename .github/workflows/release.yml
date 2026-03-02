@@ -50,8 +50,8 @@ jobs:
         draft: true
         token: ${{ secrets.GITHUB_TOKEN }}
         files: |
-          dist/mdk-dongle.hex
-          dist/mdk-dongle-fwupdate.uf2
-          dist/pca10059.hex
-          dist/pca10059-fwupdate.zip
+          dist/butterfly-mdk.hex
+          dist/butterfly-mdk-fwupgrade.uf2
+          dist/butterfly.hex
+          dist/butterfly-fwupgrade.zip
           

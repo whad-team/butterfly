@@ -6,7 +6,13 @@ GROUP(-lgcc -lc -lnosys)
 MEMORY
 {
   FLASH (rx) : ORIGIN = 0x1000, LENGTH = 0xDF000
-  RAM (rwx) :  ORIGIN = 0x20000008, LENGTH = 0x3FFF8
+  /* 
+   * Nordic SDK v15+ uses a length of 0x3FFF8 but it seems to mess up
+   * with nRF52840 xxAA Cx0 (Engineering C, 1) variants used in cheaper
+   * dongles (the Cx0 is not a Production version and is deprecated, but
+   * it may explain why those dongles are cheaper.
+   */
+  RAM (rwx) :  ORIGIN = 0x20000008, LENGTH = 0x3FF00
 }
 
 SECTIONS
