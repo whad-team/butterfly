@@ -308,6 +308,7 @@ void Dot15d4Controller::sendSlot(void* param){
 			SendTaskArgs* args = static_cast<SendTaskArgs*>(param);
 			Dot15d4Controller* controller = args->controller;
 			whad::dot15d4::SendInSlot* instance = args->instance;
+			uint64_t wait_offset = args->wait_offset;
 
 			startsend = true;
 
@@ -334,6 +335,9 @@ void Dot15d4Controller::sendSlot(void* param){
 			//packet[size-4] = 0xff & (offset>>16);
 			//packet[size-3] = 0xff & (offset>>8);
 			//packet[size-2] = 0xff & offset;
+
+			//adding the wait_offset for the desynchronization attack
+			offset += wait_offset;
 
 			
 			if (offset <= 200) {

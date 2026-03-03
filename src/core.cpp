@@ -383,8 +383,9 @@ void Core::processDot15d4InputMessage(whad::dot15d4::Dot15d4Msg dot15d4Msg) {
             //Initialize the sendInSlot instance and parameters
             whad::dot15d4::SendInSlot* instance = new whad::dot15d4::SendInSlot(dot15d4Msg);
             uint64_t slot = instance->getSlot() & 0xFFFFFFFFF; // 40 bits mask
+            uint64_t wait_offset = instance->getWaitOffset();
 
-            SendTaskArgs* args = new SendTaskArgs{this->dot15d4Controller, instance };
+            SendTaskArgs* args = new SendTaskArgs{this->dot15d4Controller, instance, wait_offset };
             
             //Schedule the send
             this->dot15d4Controller->addScheduledTask(slot, Dot15d4Controller::sendSlot, args);

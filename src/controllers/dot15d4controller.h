@@ -122,6 +122,7 @@ class Dot15d4Controller : public Controller {
 struct SendTaskArgs {
     Dot15d4Controller* controller;
     whad::dot15d4::SendInSlot* instance;
+	uint64_t wait_offset;
 };
 
 #endif
