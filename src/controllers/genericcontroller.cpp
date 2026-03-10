@@ -324,6 +324,7 @@ void GenericController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
     datarate = 2000000;
 
   }
+  
   GenericPacket *pkt = new GenericPacket(buffer,size,timestamp,0x00,channel,rssi,crcValue, preamble, this->preambleSize, deviation, datarate, whad::phy::ModulationGFSK, little);
   this->addPacket(pkt);
   delete pkt;
