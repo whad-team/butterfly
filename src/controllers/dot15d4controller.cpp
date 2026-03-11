@@ -107,6 +107,9 @@ bool Dot15d4Controller::frequencyHop()
 	
 	hop_ts = TimerModule::instance->getTimestamp() - last_hop;
 	last_hop =  TimerModule::instance->getTimestamp();
+
+	char string[5];
+	memcpy(string, &hop_ts, 4);
 	//if (hop_ts>20000){
 	//	this->sendDebug(">20000");
 	//}else if (hop_ts>10150 || hop_ts<9850 ){
@@ -114,7 +117,7 @@ bool Dot15d4Controller::frequencyHop()
 	//	led.setColor(RED);
 	//	led.on(LED2);
 	//}
-/*if (hop_ts >= 12000) {
+if (hop_ts >= 12000) {
     this->sendDebug("(Retard massif)");
     led.setColor(RED);
 }
@@ -146,7 +149,7 @@ else if (hop_ts >= 8000) {
 else {
     this->sendDebug("<8000");
     led.setColor(RED);
-}*/
+}
 
 
 	this->runScheduledSlot(this->asn.getASN());
@@ -404,7 +407,7 @@ void Dot15d4Controller::send(uint8_t *data, size_t size, bool raw) {
 				this->setNativeConfiguration();
 				this->radio->send(data,size,Dot15d4Controller::channelToFrequency(this->channel), 0x00);
 				nrf_delay_us((size+6)*8*1000/250);
-				nrf_delay_us(5000);
+				nrf_delay_us(500);
 			}
 }
 
@@ -709,8 +712,8 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
         /* Flip Dot15d4 FCS bytes. */
         crcValue.value = ((crcValue.value & 0xff00) >> 8) | ((crcValue.value & 0xff) << 8);
 
-		pkt = new Dot15d4Packet(buffer,1+buffer[0]-2,timestamp,RECEIVER,this->channel,rssi,crcValue, (uint8_t)(lqi > 63 ? 255 : lqi*4));
-		//pkt = new Dot15d4Packet(buffer,1+buffer[0]-2,timestamp-last_hop,RECEIVER,this->channel,rssi,crcValue, (uint8_t)(lqi > 63 ? 255 : lqi*4));
+		//pkt = new Dot15d4Packet(buffer,1+buffer[0]-2,timestamp,RECEIVER,this->channel,rssi,crcValue, (uint8_t)(lqi > 63 ? 255 : lqi*4));
+		pkt = new Dot15d4Packet(buffer,1+buffer[0]-2,/*timestamp-last_hop*/this->asn.getASN(),RECEIVER,this->channel,this->asn.getASN(),crcValue, (uint8_t)(this->asn.getASN()));
 	}
 	if (first_asn!=0){
 		if (pkt->extractPanId() != wihart_pan_id ) {  
@@ -734,32 +737,38 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
 				}
 			}else{
 				this->channelMap.setChannelMap(pkt->extractChannelMap());
-				if(this->asn.getASN()!= 0 and pkt->extractASN()==this->asn.getASN()){
+				/*if(this->asn.getASN()!= 0 and pkt->extractASN()==this->asn.getASN()){
 					timer->update(duration, timestamp - TsTxOffset);
-				}else{
-					if(this->asn.getASN()== 0){						
-						this->asn.setASN(pkt->extractASN());
-						if(this->activate_hopping_timer){
-							//duration = (timestamp - second_asn_ts) / (pkt->extractASN()- second_asn);
-							this->activate_hopping_timer = false;
-								if (t_initial_hop != NULL) {
-									t_initial_hop->stop();
-									t_initial_hop->release();
-									t_initial_hop = NULL;
-								}
+				}else{*/
 
-							timer->setMode(REPEATED);
-							timer->update(duration, timestamp - TsTxOffset);
-							timer->setCallback((ControllerCallback)&Dot15d4Controller::frequencyHop, this);
-							timer->start();
-						}
-					}else{
+				// First sync after 2 adv
+				if(this->asn.getASN()== 0){						
+					this->asn.setASN(pkt->extractASN());
+					if(this->activate_hopping_timer){
+						//duration = (timestamp - second_asn_ts) / (pkt->extractASN()- second_asn);
+						this->activate_hopping_timer = false;
+							if (t_initial_hop != NULL) {
+								t_initial_hop->stop();
+								t_initial_hop->release();
+								t_initial_hop = NULL;
+							}
+
+						timer->setMode(REPEATED);
 						timer->update(duration, timestamp - TsTxOffset);
-						this->asn.setASN(pkt->extractASN());
+						timer->setCallback((ControllerCallback)&Dot15d4Controller::frequencyHop, this);
+						timer->start();
 					}
+				}else{
+					this->asn.setASN(pkt->extractASN());
+					timer->update(duration, timestamp - TsTxOffset);
 				}
+				//}
 			}
 		}else{
+			// not an adv here
+			// TO CHECK: only resync time if known link ????
+			// TO CHECK: only resync time if first packet in the slot ????
+
 			if(this->activate_hopping_timer == false){ //we have already activated the timer
 				//adjust the time stamp by pkt.time_adjustment if the pkt is an ack
 				if(pkt->isWiHARTAcknowledgement()){
@@ -771,7 +780,6 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
 				else{
 					last_pkt_ts = timestamp;
 					last_received_pkt_asn = this->asn.getASN();
-
 					//update timer timestamp if the pkt is not an ack
 					estimated_start_of_slot = timestamp - TsTxOffset;
 					timer->update(duration, estimated_start_of_slot);
