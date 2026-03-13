@@ -117,40 +117,41 @@ bool Dot15d4Controller::frequencyHop()
 	//	led.setColor(RED);
 	//	led.on(LED2);
 	//}
-if (hop_ts >= 12000) {
-    this->sendDebug("(Retard massif)");
-    led.setColor(RED);
-}
-else if (hop_ts >= 11500) {
-    this->sendDebug(" 11500 - 11999");
-}
-else if (hop_ts >= 11000) {
-    this->sendDebug("11000 - 11499");
-}
-else if (hop_ts >= 10500) {
-    this->sendDebug("10500 - 10999 ");
-}
-else if (hop_ts >= 10000) {
-    // Zone cible ideale (10ms)
-    this->sendDebug("10000 - 10499 ");
-}
-else if (hop_ts >= 9500) {
-    this->sendDebug(": 9500 - 9999 ");
-}
-else if (hop_ts >= 9000) {
-    this->sendDebug(" 9000 - 9499");
-}
-else if (hop_ts >= 8500) {
-    this->sendDebug(" 8500 - 8999");
-}
-else if (hop_ts >= 8000) {
-    this->sendDebug(" 8000 - 8499");
-}
-else {
-    this->sendDebug("<8000");
-    led.setColor(RED);
-}
-
+	/*
+	if (hop_ts >= 12000) {
+		this->sendDebug("(Retard massif)");
+		led.setColor(RED);
+	}
+	else if (hop_ts >= 11500) {
+		this->sendDebug(" 11500 - 11999");
+	}
+	else if (hop_ts >= 11000) {
+		this->sendDebug("11000 - 11499");
+	}
+	else if (hop_ts >= 10500) {
+		this->sendDebug("10500 - 10999 ");
+	}
+	else if (hop_ts >= 10000) {
+		// Zone cible ideale (10ms)
+		this->sendDebug("10000 - 10499 ");
+	}
+	else if (hop_ts >= 9500) {
+		this->sendDebug(": 9500 - 9999 ");
+	}
+	else if (hop_ts >= 9000) {
+		this->sendDebug(" 9000 - 9499");
+	}
+	else if (hop_ts >= 8500) {
+		this->sendDebug(" 8500 - 8999");
+	}
+	else if (hop_ts >= 8000) {
+		this->sendDebug(" 8000 - 8499");
+	}
+	else {
+		this->sendDebug("<8000");
+		led.setColor(RED);
+	}
+	*/
 
 	this->runScheduledSlot(this->asn.getASN());
 	return true;
@@ -717,10 +718,10 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
 	}
 	if (first_asn!=0){
 		if (pkt->extractPanId() != wihart_pan_id ) {  
-        //this->addPacket(pkt);
-        delete pkt;
-        return;  
-    }
+			//this->addPacket(pkt);
+			delete pkt;
+			return;  
+		}
 	}
 	if(this->hopping ){
 		if (pkt->isWiHARTAdvertisement()){
@@ -778,11 +779,13 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
 					}
 				}
 				else{
-					last_pkt_ts = timestamp;
-					last_received_pkt_asn = this->asn.getASN();
-					//update timer timestamp if the pkt is not an ack
-					estimated_start_of_slot = timestamp - TsTxOffset;
-					timer->update(duration, estimated_start_of_slot);
+					if (known_link) {
+						last_pkt_ts = timestamp;
+						last_received_pkt_asn = this->asn.getASN();
+						//update timer timestamp if the pkt is not an ack
+						estimated_start_of_slot = timestamp - TsTxOffset;
+						timer->update(duration, estimated_start_of_slot);
+					}
 				}
 			}
 
