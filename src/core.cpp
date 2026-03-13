@@ -599,7 +599,7 @@ void Core::processBLEInputMessage(whad::ble::BleMsg bleMsg) {
                 {
                     if (this->bleController->getState() == SIMULATING_MASTER || this->bleController->getState() == PERFORMING_MITM) {
                         this->bleController->setMasterPayload(query.getPdu().getBytes(), query.getPdu().getSize());
-                        while (!max_retry && !this->bleController->isMasterPayloadTransmitted()) {--max_retry;}
+                        while (max_retry>0 && !this->bleController->isMasterPayloadTransmitted()) {--max_retry;}
                         if (max_retry != 0) {
                             response = new whad::generic::Success();
                         } else {
@@ -1892,25 +1892,29 @@ void Core::loop() {
 	while (true) {
 
 		this->serialModule->process();
-        //this->getLedModule()->on(LED1);
+		//this->getLedModule()->on(LED1);
 
-        /* Check if we receveived a WHAD message. */
-        if (whad_get_message(&msg) == WHAD_SUCCESS)
-        {
-            //this->getLedModule()->off(LED1);
-            //this->getLedModule()->on(LED2);
-            this->processInputMessage(msg);
-        }
-        if (message != NULL) {
-          if (whad_send_message(message) == WHAD_ERROR)
-          {
-              //this->getLedModule()->on(LED1);
-          }
-          free(message);
-          message = this->popMessageFromQueue();
-        }
-        else {
-          message = this->popMessageFromQueue();
-        }
+		/* Check if we receveived a WHAD message. */
+		if (whad_get_message(&msg) == WHAD_SUCCESS)
+		{
+		    //this->getLedModule()->off(LED1);
+		    //this->getLedModule()->on(LED2);
+		    this->processInputMessage(msg);
+		}
+		if (message != NULL) {
+		  if (whad_send_message(message) == WHAD_ERROR)
+		  {
+		      //this->getLedModule()->on(LED1);
+		  }
+		  free(message);
+		  message = this->popMessageFromQueue();
+		}
+		else {
+		  message = this->popMessageFromQueue();
+		}
+		// Even if we miss an event enabling USB, USB event would wake us up.
+		__WFE();
+		// Clear SEV flag if CPU was woken up by event
+		__SEV();
     }
 }

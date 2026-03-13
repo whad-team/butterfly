@@ -4845,6 +4845,12 @@
 // </h> 
 //==========================================================
 
+#ifndef NRFX_SPIM_DEFAULT_CONFIG_IRQ_PRIORITY
+#define NRFX_SPIM_DEFAULT_CONFIG_IRQ_PRIORITY 6
+#endif
+
+
+
 // <<< end of configuration section >>>
 #endif //SDK_CONFIG_H
 

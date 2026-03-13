@@ -1,0 +1,3 @@
+- Github Actions (CI/CD) has been integrated with two main worflows: 
+    - compile: check that code compiles properly
+    - release: automatically compiles and creates a release when a tag is marked

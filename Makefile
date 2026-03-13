@@ -2,7 +2,8 @@ PROJECT_NAME     := injectable
 TARGETS          := nrf52840_xxaa
 OUTPUT_DIRECTORY := build
 DIST_DIRECTORY 	 := dist
-SDK_ROOT		 := ../../nRF5_SDK_17.1.0_ddde560/
+NRFUTIL 		 := nrfutil
+SDK_ROOT		 := ../../.sdks/nRF5_SDK_17.1.0_ddde560/
 
 ifeq ($(PLATFORM),)
     PLATFORM = BOARD_PCA10059
@@ -153,8 +154,8 @@ SRC_FILES += \
 	$(SDK_ROOT)/integration/nrfx/legacy/nrf_drv_clock.c \
 	$(SDK_ROOT)/integration/nrfx/legacy/nrf_drv_power.c \
 	$(SDK_ROOT)/integration/nrfx/legacy/nrf_drv_uart.c \
-  $(SDK_ROOT)/integration/nrfx/legacy/nrf_drv_spi.c \
-  $(SDK_ROOT)/integration/nrfx/legacy/nrf_drv_spis.c \
+	$(SDK_ROOT)/integration/nrfx/legacy/nrf_drv_spi.c \
+	$(SDK_ROOT)/integration/nrfx/legacy/nrf_drv_spis.c \
 	$(SDK_ROOT)/components/drivers_nrf/nrf_soc_nosd/nrf_nvic.c \
 	$(SDK_ROOT)/components/drivers_nrf/nrf_soc_nosd/nrf_soc.c \
 	$(SDK_ROOT)/modules/nrfx/soc/nrfx_atomic.c \
@@ -166,11 +167,13 @@ SRC_FILES += \
 	$(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_uart.c \
 	$(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_uarte.c \
 	$(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_usbd.c \
-  $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_spi.c \
-  $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_spim.c \
-  $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_spis.c \
+	$(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_spi.c \
+	$(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_spim.c \
+	$(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_spis.c \
 	$(SDK_ROOT)/components/libraries/bsp/bsp.c \
 	$(SDK_ROOT)/modules/nrfx/mdk/system_nrf52840.c \
+	$(SDK_ROOT)/components/libraries/usbd/class/nrf_dfu_trigger/app_usbd_nrf_dfu_trigger.c \
+	$(SDK_ROOT)/components/libraries/bootloader/dfu/nrf_dfu_trigger_usb.c \
 	$(PROJ_DIR)/led.cpp \
 	$(PROJ_DIR)/timer.cpp \
 	$(PROJ_DIR)/helpers.cpp \
@@ -205,7 +208,6 @@ WHAD_SRC := $(wildcard $(WHAD_DIR)/nanopb/*.c) \
 	$(wildcard $(WHAD_DIR)/src/cpp/generic/*.cpp)
 SRC_FILES += $(WHAD_SRC)
 
-
 # Include folders common to all targets
 INC_FOLDERS += \
 	$(SDK_ROOT)/components \
@@ -221,6 +223,7 @@ INC_FOLDERS += \
 	$(SDK_ROOT)/components/libraries/timer \
 	$(SDK_ROOT)/components/libraries/util \
 	$(SDK_ROOT)/components/libraries/bsp \
+	$(SDK_ROOT)/components/libraries/block_dev \
 	$(PROJ_DIR) \
 	$(CONF_DIR) \
 	$(SDK_ROOT)/components/libraries/usbd/class/cdc \
@@ -252,6 +255,10 @@ INC_FOLDERS += \
 	$(SDK_ROOT)/modules/nrfx/hal \
 	$(SDK_ROOT)/external/fprintf \
 	$(SDK_ROOT)/components/libraries/log/src \
+	$(SDK_ROOT)/components/libraries/bootloader/dfu \
+	$(SDK_ROOT)/components/libraries/usbd/class/nrf_dfu_trigger \
+
+
 
 # WHAD Lib
 INC_FOLDERS += \
@@ -298,11 +305,17 @@ LIB_FILES += -lc -lnosys -lm
 
 # Default target - first one defined
 default: nrf52840_xxaa
+
+dist: nrf52840_xxaa
 ifeq ($(PLATFORM),BOARD_PCA10059)
+	mkdir -p $(DIST_DIRECTORY)
 	cp $(OUTPUT_DIRECTORY)/nrf52840_xxaa.hex $(DIST_DIRECTORY)/pca10059.hex
+	$(NRFUTIL) pkg generate --hw-version 52 --sd-req 0x00 --debug-mode --application $(OUTPUT_DIRECTORY)/nrf52840_xxaa.hex $(DIST_DIRECTORY)/pca10059-fwupdate.zip
 endif
 ifeq ($(PLATFORM),BOARD_MDK_DONGLE)
+	mkdir -p $(DIST_DIRECTORY)
 	cp $(OUTPUT_DIRECTORY)/nrf52840_xxaa.hex $(DIST_DIRECTORY)/mdk-dongle.hex
+	python3 $(CONF_DIR)/uf2conv.py $(DIST_DIRECTORY)/mdk-dongle.hex -c -f 0xADA52840 -o $(DIST_DIRECTORY)/mdk-dongle-fwupdate.uf2
 endif
 # Print all targets that can be built
 help:
@@ -323,20 +336,25 @@ $(foreach target, $(TARGETS), $(call define_target, $(target)))
 create_builddir:
 	mkdir -p build
 
+
+enter_dfu:
+	python3 $(CONF_DIR)/trigger_dfu.py $(SERIAL_PORT)
+	
+	
 send: create_builddir
 ifeq ($(PLATFORM),BOARD_PCA10059)
 	@echo "Generating DFU package ..."
 	rm -f $(OUTPUT_DIRECTORY)/dfu.zip
-	nrfutil pkg generate --hw-version 52 --sd-req 0x00 --debug-mode --application $(DIST_DIRECTORY)/pca10059.hex $(OUTPUT_DIRECTORY)/dfu.zip
+	$(NRFUTIL) pkg generate --hw-version 52 --sd-req 0x00 --debug-mode --application $(OUTPUT_DIRECTORY)/nrf52840_xxaa.hex $(OUTPUT_DIRECTORY)/dfu.zip
 	@echo "Flashing device ..."
-	nrfutil dfu usb-serial -pkg $(OUTPUT_DIRECTORY)/dfu.zip -p $(SERIAL_PORT) -b 115200
+	$(NRFUTIL) dfu usb-serial -pkg $(OUTPUT_DIRECTORY)/dfu.zip -p $(SERIAL_PORT) -b 115200
 	@echo "Done :)"
 endif
 ifeq ($(PLATFORM),BOARD_MDK_DONGLE)
 ifneq ($(MDK_MOUNTPOINT),)
 	@echo "Generating DFU package ..."
 	rm -f $(OUTPUT_DIRECTORY)/flash.uf2
-	python3 $(CONF_DIR)/uf2conv.py $(DIST_DIRECTORY)/mdk-dongle.hex -c -f 0xADA52840 -o $(OUTPUT_DIRECTORY)/flash.uf2
+	python3 $(CONF_DIR)/uf2conv.py $(OUTPUT_DIRECTORY)/nrf52840_xxaa.hex -c -f 0xADA52840 -o $(OUTPUT_DIRECTORY)/flash.uf2
 	@echo "Flashing device ..."
 	cp $(OUTPUT_DIRECTORY)/flash.uf2 $(MDK_MOUNTPOINT)
 	@echo "Done :)"

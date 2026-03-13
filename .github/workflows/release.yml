@@ -1,0 +1,57 @@
+name: C/C++ compile & release CI
+
+on:
+  push:
+    tags:
+    - "v*.*.*"
+  pull_request:
+    tags:
+    - "v*.*.*"
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    - name: Install nRF util
+      run: |
+        mkdir -p .tool
+        curl 'https://files.nordicsemi.com/ui/api/v1/download?repoKey=swtools&path=external/nrfutil/executables/x86_64-unknown-linux-gnu/nrfutil&isNativeBrowsing=false' --output .tool/nrfutil
+        chmod +x .tool/nrfutil
+        .tool/nrfutil install nrf5sdk-tools --force
+    - name: Install Toolchain
+      run: |
+        mkdir .toolchain
+        wget https://developer.arm.com/-/media/Files/downloads/gnu/14.3.rel1/binrel/arm-gnu-toolchain-14.3.rel1-x86_64-arm-none-eabi.tar.xz
+        tar xf arm-gnu-toolchain-14.3.rel1-x86_64-arm-none-eabi.tar.xz -C .toolchain
+        rm -rf arm-gnu-toolchain-14.3.rel1-x86_64-arm-none-eabi.tar.xz 
+    - name: Install SDK
+      run: |
+        mkdir .sdk
+        wget https://nsscprodmedia.blob.core.windows.net/prod/software-and-other-downloads/sdks/nrf5/binaries/nrf5_sdk_17.1.0_ddde560.zip
+        unzip nrf5_sdk_17.1.0_ddde560.zip -d .sdk
+        rm -rf nrf5_sdk_17.1.0_ddde560.zip
+        rm -rf .sdk/nRF5_SDK_17.1.0_ddde560/components/toolchain/gcc/Makefile.posix
+        echo -ne "GNU_INSTALL_ROOT ?= $(pwd)/.toolchain/arm-gnu-toolchain-14.3.rel1-x86_64-arm-none-eabi/bin/\nGNU_VERSION ?= 14.3.1\nGNU_PREFIX ?= arm-none-eabi\n" > .sdk/nRF5_SDK_17.1.0_ddde560/components/toolchain/gcc/Makefile.posix
+    - name: Compiling & generating assets
+      run: |
+        mkdir -p dist
+        make dist NRFUTIL=.tool/nrfutil SDK_ROOT=$(pwd)/.sdk/nRF5_SDK_17.1.0_ddde560
+        make dist PLATFORM=BOARD_MDK_DONGLE NRFUTIL=.tool/nrfutil SDK_ROOT=$(pwd)/.sdk/nRF5_SDK_17.1.0_ddde560
+    - name: Pushing release
+      uses: softprops/action-gh-release@v2
+      if: github.ref_type == 'tag'
+      with:
+        body_path: CHANGELOG.txt
+        draft: true
+        token: ${{ secrets.GITHUB_TOKEN }}
+        files: |
+          dist/mdk-dongle.hex
+          dist/mdk-dongle-fwupdate.uf2
+          dist/pca10059.hex
+          dist/pca10059-fwupdate.zip
+          

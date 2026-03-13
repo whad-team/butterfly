@@ -1,5 +1,7 @@
 # ButteRFly, a WHAD-compatible firmware for nRF52-based USB dongles
 
+[![C/C++ compilation CI](https://github.com/whad-team/butterfly/actions/workflows/compile.yml/badge.svg)](https://github.com/whad-team/butterfly/actions/workflows/compile.yml)
+
 ## Introduction
 
 ButteRFly is a firmware specifically designed to be used with [WHAD](https://github.com/whad-team/whad-client)

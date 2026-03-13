@@ -541,7 +541,7 @@ bool BLEController::stopConnection() {
 
 bool BLEController::connectionLost() {
 	//We are sending a notification to Host
-	//bsp_board_led_off(0);
+	bsp_board_led_off(0);
 
 	this->sendConnectionReport(DISCONNECTED);
 	this->sendConnectionReport(CONNECTION_LOST);
@@ -638,6 +638,10 @@ void BLEController::start() {
 		this->setChannel(37);
 		this->setHardwareConfiguration(0x8e89bed6, 0x555555);
 
+        /* Disable hardware address filtering. */
+        this->setFilter(true, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF);
+
+        /* Configure radio if active scanning is required. */
 		if (this->activeScanning) {
 			this->radio->enableAutoTXafterRX();
 			this->radio->setInterFrameSpacing(145);
@@ -1124,6 +1128,7 @@ void BLEController::setHardwareConfiguration(uint32_t accessAddress, uint32_t cr
 }
 
 void BLEController::startScanning(bool active) {
+    /* Enable scanning. */
 	this->controllerState = SCANNING;
 	this->activeScanning = active;
 }
@@ -1300,7 +1305,8 @@ bool BLEController::checkSynchronization() {
 
 		// We are not synchronized anymore
 		this->sync = false;
-		// We are not waiting for an update
+		
+        // We are not waiting for an update
 		this->clearConnectionUpdate();
 
 		if (this->controllerState == CONNECTION_INITIATION || this->controllerState == SIMULATING_MASTER) {
@@ -1322,9 +1328,11 @@ bool BLEController::checkSynchronization() {
 		else {
 			// Reconfigure radio to receive advertisements
 			this->setHardwareConfiguration(0x8e89bed6,0x555555);
-			// Reset the channel
+			
+            // Reset the channel
 			this->setChannel(this->lastAdvertisingChannel);
 
+            // Back to advertisements sniffing
 			this->controllerState = SNIFFING_ADVERTISEMENTS;
 
 			//Core::instance->getLedModule()->off(LED2);
@@ -1846,20 +1854,20 @@ void BLEController::sendTriggeredReport(uint8_t id) {
 
 void BLEController::sendConnectedReport() {
 	uint8_t initiator[6] = {
-		this->own.bytes[5],
-		this->own.bytes[4],
-		this->own.bytes[3],
-		this->own.bytes[2],
+		this->own.bytes[0],
 		this->own.bytes[1],
-		this->own.bytes[0]
+		this->own.bytes[2],
+		this->own.bytes[3],
+		this->own.bytes[4],
+		this->own.bytes[5]
 	};
 	uint8_t responder[6] = {
-		this->connectionInitiationData.responder.bytes[0],
-		this->connectionInitiationData.responder.bytes[1],
-		this->connectionInitiationData.responder.bytes[2],
-		this->connectionInitiationData.responder.bytes[3],
+		this->connectionInitiationData.responder.bytes[5],
 		this->connectionInitiationData.responder.bytes[4],
-		this->connectionInitiationData.responder.bytes[5]
+		this->connectionInitiationData.responder.bytes[3],
+		this->connectionInitiationData.responder.bytes[2],
+		this->connectionInitiationData.responder.bytes[1],
+		this->connectionInitiationData.responder.bytes[0]
 
 	};
 
@@ -1895,12 +1903,12 @@ void BLEController::sendSlaveConnectedReport() {
     );
 
 	uint8_t initiator[6] = {
-		this->connectionInitiationData.responder.bytes[0],
-		this->connectionInitiationData.responder.bytes[1],
-		this->connectionInitiationData.responder.bytes[2],
-		this->connectionInitiationData.responder.bytes[3],
+		this->connectionInitiationData.responder.bytes[5],
 		this->connectionInitiationData.responder.bytes[4],
-		this->connectionInitiationData.responder.bytes[5]
+		this->connectionInitiationData.responder.bytes[3],
+		this->connectionInitiationData.responder.bytes[2],
+		this->connectionInitiationData.responder.bytes[1],
+		this->connectionInitiationData.responder.bytes[0]
 
 	};
 
@@ -2147,6 +2155,8 @@ void BLEController::connectionInitiationAdvertisementProcessing(BLEPacket *pkt) 
 void BLEController::connectionInitiationConnectedProcessing(BLEPacket *pkt) {
 	if (!this->sync) {
 		this->sync = true;
+
+        bsp_board_led_on(0);
 
         /* No empty PDUs. */
         this->setEmptyTransmitIndicator(false);
