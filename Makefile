@@ -3,7 +3,7 @@ TARGETS          := nrf52840_xxaa
 OUTPUT_DIRECTORY := build
 DIST_DIRECTORY 	 := dist
 NRFUTIL 		 := nrfutil
-SDK_ROOT		 := ../../.sdks/nRF5_SDK_17.1.0_ddde560/
+SDK_ROOT		 := ../../nRF5_SDK_17.1.0_ddde560/
 
 ifeq ($(PLATFORM),)
     PLATFORM = BOARD_PCA10059
@@ -335,6 +335,13 @@ $(foreach target, $(TARGETS), $(call define_target, $(target)))
 
 create_builddir:
 	mkdir -p build
+
+enter_dfu:
+ifeq ($(PLATFORM),BOARD_PCA10059)
+	@echo "Triggering USB trigger..."
+	python3 $(CONF_DIR)/trigger_dfu.py $(SERIAL_PORT)
+	@echo "Done :)"
+endif
 
 send: create_builddir
 ifeq ($(PLATFORM),BOARD_PCA10059)
