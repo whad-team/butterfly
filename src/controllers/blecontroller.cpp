@@ -542,7 +542,7 @@ bool BLEController::stopConnection() {
 
 bool BLEController::connectionLost() {
 	//We are sending a notification to Host
-	//bsp_board_led_off(0);
+	bsp_board_led_off(0);
 
 	this->sendConnectionReport(DISCONNECTED);
 	this->sendConnectionReport(CONNECTION_LOST);
@@ -1860,20 +1860,20 @@ void BLEController::sendTriggeredReport(uint8_t id) {
 
 void BLEController::sendConnectedReport() {
 	uint8_t initiator[6] = {
-		this->own.bytes[5],
-		this->own.bytes[4],
-		this->own.bytes[3],
-		this->own.bytes[2],
+		this->own.bytes[0],
 		this->own.bytes[1],
-		this->own.bytes[0]
+		this->own.bytes[2],
+		this->own.bytes[3],
+		this->own.bytes[4],
+		this->own.bytes[5]
 	};
 	uint8_t responder[6] = {
-		this->connectionInitiationData.responder.bytes[0],
-		this->connectionInitiationData.responder.bytes[1],
-		this->connectionInitiationData.responder.bytes[2],
-		this->connectionInitiationData.responder.bytes[3],
+		this->connectionInitiationData.responder.bytes[5],
 		this->connectionInitiationData.responder.bytes[4],
-		this->connectionInitiationData.responder.bytes[5]
+		this->connectionInitiationData.responder.bytes[3],
+		this->connectionInitiationData.responder.bytes[2],
+		this->connectionInitiationData.responder.bytes[1],
+		this->connectionInitiationData.responder.bytes[0]
 
 	};
 
@@ -1909,12 +1909,12 @@ void BLEController::sendSlaveConnectedReport() {
     );
 
 	uint8_t initiator[6] = {
-		this->connectionInitiationData.responder.bytes[0],
-		this->connectionInitiationData.responder.bytes[1],
-		this->connectionInitiationData.responder.bytes[2],
-		this->connectionInitiationData.responder.bytes[3],
+		this->connectionInitiationData.responder.bytes[5],
 		this->connectionInitiationData.responder.bytes[4],
-		this->connectionInitiationData.responder.bytes[5]
+		this->connectionInitiationData.responder.bytes[3],
+		this->connectionInitiationData.responder.bytes[2],
+		this->connectionInitiationData.responder.bytes[1],
+		this->connectionInitiationData.responder.bytes[0]
 
 	};
 
@@ -2161,6 +2161,8 @@ void BLEController::connectionInitiationAdvertisementProcessing(BLEPacket *pkt) 
 void BLEController::connectionInitiationConnectedProcessing(BLEPacket *pkt) {
 	if (!this->sync) {
 		this->sync = true;
+
+        bsp_board_led_on(0);
 
         /* No empty PDUs. */
         this->setEmptyTransmitIndicator(false);

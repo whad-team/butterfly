@@ -4,6 +4,14 @@
 
 uint8_t tmp_buf[64];
 
+#ifdef BOARD_PCA10059
+extern "C" {
+	#include "nrf_dfu_trigger_usb.h"
+}
+#endif
+
+static volatile bool m_usb_started = false;
+
 SerialComm* SerialComm::instance = NULL;
 
 void SerialComm::cdcAcmHandler(app_usbd_class_inst_t const * p_inst, app_usbd_cdc_acm_user_event_t event) {
@@ -97,6 +105,7 @@ void  SerialComm::usbdHandler(app_usbd_event_type_t event)
 		case APP_USBD_EVT_DRV_RESUME:
 			break;
 		case APP_USBD_EVT_STARTED:
+			m_usb_started = true;
 			break;
 		case APP_USBD_EVT_STOPPED:
 			app_usbd_disable();
@@ -160,7 +169,13 @@ void SerialComm::init() {
 	APP_ERROR_CHECK(ret);
 	if (USBD_POWER_DETECTION)
 	{
+#ifdef BOARD_PCA10059
+		nrf_dfu_trigger_usb_init();
+#endif
 		ret = app_usbd_power_events_enable();
+		while (! m_usb_started) {
+			while (app_usbd_event_queue_process()){}
+		}
 		APP_ERROR_CHECK(ret);
 	}
 	else
