@@ -742,6 +742,12 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
 					timer->update(duration, timestamp - TsTxOffset);
 				}else{*/
 
+				if (timestamp < TsTxOffset){
+					// integer overflow on timestamp => put timestamp value to TsTxoffset to start next slot on TS 10ms
+					timestamp = TsTxOffset;
+
+				}
+
 				// First sync after 2 adv
 				if(this->asn.getASN()== 0){						
 					this->asn.setASN(pkt->extractASN());
@@ -783,7 +789,13 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
 						last_pkt_ts = timestamp;
 						last_received_pkt_asn = this->asn.getASN();
 						//update timer timestamp if the pkt is not an ack
-						estimated_start_of_slot = timestamp - TsTxOffset;
+						if (timestamp > TsTxOffset){
+							estimated_start_of_slot = timestamp - TsTxOffset;
+						}else{
+							// integer overflow on timestamp
+							estimated_start_of_slot = 0;
+						}
+						
 						timer->update(duration, estimated_start_of_slot);
 					}
 				}
