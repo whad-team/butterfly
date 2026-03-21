@@ -36,44 +36,48 @@ void ESBController::setChannel(int channel) {
 }
 
 void ESBController::nextPairingChannel() {
-  int channel = this->getChannel();
-  if (channel == 5) {
-    this->setChannel(32);
+  int channel;
+  
+  switch(this->getChannel()) {
+  case 5:
+    channel = 32;
+    break;
+  case 32:
+    channel = 62;
+    break;
+  case 62:
+    channel = 8;
+    break;
+  case 8:
+    channel = 35;
+    break;
+  case 35:
+    channel = 65;
+    break;
+  case 65:
+    channel = 14;
+    break;
+  case 14:
+    channel = 41;
+    break;
+  case 41:
+    channel = 71;
+    break;
+  case 71:
+    channel = 17;
+    break;
+  case 17:
+    channel = 44;
+    break;
+  case 44:
+    channel = 74;
+    break;
+  //case 74:
+  default:
+    channel = 5;
   }
-  else if (channel == 32) {
-    this->setChannel(62);
-  }
-  else if (channel == 62) {
-    this->setChannel(35);
-  }
-  else if (channel == 35) {
-    this->setChannel(65);
-  }
-  else if (channel == 65) {
-    this->setChannel(14);
-  }
-  else if (channel == 14) {
-    this->setChannel(41);
-  }
-  else if (channel == 41) {
-    this->setChannel(71);
-  }
-
-  else if (channel == 71) {
-    this->setChannel(17);
-  }
-  else if (channel == 17) {
-      this->setChannel(44);
-    }
-  else if (channel == 44) {
-    this->setChannel(74);
-  }
-  else if (channel == 74) {
-    this->setChannel(5);
-  }
-  else {
-    this->setChannel(5);
-  }
+  
+  this->setChannel(channel);
 }
 
 bool ESBController::timeout() {
