@@ -40,7 +40,7 @@ void Dot15d4Controller::enableHopping()
 	this->channelMap.setChannelMap((uint16_t)(0xffff - (0x1<<15)));
 	t_initial_hop = TimerModule::instance->getTimer();
 	t_initial_hop->setMode(REPEATED);
-	t_initial_hop->update(1000000);
+	t_initial_hop->update(2000000);
 	t_initial_hop->setCallback((ControllerCallback)&Dot15d4Controller::searchActiveChannel, this);
 	t_initial_hop->start();
 	
@@ -86,15 +86,25 @@ bool Dot15d4Controller::frequencyHop()
 {	
 	this->asn.incrementASN();
 	channelOffset = getChannelOffset();
-
+	int activeChan = 11;
 	if (channelOffset==CHANNEL_OFFSET_NOT_DEFINED){
 		//no known links found => discover other links
+		/*
 		known_link = false;
 		channelOffset = (this->asn.getASN() / this->superframes.getMaximumSuperframeSize()) % this->channelMap.getNumberOfActiveChannels();
+		activeChan = 11 + this->channelMap.getActiveChannel((channelOffset + this->asn.getASN()) % this->channelMap.getNumberOfActiveChannels());
+		*/
+		for (int i=0;i<this->channelMap.getNumberOfActiveChannels(); i++) {
+			known_link = false;
+			channelOffset = i;//(this->asn.getASN() / this->superframes.getMaximumSuperframeSize()) % this->channelMap.getNumberOfActiveChannels();
+			activeChan = 11 + this->channelMap.getActiveChannel((channelOffset + this->asn.getASN()) % this->channelMap.getNumberOfActiveChannels());
+			if (activeChan == this->activeAdvChannel) break;
+		}
+		activeChan = this->activeAdvChannel;
 	}else{
 		known_link = true;
+		activeChan = 11 + this->channelMap.getActiveChannel((channelOffset + this->asn.getASN()) % this->channelMap.getNumberOfActiveChannels());
 	}
-	int activeChan = 11 + this->channelMap.getActiveChannel((channelOffset + this->asn.getASN()) % this->channelMap.getNumberOfActiveChannels());
 	if(this->getChannel()!=activeChan){
 		setChannel(activeChan);		
 	}
@@ -531,6 +541,7 @@ void Dot15d4Controller::setRawConfiguration() {
 
 void Dot15d4Controller::start() {
 	this->started = true;
+	this->activeAdvChannel = 0;
 	if (this->controllerState == RECEIVING) {
 		this->setNativeConfiguration();
 	}
@@ -714,7 +725,7 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
         crcValue.value = ((crcValue.value & 0xff00) >> 8) | ((crcValue.value & 0xff) << 8);
 
 		//pkt = new Dot15d4Packet(buffer,1+buffer[0]-2,timestamp,RECEIVER,this->channel,rssi,crcValue, (uint8_t)(lqi > 63 ? 255 : lqi*4));
-		pkt = new Dot15d4Packet(buffer,1+buffer[0]-2,/*timestamp-last_hop*/this->asn.getASN(),RECEIVER,this->channel,this->asn.getASN(),crcValue, (uint8_t)(this->asn.getASN()));
+		pkt = new Dot15d4Packet(buffer,1+buffer[0]-2,timestamp-last_hop/*this->asn.getASN()*/,RECEIVER,this->channel,this->asn.getASN(),crcValue, (uint8_t)(this->asn.getASN()));
 	}
 	if (first_asn!=0){
 		if (pkt->extractPanId() != wihart_pan_id ) {  
@@ -725,6 +736,9 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
 	}
 	if(this->hopping ){
 		if (pkt->isWiHARTAdvertisement()){
+			if (this->activeAdvChannel == 0) {
+				this->activeAdvChannel = this->channel;
+			}
 			if (second_asn == 0){
 				//getting three first adv in order to get the avg of the duration of a slot ~=10ms
 				if(first_asn == 0){
@@ -796,7 +810,7 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
 							estimated_start_of_slot = 0;
 						}
 						
-						timer->update(duration, estimated_start_of_slot);
+						//timer->update(duration, estimated_start_of_slot);
 					}
 				}
 			}

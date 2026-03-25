@@ -341,6 +341,19 @@ enter_dfu:
 	python3 $(CONF_DIR)/trigger_dfu.py $(SERIAL_PORT)
 	
 	
+
+remote_send: create_builddir
+ifeq ($(PLATFORM),BOARD_PCA10059)
+	@echo "Generating DFU package ..."
+	rm -f $(OUTPUT_DIRECTORY)/dfu.zip
+	$(NRFUTIL) pkg generate --hw-version 52 --sd-req 0x00 --debug-mode --application $(OUTPUT_DIRECTORY)/nrf52840_xxaa.hex $(OUTPUT_DIRECTORY)/dfu.zip
+	@echo "Flashing device ..."
+	scp $(OUTPUT_DIRECTORY)/dfu.zip wihart:/tmp/dfu.zip
+	@echo "Done :)"
+	sleep 1	
+	ssh wihart "butterfly_flash.py /dev/ttyACM0 /tmp/dfu.zip"
+endif
+
 send: create_builddir
 ifeq ($(PLATFORM),BOARD_PCA10059)
 	@echo "Generating DFU package ..."

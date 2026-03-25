@@ -48,6 +48,7 @@ class Dot15d4Controller : public Controller {
 		int channel;
 		int channelOffset;
 
+		
 		Timer *timerSend;
 		Task task_list[MAX_TASKS];
 		int task_count = 0;
@@ -62,6 +63,8 @@ class Dot15d4Controller : public Controller {
 		bool activate_hopping_timer = false;
 		bool known_link = true;
 	public:
+		int activeAdvChannel;
+		
 		static int channelToFrequency(int channel);
 		Dot15d4Controller(Radio* radio);
     void start();
