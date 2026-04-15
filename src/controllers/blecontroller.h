@@ -74,6 +74,17 @@ typedef struct BLEConnectionUpdate {
 	uint8_t channelMap[5];
 } BLEConnectionUpdate;
 
+typedef enum {
+    PHY_UPDATE_NONE,
+    PHY_UPDATE_BOTH
+} BLEPhyUpdateType;
+
+typedef struct BLEPhyUpdate {
+    BLEPhyUpdateType type;
+    uint16_t instant;
+    uint8_t c2p;
+    uint8_t p2c;
+} BLEPhyUpdate;
 
 // Sequence numbers definition
 typedef struct BLESequenceNumbers {
@@ -125,6 +136,11 @@ typedef enum ChannelState {
 	NOT_MONITORED = 3
 } ChannelState;
 
+typedef enum ChanSelAlg {
+    CSA1 = 0,
+    CSA2,
+} ChanSelAlg;
+
 typedef struct ActiveConnectionRecovery {
 	bool monitoredChannels[37];
 	int monitoredChannelsCount;
@@ -165,6 +181,7 @@ typedef struct ConnectionInitiationData {
 		uint8_t sca;
 		uint8_t hopIncrement;
 		uint8_t channelMap[5];
+        ChanSelAlg csa;
 } ConnectionInitiationData;
 
 typedef struct AdvertisingData {
@@ -230,6 +247,7 @@ class BLEController : public Controller {
 		bool channelsInUse[37];
 		int *remappingTable;
 		BLEConnectionUpdate connectionUpdate;
+        BLEPhyUpdate phyUpdate;
 		bool sync;
 		uint8_t desyncCounter;
 		uint16_t latency;
@@ -238,6 +256,10 @@ class BLEController : public Controller {
 		int lastPacketCount;
 		int masterSCA;
 		int slaveSCA;
+
+        /* Channel Selection Algorithm related. */
+        ChanSelAlg csa;
+        uint32_t csa2_chan_id;
 
 		uint8_t channelMap[5];
 
@@ -343,7 +365,7 @@ class BLEController : public Controller {
 		void attachToExistingConnection(uint32_t accessAddress, uint32_t crcInit, uint8_t *channelMap, uint16_t interval, uint8_t hopIncrement);
 
 		// Connection specific methods
-		void followConnection(uint16_t hopInterval, uint8_t hopIncrement, uint8_t *channelMap,uint32_t accessAddress,uint32_t crcInit,  int masterSCA,uint16_t latency);
+		void followConnection(ChanSelAlg csa, uint16_t hopInterval, uint8_t hopIncrement, uint8_t *channelMap,uint32_t accessAddress,uint32_t crcInit,  int masterSCA,uint16_t latency, uint16_t winOffset, uint8_t winSize);
 
 		void advertise(uint8_t *advertisingData, size_t advertisingDataSize, uint8_t *scanData, size_t scanDataSize, bool connectable, uint32_t interval);
 
@@ -369,6 +391,9 @@ class BLEController : public Controller {
 		void prepareConnectionUpdate(uint16_t instant, uint16_t hopInterval, uint8_t windowSize, uint8_t windowOffset,uint16_t latency);
 		void prepareConnectionUpdate(uint16_t instant, uint8_t *channelMap);
 		void applyConnectionUpdate();
+        void clearPhyUpdate();
+        void preparePhyUpdate(uint16_t instant, uint8_t c2p, uint8_t p2c);
+        void applyPhyUpdate();
 
 		void updateMasterSequenceNumbers(uint8_t sn, uint8_t nesn);
 		void updateSlaveSequenceNumbers(uint8_t sn, uint8_t nesn);

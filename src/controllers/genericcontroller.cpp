@@ -36,9 +36,20 @@ bool GenericController::setPreamble(uint8_t *preamble, size_t preambleSize) {
   return false;
 }
 
+/*
+ * Returns the size of the configured preamble.
+ */
+size_t GenericController::getPreambleSize() {
+    return this->preambleSize;
+}
+
 bool GenericController::setPacketSize(size_t packetSize) {
   this->packetSize = packetSize;
   return true;
+}
+
+size_t GenericController::getPacketSize() {
+    return this->packetSize;
 }
 
 bool GenericController::setEndianness(GenericEndianness endianness) {
@@ -313,6 +324,7 @@ void GenericController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
     datarate = 2000000;
 
   }
+  
   GenericPacket *pkt = new GenericPacket(buffer,size,timestamp,0x00,channel,rssi,crcValue, preamble, this->preambleSize, deviation, datarate, whad::phy::ModulationGFSK, little);
   this->addPacket(pkt);
   delete pkt;

@@ -303,13 +303,13 @@ default: nrf52840_xxaa
 dist: nrf52840_xxaa
 ifeq ($(PLATFORM),BOARD_PCA10059)
 	mkdir -p $(DIST_DIRECTORY)
-	cp $(OUTPUT_DIRECTORY)/nrf52840_xxaa.hex $(DIST_DIRECTORY)/pca10059.hex
-	$(NRFUTIL) pkg generate --hw-version 52 --sd-req 0x00 --debug-mode --application $(OUTPUT_DIRECTORY)/nrf52840_xxaa.hex $(DIST_DIRECTORY)/pca10059-fwupdate.zip
+	cp $(OUTPUT_DIRECTORY)/nrf52840_xxaa.hex $(DIST_DIRECTORY)/butterfly.hex
+	$(NRFUTIL) pkg generate --hw-version 52 --sd-req 0x00 --debug-mode --application $(OUTPUT_DIRECTORY)/nrf52840_xxaa.hex $(DIST_DIRECTORY)/butterfly-fwupgrade.zip
 endif
 ifeq ($(PLATFORM),BOARD_MDK_DONGLE)
 	mkdir -p $(DIST_DIRECTORY)
-	cp $(OUTPUT_DIRECTORY)/nrf52840_xxaa.hex $(DIST_DIRECTORY)/mdk-dongle.hex
-	python3 $(CONF_DIR)/uf2conv.py $(DIST_DIRECTORY)/mdk-dongle.hex -c -f 0xADA52840 -o $(DIST_DIRECTORY)/mdk-dongle-fwupdate.uf2
+	cp $(OUTPUT_DIRECTORY)/nrf52840_xxaa.hex $(DIST_DIRECTORY)/butterfly-mdk.hex
+	python3 $(CONF_DIR)/uf2conv.py $(DIST_DIRECTORY)/butterfly-mdk.hex -c -f 0xADA52840 -o $(DIST_DIRECTORY)/butterfly-mdk-fwupgrade.uf2
 endif
 # Print all targets that can be built
 help:

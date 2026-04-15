@@ -57,8 +57,10 @@ class GenericController : public Controller {
 
 		bool setTxPower(GenericTxPower txPower);
 		bool setPreamble(uint8_t *preamble, size_t preambleSize);
+        size_t getPreambleSize();
 		bool setPacketSize(size_t packetSize);
-		bool setEndianness(GenericEndianness endianness);
+		size_t getPacketSize();
+        bool setEndianness(GenericEndianness endianness);
 		bool setPhy(GenericPhy phy);
 		GenericPhy getPhy();
 
