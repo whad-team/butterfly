@@ -404,7 +404,6 @@ void Core::processBLEInputMessage(whad::ble::BleMsg bleMsg) {
         case whad::ble::SniffAAMsg:
         {
             whad::ble::SniffAccessAddress query(bleMsg);
-
             this->bleController->setChannel(0);
             this->bleController->setMonitoredChannels(query.getChannelMap().getChannelMapBuf());
             this->bleController->sniffAccessAddresses();
@@ -1784,7 +1783,6 @@ bool Core::selectController(Protocol controller) {
 }
 
 void Core::sendDebug(const char *message) {
-	//this->pushMessageToQueue(new DebugNotification(message));
 }
 
 void Core::sendDebug(uint8_t *buffer, uint8_t size) {
@@ -1837,8 +1835,8 @@ Message* Core::popMessageFromQueue() {
 
 void Core::sendVerbose(const char* data) {
   std::string message(data);
-  whad::generic::Verbose verbMsg(message);
-  this->pushMessageToQueue(verbMsg.getRaw());
+  whad::generic::Verbose *verbMsg = new whad::generic::Verbose(message);
+  this->pushMessageToQueue(verbMsg->getRaw());
 }
 
 void Core::loop() {
