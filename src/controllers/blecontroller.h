@@ -125,8 +125,9 @@ typedef struct BLEPayload {
 } BLEPayload;
 
 typedef struct CandidateAccessAddresses {
-	uint32_t candidates[MAX_AA_CANDIDATES];
-	uint8_t pointer;
+    uint32_t aa[MAX_AA_CANDIDATES];
+    uint32_t seen[MAX_AA_CANDIDATES];
+    int32_t count;
 } CandidateAccessAddresses;
 
 typedef enum ChannelState {
