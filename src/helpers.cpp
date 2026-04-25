@@ -92,7 +92,7 @@ int is_access_address_valid(uint32_t aa)
     bb = aa;
     for (i=0; i<26; i++)
     {
-        if (((bb&0x3F) == 0) || ((bb&0x3F)==0x3F))
+        if (((bb&0x7F) == 0) || ((bb&0x7F)==0x7F))
             return 0;
         bb >>= 1;
     }
@@ -101,20 +101,16 @@ int is_access_address_valid(uint32_t aa)
     bb = aa;
     t = 0;
     a = (bb & 0x80000000)>>31;
-    for (i=30; i>=0; i--)
+    for (i=30; i>=26; i--)
     {
         if (((bb & (1<<i))>>i) != a)
         {
             a = ((bb & (1<<i))>>i);
             t++;
-            if (t>24)
-                return 0;
         }
-        if ((i < 26) && (t<2))
-            return 0;
     }
 
-    return 1;
+    return (t>=2)?1:0;
 }
 
 uint32_t reverse_crc_ble(uint32_t crc, uint8_t *data, int len) {
