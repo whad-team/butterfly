@@ -868,26 +868,80 @@ void BLEController::start() {
 	}
 }
 
+/**
+ * Reset Access Address detection structure.
+ **/
+
 void BLEController::resetAccessAddressesCandidates() {
-	this->activeConnectionRecovery.accessAddressCandidates.pointer = 0;
+	this->activeConnectionRecovery.accessAddressCandidates.count = 0;
 	for (int i=0;i<MAX_AA_CANDIDATES;i++) {
-		this->activeConnectionRecovery.accessAddressCandidates.candidates[i] = 0x00000000;
+		this->activeConnectionRecovery.accessAddressCandidates.aa[i] = 0x00000000;
+		this->activeConnectionRecovery.accessAddressCandidates.seen[i] = 0x00000000;
 	}
 }
+
+/**
+ * Check if a given Access Address is known (seen at least twice).
+ **/
+
 bool BLEController::isAccessAddressKnown(uint32_t accessAddress) {
 	bool found = false;
 	for (int i=0;i<MAX_AA_CANDIDATES;i++) {
-		if (this->activeConnectionRecovery.accessAddressCandidates.candidates[i] == accessAddress) {
-			found = true;
-			break;
-		}
+		if (this->activeConnectionRecovery.accessAddressCandidates.aa[i] == accessAddress) {
+            this->activeConnectionRecovery.accessAddressCandidates.seen[i]++;
+            if (this->activeConnectionRecovery.accessAddressCandidates.seen[i] > 1) {
+                found = true;
+            }
+            break;
+        }
 	}
 	return found;
 }
 
+
+/**
+ * Add a candidate Access Address to our list.
+ *
+ * This list is limited to 25 entries, when no slot is available this list
+ * is sorted by candidate count and the bottom half candidates are discarded
+ * before inserting a new one. This way, we keep track of the best candidates.
+ **/
+
 void BLEController::addCandidateAccessAddress(uint32_t accessAddress) {
-		this->activeConnectionRecovery.accessAddressCandidates.candidates[this->activeConnectionRecovery.accessAddressCandidates.pointer] = accessAddress;
-		this->activeConnectionRecovery.accessAddressCandidates.pointer = (this->activeConnectionRecovery.accessAddressCandidates.pointer + 1) % MAX_AA_CANDIDATES;
+    uint32_t x,z;
+    int change;
+    CandidateAccessAddresses *candidates = &this->activeConnectionRecovery.accessAddressCandidates;
+
+    if (candidates->count < MAX_AA_CANDIDATES) {
+        candidates->seen[candidates->count] = 1;
+		candidates->aa[candidates->count++] = accessAddress;
+    } else {
+        /* No more space? Sort our list, remove half the values and add our AA. */
+        do
+        {
+            change = 0;
+            for (int i=0; i<(candidates->count - 1); i++)
+            {
+                for (int j=i+1; j<candidates->count; j++)
+                {
+                    if (candidates->seen[i] < candidates->seen[j])
+                    {
+                        x = candidates->seen[i];
+                        candidates->seen[i] = candidates->seen[j];
+                        candidates->seen[j] = x;
+                        z = candidates->aa[i];
+                        candidates->aa[i] = candidates->aa[j];
+                        candidates->aa[j] = z;
+                        change = 1;
+                    }
+                }
+            }
+        } while (change > 0);
+
+        candidates->count /= 2;
+        candidates->aa[candidates->count] = accessAddress;
+        candidates->seen[candidates->count++] = 1;
+    }
 }
 
 
@@ -1084,10 +1138,10 @@ void BLEController::sniffAccessAddresses() {
 }
 
 void BLEController::setAccessAddressDiscoveryConfiguration(uint8_t preamble) {
-	uint8_t two_bytes_preamble[] = {preamble, 0xff};
+  uint8_t two_bytes_preamble[] = {preamble, 0xff};
   this->radio->setPreamble(two_bytes_preamble, 2);
-	this->radio->setPrefixes(0xa8,0x1f,0x9f,0xaf, 0xa9,0x00,0xFF);
-	//this->radio->setPrefixes();
+  this->radio->setPrefixes(0xa8,0x1f,0x9f,0xaf, 0xa9,0x00,0xFF);
+  //this->radio->setPrefixes();
   this->radio->setMode(MODE_NORMAL);
   this->radio->setFastRampUpTime(true);
   this->radio->setEndianness(LITTLE);
@@ -1105,9 +1159,9 @@ void BLEController::setAccessAddressDiscoveryConfiguration(uint8_t preamble) {
   this->radio->setCrcSize(2);
   this->radio->setCrcInit(0xFFFF);
   this->radio->setCrcPoly(0x1021);
-  this->radio->setPayloadLength(4);
+  this->radio->setPayloadLength(8);
   this->radio->setInterFrameSpacing(0);
-  this->radio->setExpandPayloadLength(4);
+  this->radio->setExpandPayloadLength(8);
   this->radio->setFrequency(BLEController::channelToFrequency(channel));
   this->radio->reload();
 }
@@ -2730,22 +2784,52 @@ void BLEController::advertisementPacketProcessing(BLEPacket *pkt) {
 }
 
 void BLEController::accessAddressProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
+    uint8_t candidate_pdu[2];
+    uint32_t accessAddress = buffer[0] | (buffer[1] << 8) | (buffer[2] << 16) | (buffer[3] << 24);
 
-			uint32_t accessAddress = (
-																buffer[0] |
-																(buffer[1] << 8) |
-		 														(buffer[2] << 16) |
-																(buffer[3] << 24)
-			);
-			if (is_access_address_valid(accessAddress)) {
-			 	if (this->isAccessAddressKnown(accessAddress)) {
-					this->sendAccessAddressReport(accessAddress, timestamp, -1 * rssi);
-				}
-				else {
-					this->addCandidateAccessAddress(accessAddress);
-				}
-			}
+    /* Dewhiten the two bytes following the candidate AA (BLE PDU header) */
+    candidate_pdu[0] = buffer[4];
+    candidate_pdu[1] = buffer[5];
+    dewhiten_ble(candidate_pdu, 2, this->channel);
+
+    /* If the dewhitened frame header may be an empty PDU header, add AA to our candidates. */
+    if (is_access_address_valid(accessAddress) && (candidate_pdu[1] == 0) && ((candidate_pdu[0]&0x3)==1)) {
+        if (this->isAccessAddressKnown(accessAddress)) {
+            this->sendAccessAddressReport(accessAddress, timestamp, -1 * rssi);
+        }
+        else {
+            this->addCandidateAccessAddress(accessAddress);
+        }
+    } else {
+        /**
+         * If not, try with same buffer after two bit shifts (right).
+         * (algorithm from btlejack, inspired by MouseJack).
+         **/
+        for (int j=0; j<2; j++)
+        {
+            /* Shift right. */
+            for (int i=0; i<9; i++)
+                buffer[i] = buffer[i]>>1 | ((buffer[i+1]&0x01) << 7);
+
+            /* Dewhiten candidate PDU. */
+            candidate_pdu[0] = buffer[4];
+            candidate_pdu[1] = buffer[5];
+            dewhiten_ble(candidate_pdu, 2, this->channel);
+
+            /* Check if PDU is the one expected. */
+            accessAddress = buffer[0] | buffer[1]<<8 | buffer[2]<<16 | buffer[3]<<24;
+            if (is_access_address_valid(accessAddress) && (candidate_pdu[1] == 0) && ((candidate_pdu[0]&0x3)==1)) {
+                if (this->isAccessAddressKnown(accessAddress)) {
+                    this->sendAccessAddressReport(accessAddress, timestamp, -1 * rssi);
+                }
+                else {
+                    this->addCandidateAccessAddress(accessAddress);
+                }
+            }
+        }
+    }
 }
+
 void BLEController::crcInitRecoveryProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
 		// If we got an empty packet, extract the CRC and reverse the CRCInit
 		if ((buffer[0] & 0xF3) == 1 && buffer[1] == 0x00) {
