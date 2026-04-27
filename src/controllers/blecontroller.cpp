@@ -1920,9 +1920,15 @@ void BLEController::sendAccessAddressReport(uint32_t accessAddress, uint32_t tim
 }
 
 void BLEController::sendExistingConnectionReport(uint32_t accessAddress, uint32_t crcInit, uint8_t *channelMap, uint16_t hopInterval, uint8_t hopIncrement) {
+    whad::ble::ChannelMap *chanMap;
+
     /* Craft an existing connection report notification. */
-    whad::ble::ChannelMap chanMap(channelMap);
-    whad::NanoPbMsg *notification = new whad::ble::Synchronized(accessAddress, crcInit, hopInterval, hopIncrement, chanMap);
+    if (channelMap != NULL) {
+        chanMap = new whad::ble::ChannelMap(channelMap);
+    } else {
+        chanMap = new whad::ble::ChannelMap();
+    }
+    whad::NanoPbMsg *notification = new whad::ble::Synchronized(accessAddress, crcInit, hopInterval, hopIncrement, *chanMap);
 
     /* Add notification to our message queue. */
 	Core::instance->pushMessageToQueue(notification);
@@ -2832,7 +2838,7 @@ void BLEController::accessAddressProcessing(uint32_t timestamp, uint8_t size, ui
 
 void BLEController::crcInitRecoveryProcessing(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
 		// If we got an empty packet, extract the CRC and reverse the CRCInit
-		if ((buffer[0] & 0xF3) == 1 && buffer[1] == 0x00) {
+		if ((buffer[0] & 0x3) == 1 && buffer[1] == 0x00) {
 			uint32_t crc = buffer[2] | (buffer[3] << 8) | (buffer[4] << 16);
 			uint32_t crcInit = reverse_crc_ble(crc, buffer, 2);
 
