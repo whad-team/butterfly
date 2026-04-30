@@ -3,6 +3,11 @@
 #include <whad.h>
 
 /**
+ * Divide round helper.
+ **/
+#define DIVIDE_ROUND(N, D) ((N) + (D)/2) / (D)
+
+/**
  * Channel Selection Algorithm #2 PRNG primitives.
  **/
 
@@ -667,23 +672,56 @@ bool BLEController::goToNextChannel() {
 
 
 		// if we observed a channel map request, let's consider it has been applied and our counter was wrong
-		/*
+
 		if (this->controllerState != SIMULATING_MASTER && this->desyncCounter == 1 && this->connectionUpdate.type == UPDATE_TYPE_CHANNEL_MAP_REQUEST) {
-
-			bsp_board_led_on(1);
-			bsp_board_led_on(0);
-
 			this->connectionEventCount = this->connectionUpdate.instant;
 			this->updateChannelsInUse(this->connectionUpdate.channelMap);
 			this->clearConnectionUpdate();
 			int channel = this->nextChannel();
 			this->setChannel(channel);
 
-		}*/
+		}
+
+        /**
+         * If we missed a PDU and we had a pending connection update request, chances
+         * are high that the new parameters have been set. Therefore, current event
+         * counter should be set to the instant of this pending connection update
+         * and the connection interval updated as soon as possible. We also need
+         * to take into account that we may have waited too long (at least a complete
+         * connection event) and that multiple connection events may have happen
+         * since (especially if the new interval value is very small).
+         **/
+        if (this->controllerState != SIMULATING_MASTER && this->desyncCounter == 1 && this->connectionUpdate.type == UPDATE_TYPE_CONNECTION_UPDATE_REQUEST) {
+            char dbg[256];
+
+            /* Compute the number of connection events we missed. */
+            uint16_t missed_conn_events = (this->connectionTimer->getLastTimestamp() - this->lastAnchorPoint) / (this->connectionUpdate.hopInterval * 1250);
+            //snprintf(dbg, 256, "old: %d, new: %d, missed: %d, anchor: %ld, evtcount: %d",this->hopInterval, this->connectionUpdate.hopInterval, 2*missed_conn_events, this->lastAnchorPoint, this->connectionUpdate.instant + 2*missed_conn_events);
+            //Core::instance->sendVerbose(dbg);
+
+            /* Update the current connection event counter. */
+            this->connectionEventCount = this->connectionUpdate.instant + 2*missed_conn_events;
+           
+            /* Then we hop to the expected next channel (current channel counts as the first missed channel). */
+            for (int i=0; i < (2*missed_conn_events - 1); i++) {
+                this->nextChannel();
+            }
+
+            /* Update connection hop interval. Connection timer will be updated according to this value. */
+            this->updateHopInterval(this->connectionUpdate.hopInterval);
+            
+            /* Pending connection update has been processed. */
+            this->clearConnectionUpdate();
+
+			/* Update anchor point and mark connection as not in sync anymore. */
+            this->setAnchorPoint(this->lastAnchorPoint);
+			this->sync = false;
+        }
 
 		// If the desyncCounter is greater than three, the connection is considered lost
 		if (this->desyncCounter > 5 && !this->attackStatus.running) {
-			return this->connectionLost();
+			/* TODO: resynchronize if any connection update is pending. */
+            return this->connectionLost();
 		}
 		// If we are still following the connection
 		else {
@@ -854,15 +892,15 @@ void BLEController::start() {
 				this->discoveryTimer = NULL;
 			}
 			this->followConnection(
-                this->csa,
+                CSA1,
 				this->hopInterval,
 				this->hopIncrement,
 				this->channelMap,
 				this->accessAddress,
 				this->crcInit,
 				20,
-				0,
-                this->hopInterval,
+				6,
+                0,//this->hopInterval,
                 0xff
 			);
 	}
@@ -1458,8 +1496,12 @@ void BLEController::followConnection(
     }
     
 	// We calculate the first channel
-	this->lastUnmappedChannel = 0;
-	this->channel = this->nextChannel();
+    if (winSize != 0xFF) {
+        this->lastUnmappedChannel = 0;
+        this->channel = this->nextChannel();
+    } else {
+        this->lastUnmappedChannel = this->channel;
+    }
 
 
 	// No connection update is expected
@@ -1507,7 +1549,10 @@ bool BLEController::checkSynchronization() {
 
 		// We are not synchronized anymore
 		this->sync = false;
-		
+	
+        // Send a connection lost event.
+		this->sendConnectionReport(CONNECTION_LOST);
+
         // We are not waiting for an update
 		this->clearConnectionUpdate();
         this->clearPhyUpdate();
@@ -2874,6 +2919,7 @@ void BLEController::hopIntervalRecoveryProcessing(uint32_t timestamp, uint8_t si
 
 		else if ((timestamp - this->activeConnectionRecovery.lastTimestamp) > 1250) {
 			uint16_t hopInterval = (((timestamp - this->activeConnectionRecovery.lastTimestamp)/1250)/ 37);
+            //uint16_t hopInterval = DIVIDE_ROUND((timestamp - this->activeConnectionRecovery.lastTimestamp)/1250, 37);
 			if (this->hopInterval != hopInterval) {
 				this->hopInterval = hopInterval;
 				this->activeConnectionRecovery.numberOfMeasures = 0;
@@ -2881,8 +2927,8 @@ void BLEController::hopIntervalRecoveryProcessing(uint32_t timestamp, uint8_t si
 			else {
 				this->activeConnectionRecovery.numberOfMeasures++;
 				if (this->activeConnectionRecovery.numberOfMeasures > 2) {
-					this->hopInterval = this->hopInterval; // hop interval seems too small by one
-					this->sendExistingConnectionReport(this->accessAddress, this->crcInit, this->channelMap, this->hopInterval,0);
+					this->hopInterval = this->hopInterval + 1; // hop interval seems too small by one
+					this->sendExistingConnectionReport(this->accessAddress, this->crcInit, this->channelMap, this->hopInterval, 0);
 					this->recoverHopIncrement(this->accessAddress, this->crcInit, this->channelMap, this->hopInterval);
 				}
 			}
@@ -2899,24 +2945,34 @@ void BLEController::hopIncrementRecoveryProcessing(uint32_t timestamp, uint8_t s
 			this->setChannel(this->activeConnectionRecovery.secondChannel);
 		}
 		else if (this->channel == this->activeConnectionRecovery.secondChannel) {
-			uint16_t interval = (((timestamp - this->activeConnectionRecovery.lastTimestamp)/1250) / this->hopInterval);
+			//uint16_t interval = (((timestamp - this->activeConnectionRecovery.lastTimestamp)/1250) / this->hopInterval);
+            uint16_t interval = DIVIDE_ROUND((timestamp - this->activeConnectionRecovery.lastTimestamp)/1250, this->hopInterval);
 			uint8_t increment = this->activeConnectionRecovery.reverseLookUpTables[interval];
 			if (increment > 0) {
-				this->sendExistingConnectionReport(this->accessAddress, this->crcInit, this->channelMap, this->hopInterval, increment);
-				this->updateHopIncrement(increment);
-				this->hopInterval++;
+				/* Save recovered increment. */
+                this->updateHopIncrement(increment);
+                //this->hopInterval++;
+
+                /** 
+                 * Follow connection (will tune on next channel and wait for
+                 * a valid PDU.
+                 **/
+
 				this->followConnection(
-                    this->csa,
+                    CSA1,//this->csa,
 					this->hopInterval,
 					this->hopIncrement,
 					this->channelMap,
 					this->accessAddress,
 					this->crcInit,
 					20,
-					0,
-                    this->hopInterval,
+					6,
+                    0,//this->hopInterval,
                     0xff
 				);
+
+                /* Send a report when everything has been set. */
+				this->sendExistingConnectionReport(this->accessAddress, this->crcInit, this->channelMap, this->hopInterval, increment);
 
 			}
 			else {
