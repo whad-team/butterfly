@@ -671,56 +671,127 @@ bool BLEController::goToNextChannel() {
 		this->desyncCounter = (this->packetCount == 0 ? this->desyncCounter + 1 : 0);
 
 
-		// if we observed a channel map request, let's consider it has been applied and our counter was wrong
 
-		if (this->controllerState != SIMULATING_MASTER && this->desyncCounter == 1 && this->connectionUpdate.type == UPDATE_TYPE_CHANNEL_MAP_REQUEST) {
-			this->connectionEventCount = this->connectionUpdate.instant;
-			this->updateChannelsInUse(this->connectionUpdate.channelMap);
-			this->clearConnectionUpdate();
-			int channel = this->nextChannel();
-			this->setChannel(channel);
+		if (this->controllerState != SIMULATING_MASTER && this->desyncCounter == 1) {
 
-		}
+            switch (this->connectionUpdate.type) {
 
-        /**
-         * If we missed a PDU and we had a pending connection update request, chances
-         * are high that the new parameters have been set. Therefore, current event
-         * counter should be set to the instant of this pending connection update
-         * and the connection interval updated as soon as possible. We also need
-         * to take into account that we may have waited too long (at least a complete
-         * connection event) and that multiple connection events may have happen
-         * since (especially if the new interval value is very small).
-         **/
-        if (this->controllerState != SIMULATING_MASTER && this->desyncCounter == 1 && this->connectionUpdate.type == UPDATE_TYPE_CONNECTION_UPDATE_REQUEST) {
-            char dbg[256];
+                // if we observed a channel map request, let's consider it has been applied and our counter was wrong
+                case UPDATE_TYPE_CHANNEL_MAP_REQUEST:
+                    {
+                        this->connectionEventCount = this->connectionUpdate.instant;
+                        this->updateChannelsInUse(this->connectionUpdate.channelMap);
+                        this->clearConnectionUpdate();
+                        int channel = this->nextChannel();
+                        this->setChannel(channel);
+                    }
+                    break;
 
-            /* Compute the number of connection events we missed. */
-            uint16_t missed_conn_events = (this->connectionTimer->getLastTimestamp() - this->lastAnchorPoint) / (this->connectionUpdate.hopInterval * 1250);
-            //snprintf(dbg, 256, "old: %d, new: %d, missed: %d, anchor: %ld, evtcount: %d",this->hopInterval, this->connectionUpdate.hopInterval, 2*missed_conn_events, this->lastAnchorPoint, this->connectionUpdate.instant + 2*missed_conn_events);
-            //Core::instance->sendVerbose(dbg);
 
-            /* Update the current connection event counter. */
-            this->connectionEventCount = this->connectionUpdate.instant + 2*missed_conn_events;
-           
-            /* Then we hop to the expected next channel (current channel counts as the first missed channel). */
-            for (int i=0; i < (2*missed_conn_events - 1); i++) {
-                this->nextChannel();
+
+                /**
+                 * If we missed a PDU and we had a pending connection update request, chances
+                 * are high that the new parameters have been set. Therefore, current event
+                 * counter should be set to the instant of this pending connection update
+                 * and the connection interval updated as soon as possible. We also need
+                 * to take into account that we may have waited too long (at least a complete
+                 * connection event) and that multiple connection events may have happen
+                 * since (especially if the new interval value is very small).
+                 **/
+                case UPDATE_TYPE_CONNECTION_UPDATE_REQUEST:
+                    {
+                        if (this->controllerState == SNIFFING_CONNECTION && this->csa == CSA1) {
+                            /* Compute old and new hop interval in microseconds. */
+                            uint32_t now = this->connectionTimer->getLastTimestamp();
+                            uint32_t oldInterval = this->hopInterval * 1250UL;
+                            uint32_t newInterval = this->connectionUpdate.hopInterval * 1250UL;
+
+                            /*
+                             * In SNIFFING_CONNECTION, connection parameters may have been recovered from an
+                             * existing connection, so our local connectionEventCount is not guaranteed to be
+                             * aligned with the real LL instant.  A missed packet with a pending connection
+                             * update is therefore handled from elapsed time and channel-sequence phase only.
+                             *
+                             * desyncCounter == 1 means the previous timer tick already moved us one channel
+                             * after the last packet we received.  lastAnchorPoint now points to that missed
+                             * old-interval anchor, so recover the last received anchor by going back one old
+                             * interval.
+                             */
+                            uint32_t lastReceivedAnchor = this->lastAnchorPoint;
+                            if (oldInterval > 0 && this->lastAnchorPoint >= oldInterval) {
+                                lastReceivedAnchor -= oldInterval;
+                            }
+
+                            /*
+                             * Target the next new-interval connection event after now.  If it is too close,
+                             * skip events until the radio has enough time to retune before the expected PDU.
+                             */
+                            uint32_t elapsed = now - lastReceivedAnchor;
+                            uint32_t targetEventsElapsed = (elapsed / newInterval) + 1;
+                            uint32_t targetAnchor = lastReceivedAnchor + targetEventsElapsed * newInterval;
+                            const uint32_t radioReconfigurationMargin = 150;
+
+                            while ((uint32_t)(targetAnchor - now) <= radioReconfigurationMargin) {
+                                targetEventsElapsed++;
+                                targetAnchor += newInterval;
+                            }
+
+                            /*
+                             * The local channel sequence is already one step after the last received packet.
+                             * Advance only the missing delta so that the selected channel matches the chosen
+                             * future event.
+                             */
+                            uint32_t additionalSteps = (targetEventsElapsed > 1 ? targetEventsElapsed - 1 : 0);
+                            uint16_t updateInstant = this->connectionUpdate.instant;
+
+                            /* Update connection hop interval with the connection update value. */
+                            this->updateHopInterval(this->connectionUpdate.hopInterval);
+
+                            /* Pending connection update has been processed, clear it. */
+                            this->clearConnectionUpdate();
+
+                            /*
+                             * Skip missed channels to reach the next expected channel based on the current channel
+                             * map and hop increment.
+                             */
+
+                            if (additionalSteps > 0) {
+                                int channel = this->channel;
+
+                                for (uint32_t i=0; i < additionalSteps; i++) {
+                                    channel = this->nextChannel();
+                                }
+                                this->setChannel(channel);
+                            }
+
+                            /*
+                             * Re-anchor the event counter to the LL instant and the number of events elapsed
+                             * with the new interval.  CSA1 does not need an absolute counter for hopping, but
+                             * keeping it close to the real timeline avoids destabilizing trigger/update logic.
+                             */
+                            this->connectionEventCount = updateInstant + targetEventsElapsed;
+                            this->connectionTimer->update(this->hopInterval*1250UL, now);
+
+                            /*
+                             * We selected a future event to catch.  Schedule the following timer from that
+                             * future anchor and wait for the radio to receive/re-anchor on the selected event.
+                             */
+                            this->lastPacketCount = this->packetCount;
+                            this->packetCount = 0;
+                            this->sync = false;
+                            return true;
+                        }
+                    }
+                    break;
+
+                default:
+                case UPDATE_TYPE_NONE:
+                    break;
             }
-
-            /* Update connection hop interval. Connection timer will be updated according to this value. */
-            this->updateHopInterval(this->connectionUpdate.hopInterval);
-            
-            /* Pending connection update has been processed. */
-            this->clearConnectionUpdate();
-
-			/* Update anchor point and mark connection as not in sync anymore. */
-            this->setAnchorPoint(this->lastAnchorPoint);
-			this->sync = false;
         }
 
 		// If the desyncCounter is greater than three, the connection is considered lost
 		if (this->desyncCounter > 5 && !this->attackStatus.running) {
-			/* TODO: resynchronize if any connection update is pending. */
             return this->connectionLost();
 		}
 		// If we are still following the connection
@@ -779,8 +850,8 @@ bool BLEController::goToNextChannel() {
 		return true;
 	}
 	return false;
-
 }
+
 void BLEController::start() {
 	if (this->controllerState == CONNECTION_INITIATION) return;
 
