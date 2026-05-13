@@ -962,18 +962,28 @@ void BLEController::start() {
 				this->discoveryTimer->release();
 				this->discoveryTimer = NULL;
 			}
-			this->followConnection(
+
+            /* Pick a unique channel based on current channel map. */
+            uint8_t chan1=37, chan2=37;
+            this->findUniqueChannels(&chan1, &chan2);
+
+            /* Set channel. */
+            this->channel = chan1;
+            this->setChannel(this->channel);
+
+            /* Start following. */
+            this->followConnection(
                 CSA1,
-				this->hopInterval,
-				this->hopIncrement,
-				this->channelMap,
-				this->accessAddress,
-				this->crcInit,
-				20,
-				6,
-                0,//this->hopInterval,
+                this->hopInterval,
+                this->hopIncrement,
+                this->channelMap,
+                this->accessAddress,
+                this->crcInit,
+                20,
+                6,
+                0xffff, /* winOffset set to 0xffff, will wait a full hop sequence. */
                 0xff
-			);
+            );
 	}
 }
 
@@ -1531,6 +1541,16 @@ void BLEController::followConnection(
     unsigned long transmitWindow = 1250UL + (winOffset * 1250L);
     unsigned long transmitWindowEnd = transmitWindow + (winSize * 1250L);
 
+    /* 
+     * Special case: when winOffset is set to 0xFFFF, we listen on the current channel 
+     * until we get a valid packet. Timeout is set to 37*hopInterval to allow sync check
+     * once we've looped over the entire channel sequence.
+     */
+    if (winOffset == 0xffff) {
+        transmitWindow = 1250UL;
+        transmitWindowEnd = 37 * hopInterval * 1250;
+    }
+
 	// We update the parameters needed to follow the connection
 	this->updateHopInterval(hopInterval);
 	this->updateHopIncrement(hopIncrement);
@@ -1566,7 +1586,7 @@ void BLEController::followConnection(
         this->csa2_chan_id = ((accessAddress & 0xffff0000)>>16) ^ (accessAddress & 0x0000ffff);
     }
     
-	// We calculate the first channel
+	// We calculate the first channel (use the current channel when winSize is set 0xff)
     if (winSize != 0xFF) {
         this->lastUnmappedChannel = 0;
         this->channel = this->nextChannel();
