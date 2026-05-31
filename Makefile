@@ -14,7 +14,7 @@ ifeq ($(SERIAL_PORT),)
 endif
 
 
-SUPPORTED_PLATFORMS = BOARD_PCA10059 BOARD_MDK_DONGLE
+SUPPORTED_PLATFORMS = BOARD_PCA10059 BOARD_MDK_DONGLE BOARD_XIAO_NRF52840
 
 ifeq ($(filter $(PLATFORM), $(SUPPORTED_PLATFORMS)),)
     $(error "PLATFORM not in $(SUPPORTED_PLATFORMS)")
@@ -63,6 +63,44 @@ ifeq ($(DUALMODE), "MASTER")
 	CFLAGS += -DMASTER
 	CXXFLAGS += -DMASTER
 	ASMFLAGS += -DMASTER
+endif
+
+ifeq ($(PLATFORM),BOARD_XIAO_NRF52840)
+    LINKER_FILE := config/xiao-nrf52840/xiao-nrf52840.ld
+    CONF_DIR := config/xiao-nrf52840
+
+	# C flags common to all targets
+	CFLAGS += $(OPT)
+	CFLAGS += -DAPP_TIMER_V2
+	CFLAGS += -DAPP_TIMER_V2_RTC1_ENABLED
+	CFLAGS += -DBOARD_CUSTOM
+	CFLAGS += -DCONFIG_GPIO_AS_PINRESET
+	CFLAGS += -DFLOAT_ABI_HARD
+	CFLAGS += -DNRF52840_XXAA
+	CFLAGS += -mcpu=cortex-m4
+	CFLAGS += -mthumb -mabi=aapcs
+	CFLAGS += -Wall -g
+	CFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
+	CFLAGS += -ffunction-sections -fdata-sections -fno-strict-aliasing
+	CFLAGS += -fno-builtin -fshort-enums
+
+	# C++ flags common to all targets
+	CXXFLAGS += $(OPT)
+
+	# Assembler flags common to all targets
+	ASMFLAGS += -g3
+	ASMFLAGS += -mcpu=cortex-m4
+	ASMFLAGS += -mthumb -mabi=aapcs
+	ASMFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
+	ASMFLAGS += -DAPP_TIMER_V2
+	ASMFLAGS += -DAPP_TIMER_V2_RTC1_ENABLED
+	ASMFLAGS += -DBOARD_CUSTOM
+	ASMFLAGS += -DCONFIG_GPIO_AS_PINRESET
+	ASMFLAGS += -DFLOAT_ABI_HARD
+	ASMFLAGS += -DNRF52840_XXAA
+
+	SRC_FILES += $(SDK_ROOT)/components/libraries/timer/app_timer2.c
+	SRC_FILES += $(SDK_ROOT)/components/libraries/timer/drv_rtc.c
 endif
 
 ifeq ($(PLATFORM),BOARD_MDK_DONGLE)
