@@ -2791,6 +2791,9 @@ void BLEController::masterSimulationControlFlowProcessing(BLEPacket *pkt) {
 	if (this->simulatedMasterSequenceNumbers.nesn == pkt->extractSN()) {
 		// Increment the local nextExpectedSeqNum counter
 		this->simulatedMasterSequenceNumbers.nesn = (this->simulatedMasterSequenceNumbers.nesn + 1) % 2;
+		if (pkt->extractPayloadLength() > 0) {
+			this->encRxCounter++;
+		}
 	}
 	// If the NESN of the received packet is different than our sn, the slave acknowledged our packet
 	if (this->simulatedMasterSequenceNumbers.sn != pkt->extractNESN()) {
@@ -2801,6 +2804,7 @@ void BLEController::masterSimulationControlFlowProcessing(BLEPacket *pkt) {
 		if (!this->masterPayload.transmitted) {
 			this->masterPayload.lastTransmitInstant = this->connectionEventCount;
 			this->masterPayload.transmitted = true;
+			this->encTxCounter++;
 		}
 
 		// Retransmit the packet if we didn't got a response (if needed !) after 10 connection events
