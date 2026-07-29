@@ -1081,19 +1081,7 @@ bool Radio::enable() {
 		NRF_RADIO->TIFS = this->interFrameSpacing;
 		NRF_RADIO->PACKETPTR = (uint32_t)(this->rxBuffer);
 		if (this->encryption) {
-			NRF_RADIO->PACKETPTR = (uint32_t)(this->tmpBuffer);
-			NRF_CCM->INPTR = (uint32_t)(this->tmpBuffer);
-			NRF_CCM->OUTPTR = (uint32_t)(this->rxBuffer);
-			NRF_CCM->MODE = (CCM_MODE_MODE_Decryption << CCM_MODE_MODE_Pos) |
-			 								(CCM_MODE_DATARATE_1Mbit << CCM_MODE_DATARATE_Pos) |
-			 								(CCM_MODE_LENGTH_Extended << CCM_MODE_LENGTH_Pos);
-			bsp_board_led_on(0);
-			bsp_board_led_on(1);
-		// TODO: update the INPTR and OUTPTR, maybe in interrupt too
-		// TODO: add AES interrupt to manage state, or maybe reading right registers is enough ?
-		}
-		else {
-		// TODO: update the INPTR and OUTPTR
+			NRF_PPI->CHENCLR = PPI_CHEN_CH24_Msk | PPI_CHEN_CH25_Msk;
 		}
 		if (this->mode == MODE_NORMAL) {
 			if (this->isFilterEnabled()) {
@@ -1334,9 +1322,38 @@ extern "C" void RADIO_IRQHandler(void) {
 				if (Radio::instance->getState() == TX) {
 					//LedManager::instance->toggle(LED1);
 					NRF_RADIO->PACKETPTR = (uint32_t)Radio::instance->rxBuffer;
+					if (Radio::instance->isEncryptionOn()) {
+						NRF_PPI->CHENCLR = PPI_CHEN_CH24_Msk | PPI_CHEN_CH25_Msk;
+					}
 					Radio::instance->setState(RX);
 				}
 				else if (Radio::instance->getState() == RX) {
+
+					// Standalone decrypt of an encrypted RX PDU (mirror of the TX path).
+					if (Radio::instance->isEncryptionOn() && Radio::instance->rxBuffer[1] >= 5) {
+						uint8_t *rx  = Radio::instance->rxBuffer;
+						uint8_t *tmp = Radio::instance->tmpBuffer;
+						uint8_t onairLen = rx[1];            // ct(onairLen-4) + MIC(4)
+						tmp[0] = rx[0];                      // S0 header
+						tmp[1] = onairLen;                   // LENGTH (on-air, incl MIC)
+						tmp[2] = 0x00;                       // RFU / S1 slot (3-byte header)
+						for (int i=0;i<onairLen;i++) tmp[3+i] = rx[2+i]; // ct+MIC at offset 3
+						NRF_CCM->INPTR  = (uint32_t)tmp;
+						NRF_CCM->OUTPTR = (uint32_t)rx;
+						NRF_CCM->MODE = (CCM_MODE_MODE_Decryption << CCM_MODE_MODE_Pos) |
+										(CCM_MODE_DATARATE_1Mbit << CCM_MODE_DATARATE_Pos) |
+										(CCM_MODE_LENGTH_Extended << CCM_MODE_LENGTH_Pos);
+						NRF_PPI->CHENCLR = PPI_CHEN_CH24_Msk | PPI_CHEN_CH25_Msk;
+						NRF_CCM->SHORTS = CCM_SHORTS_ENDKSGEN_CRYPT_Msk;
+						NRF_CCM->EVENTS_ENDKSGEN = 0;
+						NRF_CCM->EVENTS_ENDCRYPT = 0;
+						NRF_CCM->TASKS_KSGEN = 1;
+						uint32_t guard = 0;
+						while (NRF_CCM->EVENTS_ENDCRYPT == 0 && ++guard < 200000);
+						// rx = [S0][onairLen-4][RFU][plaintext..]; drop RFU at index 2.
+						uint8_t plainLen = rx[1];            // onairLen-4 (CCM rewrote it)
+						for (int i=0;i<plainLen;i++) rx[2+i] = rx[3+i];
+					}
 
 					uint8_t bufferSize = 0;
 					if (Radio::instance->getPhy() == DOT15D4_NATIVE)  {
