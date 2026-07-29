@@ -25,18 +25,22 @@ Radio::Radio() {
 
 bool Radio::enableEncryption(uint32_t encryptionData) {
 
-	//Configure shorts between  CCM->ENDKSGEN and  CCM->CRYPT
-	NRF_CCM->SHORTS |= CCM_SHORTS_ENDKSGEN_CRYPT_Msk;
-	// Provision encryption data
+	// The CCM peripheral must be ENABLED before any KSGEN/CRYPT/decryption runs
+	NRF_CCM->ENABLE = (CCM_ENABLE_ENABLE_Enabled << CCM_ENABLE_ENABLE_Pos);
+	NRF_CCM->MAXPACKETSIZE = 0xFB;
+
+	// NO ENDKSGEN->CRYPT short
+	NRF_CCM->SHORTS = 0;
+
 	NRF_CCM->CNFPTR = encryptionData;
-	// Provision scratch zone
 	NRF_CCM->SCRATCHPTR = (uint32_t)(this->encryptionScratchpad);
 
-	/*
-	Configure PPI shorts between RADIO->EVENTS_READY and CCM->TASKS_KSGEN
-	and between RADIO->EVENTS_ADDRESS and CCM->TASKS_CRYPT
-	*/
-	NRF_PPI->CHEN = (1 << 24) | (1 << 25);
+	NRF_PPI->CHENSET = 
+		PPI_CHEN_CH24_Msk // TASKS_KSGEN
+		| 
+		PPI_CHEN_CH25_Msk // TASKS_CRYPT
+		;
+
 
 	this->encryption = true;
 	return true;
@@ -44,6 +48,10 @@ bool Radio::enableEncryption(uint32_t encryptionData) {
 
 bool Radio::disableEncryption() {
 	return true;
+}
+
+bool Radio::isEncryptionOn() {
+	return this->encryption;
 }
 
 void Radio::enableMatch(int matchingSize) {

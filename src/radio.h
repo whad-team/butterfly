@@ -94,6 +94,7 @@ class Radio
 
 		bool enableEncryption(uint32_t encryptionData);
 		bool disableEncryption();
+		bool isEncryptionOn();
 
 		void enableMatch(int matchingSize);
 		void disableMatch();
