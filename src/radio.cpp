@@ -1208,16 +1208,31 @@ bool Radio::send(uint8_t *data,int size,int frequency, uint8_t channel) {
 	NRF_RADIO->DATAWHITEIV = channel;
 	NRF_RADIO->PACKETPTR = (uint32_t)data;
 
-	if (this->encryption) {
-		NRF_RADIO->PACKETPTR = (uint32_t)(this->tmpBuffer);
-		NRF_CCM->INPTR = (uint32_t)(this->tmpBuffer);
+	// Empty PDUs (length 0, LLID=01 keepalives) must be sent UNENCRYPTED with no MIC and must NOT advance the packet counter (BLE Core spec).
+	if (this->encryption && data[1] != 0) {
+		this->tmpBuffer[0] = data[0];        // S0 (header)
+		this->tmpBuffer[1] = data[1];        // LENGTH
+		this->tmpBuffer[2] = 0x00;           // RFU / S1 slot (nRF CCM 3-byte header)
+		for (int i=2;i<size;i++) this->tmpBuffer[i+1] = data[i]; // payload at offset 3
+		int size2 = size + 1;
+
+		NRF_CCM->INPTR  = (uint32_t)(this->tmpBuffer);
 		NRF_CCM->OUTPTR = (uint32_t)(this->txBuffer);
 		NRF_CCM->MODE = (CCM_MODE_MODE_Encryption << CCM_MODE_MODE_Pos) |
 										(CCM_MODE_DATARATE_1Mbit << CCM_MODE_DATARATE_Pos) |
 										(CCM_MODE_LENGTH_Extended << CCM_MODE_LENGTH_Pos);
+		// Standalone encrypt : no RADIO-driven CCM (PPI disabled)
+		NRF_PPI->CHENCLR = PPI_CHEN_CH24_Msk | PPI_CHEN_CH25_Msk;
+		NRF_CCM->SHORTS = CCM_SHORTS_ENDKSGEN_CRYPT_Msk;
+		NRF_CCM->EVENTS_ENDKSGEN = 0;
+		NRF_CCM->EVENTS_ENDCRYPT = 0;
+		NRF_CCM->TASKS_KSGEN = 1;
+		uint32_t guard = 0;
+		while (NRF_CCM->EVENTS_ENDCRYPT == 0 && ++guard < 200000);
 
-	// TODO: update the INPTR and OUTPTR, maybe in interrupt too
-	// TODO: add AES interrupt to manage state, or maybe reading right registers is enough ?
+		int outlen = size2 + 4; // S0 + LEN + RFU + paylaod + 4-byte MIC
+		for (int i=2;i<outlen-1;i++) this->txBuffer[i] = this->txBuffer[i+1];
+		NRF_RADIO->PACKETPTR = (uint32_t)(this->txBuffer);
 	}
 
 
