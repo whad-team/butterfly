@@ -284,6 +284,11 @@ class BLEController : public Controller {
 		BLEPayload masterPayload;
 		BLEPayload temporaryPayload;
 
+		static const uint8_t MASTER_PAYLOAD_QUEUE_SIZE = 8;
+		BLEPayload masterPayloadQueue[MASTER_PAYLOAD_QUEUE_SIZE];
+		volatile uint8_t masterQueueHead;
+		volatile uint8_t masterQueueTail;
+
 		// Advertising interval related
 		uint32_t timestampsFirstChannel[ADV_REPORT_SIZE];
 		uint32_t timestampsThirdChannel[ADV_REPORT_SIZE];
@@ -435,6 +440,7 @@ class BLEController : public Controller {
 
 		void setSlavePayload(uint8_t *payload, size_t size);
 		void setMasterPayload(uint8_t *payload, size_t size);
+		void loadNextMasterPayload();
 
 		void setConnectionJammingConfiguration(uint32_t accessAddress,uint32_t channel);
 

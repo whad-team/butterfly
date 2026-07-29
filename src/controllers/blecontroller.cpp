@@ -71,6 +71,9 @@ BLEController::BLEController(Radio *radio) : Controller(radio) {
 	this->advertisementsTransmitIndicator = true;
 	this->softwareFilterEnabled = false;
 
+	this->masterQueueHead = 0;
+	this->masterQueueTail = 0;
+
     /* Set legacy channel selection algorithm. */
     this->csa = CSA1;
     this->csa2_chan_id = 0;
@@ -603,6 +606,9 @@ void BLEController::applyConnectionUpdate() {
 	}
 }
 void BLEController::setAttackPayload(uint8_t *payload, size_t size) {
+	if (size > sizeof(this->attackStatus.payload)) {
+		size = sizeof(this->attackStatus.payload);
+	}
 	for (size_t i=0;i<size;i++) {
 		this->attackStatus.payload[i] = payload[i];
 	}
@@ -610,6 +616,9 @@ void BLEController::setAttackPayload(uint8_t *payload, size_t size) {
 }
 
 void BLEController::setSlavePayload(uint8_t *payload, size_t size) {
+	if (size > sizeof(this->slavePayload.payload)) {
+		size = sizeof(this->slavePayload.payload);
+	}
 	for (size_t i=0;i<size;i++) {
 		this->slavePayload.payload[i] = payload[i];
 	}
@@ -620,13 +629,29 @@ void BLEController::setSlavePayload(uint8_t *payload, size_t size) {
 }
 
 void BLEController::setMasterPayload(uint8_t *payload, size_t size) {
-	for (size_t i=0;i<size;i++) {
-		this->masterPayload.payload[i] = payload[i];
+	if (size > sizeof(this->masterPayload.payload)) {
+		size = sizeof(this->masterPayload.payload);
 	}
-	this->masterPayload.size = size;
+	uint8_t next = (this->masterQueueTail + 1) % MASTER_PAYLOAD_QUEUE_SIZE;
+	if (next != this->masterQueueHead) {
+		BLEPayload *slot = &this->masterPayloadQueue[this->masterQueueTail];
+		memcpy(slot->payload, payload, size);
+		slot->size = size;
+		this->masterQueueTail = next;
+	}
+}
+
+void BLEController::loadNextMasterPayload() {
+	if (this->masterQueueHead == this->masterQueueTail) {
+		return; // queue empty
+	}
+	BLEPayload *slot = &this->masterPayloadQueue[this->masterQueueHead];
+	memcpy(this->masterPayload.payload, slot->payload, slot->size);
+	this->masterPayload.size = slot->size;
 	this->masterPayload.transmitted = false;
 	this->masterPayload.responseReceived = false;
 	this->masterPayload.lastTransmitInstant = 0;
+	this->masterQueueHead = (this->masterQueueHead + 1) % MASTER_PAYLOAD_QUEUE_SIZE;
 }
 
 bool BLEController::stopConnection() {
@@ -2427,6 +2452,9 @@ void BLEController::initializeConnection() {
 	this->channel = this->nextChannel();
 
 	this->masterPayload.transmitted = true;
+	// Drop any master payloads left queued from a previous connection.
+	this->masterQueueHead = 0;
+	this->masterQueueTail = 0;
 	this->mdSequence = false;
 	this->mdCount = 0;
 
@@ -2766,6 +2794,9 @@ void BLEController::masterSimulationControlFlowProcessing(BLEPacket *pkt) {
 				this->masterPayload.responseReceived = false;
 				this->masterPayload.transmitted = false;
 			}
+		}
+		if (this->masterPayload.transmitted && this->masterQueueHead != this->masterQueueTail) {
+			this->loadNextMasterPayload();
 		}
 	}
 	if (this->mdSequence && this->mdCount > 0) {
