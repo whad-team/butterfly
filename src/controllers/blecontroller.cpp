@@ -2,6 +2,15 @@
 #include "../core.h"
 #include <whad.h>
 
+// BLE packet counter
+static inline void set_ccm_counter(EncryptionData *e, uint32_t c) {
+	e->counter[0] = (uint8_t)(c);
+	e->counter[1] = (uint8_t)(c >> 8);
+	e->counter[2] = (uint8_t)(c >> 16);
+	e->counter[3] = (uint8_t)(c >> 24);
+	e->counter[4] = 0;
+}
+
 /**
  * Divide round helper.
  **/
@@ -223,13 +232,16 @@ void BLEController::setOwnAddress(uint8_t *address, bool random) {
 }
 
 bool BLEController::configureEncryption(uint8_t *key, uint8_t *iv, uint32_t counter) {
-	for (int i=0;i<16;i++) this->encryptionData.key[i] = key[i];
-	for (int i=0;i<8;i++) this->encryptionData.iv[i] = iv[7-i]; //memcpy(this->encryptionData.iv, iv, 8);
+	memcpy(this->encryptionData.key, key, 16);
+	memcpy(this->encryptionData.iv,  iv,  8);
 	this->encryptionData.direction = 0;
+	set_ccm_counter(&this->encryptionData, counter);
 	return true;
 }
 
 bool BLEController::startEncryption() {
+	this->encTxCounter = 0;
+	this->encRxCounter = 0;
 	this->radio->enableEncryption((uint32_t)&(this->encryptionData));
 	return true;
 }
@@ -1848,6 +1860,10 @@ void BLEController::executeAttack() {
 
 bool BLEController::masterRoleCallback(BLEPacket *pkt) {
 
+	// BLE CCM nonce for a central: encrypt our OUTGOING packet with direction=1
+	this->encryptionData.direction = 1;
+	set_ccm_counter(&this->encryptionData, this->encTxCounter);
+
 	if (!this->masterPayload.transmitted) {
 
 		if ((this->masterPayload.payload[0] & 0x10) != 0) {
@@ -1869,7 +1885,9 @@ bool BLEController::masterRoleCallback(BLEPacket *pkt) {
 		this->temporaryPayload.size = 2;
 		this->radio->send(this->temporaryPayload.payload, this->temporaryPayload.size, BLEController::channelToFrequency(this->channel), this->channel);
 	}
-	this->encryptionData.direction = 1 - this->encryptionData.direction;
+
+	this->encryptionData.direction = 0;
+	set_ccm_counter(&this->encryptionData, this->encRxCounter);
 	return true;
 }
 
@@ -2371,7 +2389,7 @@ void BLEController::connect(uint8_t *address, bool random,  uint32_t accessAddre
 	this->controllerState = CONNECTION_INITIATION;
 
 	// Configure encryption counter
-	this->encryptionData.counter = 0;
+	set_ccm_counter(&this->encryptionData, 0);
 
 	// Configure Hardware to monitor advertisements
 	this->setHardwareConfiguration(0x8e89bed6,0x555555);
