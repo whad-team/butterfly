@@ -1,0 +1,1 @@
+../mdk-dongle/sdk_config.h

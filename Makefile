@@ -14,7 +14,7 @@ ifeq ($(SERIAL_PORT),)
 endif
 
 
-SUPPORTED_PLATFORMS = BOARD_PCA10059 BOARD_MDK_DONGLE
+SUPPORTED_PLATFORMS = BOARD_PCA10059 BOARD_MDK_DONGLE BOARD_CLUE
 
 ifeq ($(filter $(PLATFORM), $(SUPPORTED_PLATFORMS)),)
     $(error "PLATFORM not in $(SUPPORTED_PLATFORMS)")
@@ -101,6 +101,39 @@ ifeq ($(PLATFORM),BOARD_MDK_DONGLE)
 	#ASMFLAGS += -DCONFIG_GPIO_AS_PINRESET
 	ASMFLAGS += -DDEBUG
 	ASMFLAGS += -DDEBUG_NRF
+	ASMFLAGS += -DFLOAT_ABI_HARD
+	ASMFLAGS += -DNRF52840_XXAA
+	ASMFLAGS += -DSWI_DISABLE0
+
+	SRC_FILES += $(SDK_ROOT)/components/libraries/timer/app_timer.c
+endif
+
+ifeq ($(PLATFORM),BOARD_CLUE)
+    LINKER_FILE := config/clue/clue.ld
+    CONF_DIR := config/clue
+
+	CFLAGS += $(OPT)
+	CFLAGS += -DBOARD_CUSTOM
+	CFLAGS += -DBOARD_CLUE
+	CFLAGS += -DUSBD_POWER_DETECTION=false
+	CFLAGS += -DFLOAT_ABI_HARD
+	CFLAGS += -DNRF52840_XXAA
+	CFLAGS += -DSWI_DISABLE0
+	CFLAGS += -mcpu=cortex-m4
+	CFLAGS += -mthumb -mabi=aapcs
+	CFLAGS += -Wall -Werror -Wno-array-bounds
+	CFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
+	CFLAGS += -ffunction-sections -fdata-sections -fno-strict-aliasing
+	CFLAGS += -fno-builtin -fshort-enums
+
+	CXXFLAGS += $(OPT)
+
+	ASMFLAGS += -g3
+	ASMFLAGS += -mcpu=cortex-m4
+	ASMFLAGS += -mthumb -mabi=aapcs
+	ASMFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
+	ASMFLAGS += -DBOARD_CUSTOM
+	ASMFLAGS += -DBOARD_CLUE
 	ASMFLAGS += -DFLOAT_ABI_HARD
 	ASMFLAGS += -DNRF52840_XXAA
 	ASMFLAGS += -DSWI_DISABLE0
@@ -310,6 +343,11 @@ ifeq ($(PLATFORM),BOARD_MDK_DONGLE)
 	mkdir -p $(DIST_DIRECTORY)
 	cp $(OUTPUT_DIRECTORY)/nrf52840_xxaa.hex $(DIST_DIRECTORY)/butterfly-mdk.hex
 	python3 $(CONF_DIR)/uf2conv.py $(DIST_DIRECTORY)/butterfly-mdk.hex -c -f 0xADA52840 -o $(DIST_DIRECTORY)/butterfly-mdk-fwupgrade.uf2
+endif
+ifeq ($(PLATFORM),BOARD_CLUE)
+	mkdir -p $(DIST_DIRECTORY)
+	cp $(OUTPUT_DIRECTORY)/nrf52840_xxaa.hex $(DIST_DIRECTORY)/butterfly-clue.hex
+	python3 $(CONF_DIR)/uf2conv.py $(DIST_DIRECTORY)/butterfly-clue.hex -c -f 0x239a0029 -o $(DIST_DIRECTORY)/butterfly-clue-fwupgrade.uf2
 endif
 # Print all targets that can be built
 help:
