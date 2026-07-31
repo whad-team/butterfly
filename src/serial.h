@@ -25,7 +25,9 @@ class Core;
 #define PREAMBLE_WHAD_1 0xAC
 #define PREAMBLE_WHAD_2 0xBE
 
+#ifndef USBD_POWER_DETECTION
 #define USBD_POWER_DETECTION    true
+#endif
 #define CDC_ACM_COMM_INTERFACE  0
 #define CDC_ACM_COMM_EPIN       NRF_DRV_USBD_EPIN2
 
