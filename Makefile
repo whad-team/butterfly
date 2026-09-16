@@ -3,7 +3,7 @@ TARGETS          := nrf52840_xxaa
 OUTPUT_DIRECTORY := build
 DIST_DIRECTORY 	 := dist
 NRFUTIL 		 := nrfutil
-SDK_ROOT		 := ../../nRF5_SDK_17.1.0_ddde560/
+SDK_ROOT		 := ../../.sdks/nRF5_SDK_17.1.0_ddde560/
 
 ifeq ($(PLATFORM),)
     PLATFORM = BOARD_PCA10059
@@ -182,6 +182,9 @@ SRC_FILES += \
 	$(PROJ_DIR)/sequences/sequence.cpp \
 	$(PROJ_DIR)/sequences/sequenceModule.cpp \
 	$(PROJ_DIR)/radio.cpp \
+	$(PROJ_DIR)/tsch/link.cpp \
+	$(PROJ_DIR)/tsch/superframe.cpp \
+	$(PROJ_DIR)/tsch/network.cpp \
 	$(PROJ_DIR)/controller.cpp \
 	$(PROJ_DIR)/packet.cpp \
 
@@ -343,6 +346,19 @@ ifeq ($(PLATFORM),BOARD_PCA10059)
 	@echo "Done :)"
 endif
 
+
+remote_send: create_builddir
+ifeq ($(PLATFORM),BOARD_PCA10059)
+	@echo "Generating DFU package ..."
+	rm -f $(OUTPUT_DIRECTORY)/dfu.zip
+	$(NRFUTIL) pkg generate --hw-version 52 --sd-req 0x00 --debug-mode --application $(OUTPUT_DIRECTORY)/nrf52840_xxaa.hex $(OUTPUT_DIRECTORY)/dfu.zip
+	@echo "Flashing device ..."
+	scp $(OUTPUT_DIRECTORY)/dfu.zip wihart:/tmp/dfu.zip
+	@echo "Done :)"
+	sleep 1	
+	ssh wihart "butterfly_flash.py /dev/ttyACM0 /tmp/dfu.zip"
+endif
+
 send: create_builddir
 ifeq ($(PLATFORM),BOARD_PCA10059)
 	@echo "Generating DFU package ..."
@@ -361,6 +377,7 @@ ifneq ($(MDK_MOUNTPOINT),)
 	cp $(OUTPUT_DIRECTORY)/flash.uf2 $(MDK_MOUNTPOINT)
 	@echo "Done :)"
 endif
+
 ifeq ($(MDK_MOUNTPOINT),)
 	@echo "Mountpoint not detected, aborting ..."
 endif

@@ -195,7 +195,16 @@ void Core::processANTInputMessage(whad::ant::AntMsg antMsg) {
             uint32_t rf_channel = query.getRFChannel();
             uint8_t packet[17];
             memcpy(packet, query.getPacket().getBytes(), 17);
-            if (channel_number < MAX_CHANNELS) {
+            if (channel_number == 0xFF) {
+                this->antController->setActiveRFChannel(rf_channel);
+                this->antController->setHardwareConfiguration();
+                this->antController->start();
+                this->antController->send(packet, 17);
+
+                response = new whad::generic::Success();
+
+            }
+            else if (channel_number < MAX_CHANNELS) {
                 if (
                     this->antController->isChannelOpen((uint8_t)(channel_number & 0xFF)) &&
                     
@@ -782,6 +791,165 @@ void Core::processDot15d4InputMessage(whad::dot15d4::Dot15d4Msg dot15d4Msg) {
         }
         break;
 
+        /* New Time-Slotted Channel Hopping commands, introduced in WHAD protocol version 3 */
+        case whad::dot15d4::ConfigureTSCHMsg:
+        {
+            whad::dot15d4::ConfigureTSCH query(dot15d4Msg);
+        
+            /* Enable or disable the TSCH mode on the 802.15.4 controller  */
+            bool enabled = query.getEnabled();
+            this->dot15d4Controller->configureTSCH(enabled);
+
+            response = new whad::generic::Success();
+        }
+        break;
+
+
+        case whad::dot15d4::SendInSlotMsg:
+        {
+            if (this->dot15d4Controller->isTSCHEnabled()) {
+                /* If 802.15.4 TSCH mode is enabled, parse the message. */
+                whad::dot15d4::SendInSlotPdu query(dot15d4Msg);
+
+                uint32_t wait_offset = query.getWaitOffset();
+                uint64_t asn = query.getSlot();
+
+                /* Build packet. */
+                size_t size = query.getPdu().getSize();
+                uint8_t *packet = (uint8_t*)malloc(1 + size);
+                packet[0] = size;
+                memcpy(packet+1,query.getPdu().getBytes(), size);
+
+                /* Schedule a new transmission */
+                this->dot15d4Controller->scheduleFrameTx(
+                    asn, 
+                    packet, size, 
+                    wait_offset, 
+                    asn == 0x0 // ASN equals to zero triggers a transmission on the next available slot
+                );
+                free(packet);
+
+                /* Success. */
+                response = new whad::generic::Success();
+            }
+            else {
+                /* 802.15.4 TSCH mode is not enabled, indicate a Wrong Mode response */
+                response = new whad::generic::WrongMode();
+            }
+        }
+        break;
+
+
+        case whad::dot15d4::SetChannelMapMsg:
+        {
+            if (this->dot15d4Controller->isTSCHEnabled()) {
+
+                whad::dot15d4::SetChannelMap query(dot15d4Msg);
+            
+                /* Configure the network with the provided Channel Map */
+                uint32_t channel_map = query.getChannelMap();
+                if ((channel_map >= 0) && (channel_map <= 0xFFFF)) {
+                    this->dot15d4Controller->getNetwork()->setChannelMap((uint16_t)channel_map);
+                    response = new whad::generic::Success();
+                }
+                else {
+                    response = new whad::generic::ParameterError();
+                }
+            }
+            else {
+                /* 802.15.4 TSCH mode is not enabled, indicate a Wrong Mode response */
+                response = new whad::generic::WrongMode();
+            }
+        }
+        break;
+
+        case whad::dot15d4::UpdateSuperframeMsg:
+        {
+            if (this->dot15d4Controller->isTSCHEnabled()) {
+                /* Create or Update a new TSCH superframe. */
+                whad::dot15d4::UpdateSuperframe query(dot15d4Msg);
+
+                uint32_t sf_id = query.getSuperframeId();
+                uint32_t slots = query.getNumberOfSlots();
+                uint32_t flags = query.getFlags();
+
+                
+                if (this->dot15d4Controller->getNetwork()->updateSuperframe(sf_id, slots, flags)) {
+                    response = new whad::generic::Success();
+                }
+                else {
+                    response = new whad::generic::ParameterError();
+                }
+            }
+            else {
+                /* 802.15.4 TSCH mode is not enabled, indicate a Wrong Mode response */
+                response = new whad::generic::WrongMode();
+            }
+        }
+        break;
+
+        case whad::dot15d4::DeleteSuperframeMsg:
+        {
+            whad::dot15d4::DeleteSuperframe query(dot15d4Msg);
+
+            uint32_t sf_id = query.getSuperframeId();
+            if (this->dot15d4Controller->getNetwork()->deleteSuperframe(sf_id)) {
+                response = new whad::generic::Success();
+            }
+            else {
+                response = new whad::generic::ParameterError();
+            }
+        }
+        break;
+
+        case whad::dot15d4::AddLinkMsg:
+        {
+            whad::dot15d4::AddLink query(dot15d4Msg);
+
+            tsch::Superframe* sf = this->dot15d4Controller->getNetwork()->findSuperframe(query.getSuperframeId());
+            if (sf != NULL) {
+
+                tsch::Link newLink(
+                    query.getSource(),
+                    query.getTimeSlot(),
+                    query.getChannelOffset(),
+                    query.getNeighbor(),
+                    (whad::dot15d4::LinkOptions)(query.getLinkOptions()),
+                    (whad::dot15d4::LinkType)(query.getLinkType())
+                );
+
+                if (sf->addLink(newLink)) {
+                    response = new whad::generic::Success();
+                }
+                else {
+                    response = new whad::generic::ParameterError();
+                }
+            }
+            else {
+                response = new whad::generic::ParameterError();
+            }
+        }
+        break;
+
+        case whad::dot15d4::DeleteLinkMsg:
+        {
+            whad::dot15d4::DeleteLink query(dot15d4Msg);
+
+            tsch::Superframe* sf = this->dot15d4Controller->getNetwork()->findSuperframe(query.getSuperframeId());
+            if (sf != NULL) {
+                if (sf->deleteLink(query.getTimeSlot(), query.getChannelOffset())) {
+                    response = new whad::generic::Success();
+                }
+                else {
+                    // Lien introuvable dans cette superframe
+                    response = new whad::generic::ParameterError();
+                }
+            }
+            else {
+                response = new whad::generic::ParameterError();
+            }
+        }
+        break;
         default:
             response = new whad::generic::Error();
             break;

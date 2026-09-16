@@ -48,7 +48,14 @@ const whad_domain_desc_t CAPABILITIES[] = {
       CMD(dot15d4_Dot15d4Command_EndDeviceMode) |
       CMD(dot15d4_Dot15d4Command_CoordinatorMode) |
       CMD(dot15d4_Dot15d4Command_RouterMode) |
-      CMD(dot15d4_Dot15d4Command_ManInTheMiddle)
+      CMD(dot15d4_Dot15d4Command_ManInTheMiddle) |
+      CMD(dot15d4_Dot15d4Command_ConfigureTSCH) |
+      CMD(dot15d4_Dot15d4Command_AddLink) |
+      CMD(dot15d4_Dot15d4Command_DeleteLink) |
+      CMD(dot15d4_Dot15d4Command_UpdateSuperframe) |
+      CMD(dot15d4_Dot15d4Command_DeleteSuperframe) |
+      CMD(dot15d4_Dot15d4Command_SetChannelMap) |
+      CMD(dot15d4_Dot15d4Command_SendInSlot)
       )
   },
   {
@@ -98,7 +105,6 @@ const whad_domain_desc_t CAPABILITIES[] = {
       CMD(ant_ANTCommand_SetRFChannel) |
       CMD(ant_ANTCommand_Sniff) |
       CMD(ant_ANTCommand_Jam) |
-      // CMD(ant_ANTCommand_Send) |
       CMD(ant_ANTCommand_SendRaw) |
       CMD(ant_ANTCommand_MasterMode) |
       CMD(ant_ANTCommand_SlaveMode) |

@@ -128,16 +128,60 @@ class BLEPacket : public Packet {
 class Dot15d4Packet : public Packet {
 	protected:
 		uint8_t lqi;
+		
+		bool tschMetadataEnabled;
 
+		uint64_t asn;
+		uint32_t startOfSlotTimestamp;
+		uint64_t timeSlot;
+		uint32_t baseChannelFrequency;
+		uint32_t numberOfChannels;
+		uint32_t channelSpacing;
+		 
 	public:
 		Dot15d4Packet(uint8_t *packetBuffer, size_t packetSize, uint32_t timestamp, uint8_t source, uint8_t channel, int8_t rssi, CrcValue crcValue, uint8_t lqi);
 		bool extractAcknowledgmentRequest();
 		uint8_t extractSequenceNumber();
 		uint8_t getLQI();
 		Dot15d4AddressMode extractDestinationAddressMode();
+		Dot15d4AddressMode extractSourceAddressMode();
+
 		uint16_t extractShortDestinationAddress();
 		uint64_t extractExtendedDestinationAddress();
+		uint16_t extractShortSourceAddress();
+		uint64_t extractExtendedSourceAddress();
+
+		uint64_t extractASN();
+		uint16_t extractChannelMap();
+		uint16_t extractPanId();
+		uint8_t extractWiHARTPacketType();
+		int16_t extractTimeAdjustment();
+
+		bool isWiHARTAcknowledgement();
+		bool isWiHARTAdvertisement();
+		bool isWiHARTKeepAlive();
+		bool isWiHARTDisconnect();
+		bool isWiHARTData();
+
 		uint32_t getFCS();
+
+		bool isTSCHMetadataEnabled();
+		void setTSCHMetadata(
+			uint64_t asn,
+			uint32_t startOfSlotTimestamp,
+			uint64_t timeSlot,
+			uint32_t baseChannelFrequency,
+			uint32_t numberOfChannels,
+			uint32_t channelSpacing
+		);
+		uint64_t getASN();
+		uint32_t getStartOfSlotTimestamp();
+		uint64_t getTimeSlot();
+		uint32_t getBaseChannelFrequency();
+		uint32_t getNumberOfChannels();
+		uint32_t getChannelSpacing();
+		
+		
 
 };
 

@@ -518,42 +518,276 @@ uint8_t Dot15d4Packet::getLQI() {
 	return this->lqi;
 }
 
+
+bool Dot15d4Packet::isTSCHMetadataEnabled() {
+	return this->tschMetadataEnabled;
+}
+void Dot15d4Packet::setTSCHMetadata(
+	uint64_t asn,
+	uint32_t startOfSlotTimestamp,
+	uint64_t timeSlot,
+	uint32_t baseChannelFrequency,
+	uint32_t numberOfChannels,
+	uint32_t channelSpacing
+) {
+	this->tschMetadataEnabled = true;
+
+	this->asn = asn;
+	this->startOfSlotTimestamp = startOfSlotTimestamp;
+	this->timeSlot = timeSlot;
+	this->baseChannelFrequency = baseChannelFrequency;
+	this->numberOfChannels = numberOfChannels;
+	this->channelSpacing = channelSpacing;
+}
+
+uint64_t Dot15d4Packet::getASN() {
+	return this->asn ;
+}
+uint32_t Dot15d4Packet::getStartOfSlotTimestamp() {
+	return this->startOfSlotTimestamp ;
+}
+uint64_t Dot15d4Packet::getTimeSlot() {
+	return this->timeSlot ;
+}
+uint32_t Dot15d4Packet::getBaseChannelFrequency() {
+	return this->baseChannelFrequency ;
+}
+uint32_t Dot15d4Packet::getNumberOfChannels() {
+	return this->numberOfChannels ;
+}
+uint32_t Dot15d4Packet::getChannelSpacing() {
+	return this->channelSpacing ;
+}
+
 bool Dot15d4Packet::extractAcknowledgmentRequest() {
-	return this->packetPointer[1] & (1 << 5);
+	if (this->packetSize >= 2) {
+		return this->packetPointer[1] & (1 << 5);
+	}
+	return false;
 }
 
 Dot15d4AddressMode Dot15d4Packet::extractDestinationAddressMode() {
-	uint8_t mode = ((this->packetPointer[2] & 0x0C) >> 2);
-	if (mode == 2) {
-		return ADDR_SHORT;
+	if (this->packetSize >= 3 + 1) {
+		uint8_t mode = ((this->packetPointer[2] & 0x0C) >> 2);
+		if (mode == 2) {
+			return ADDR_SHORT;
+		}
+		else if (mode == 3) {
+			return ADDR_EXTENDED;
+		}
+		else {
+			return ADDR_NONE;
+		}
 	}
-	else if (mode == 3) {
-		return ADDR_EXTENDED;
+	return ADDR_NONE;
+}
+
+
+
+Dot15d4AddressMode Dot15d4Packet::extractSourceAddressMode() {
+	if (this->packetSize >= 3) {
+		uint8_t mode = ((this->packetPointer[2] & 0xC0) >> 6);
+		if (mode == 2) {
+			return ADDR_SHORT;
+		}
+		else if (mode == 3) {
+			return ADDR_EXTENDED;
+		}
+		else {
+			return ADDR_NONE;
+		}
 	}
-	else {
+	return ADDR_NONE;
+}
+
+
+uint16_t Dot15d4Packet::extractShortSourceAddress() {
+	switch (this->extractDestinationAddressMode())
+	{
+	case ADDR_SHORT:
+		if (this->packetSize >= 9) {
+			return (this->packetPointer[8] | (this->packetPointer[9] << 8));
+		}
+		return 0;
+		break;
+		
+	case ADDR_EXTENDED:
+		if (this->packetSize >= 16) {
+			return (this->packetPointer[14] | (this->packetPointer[15] << 8));
+		}
+		return 0;
+		break;
+
+	default:
+		return ADDR_NONE;
+		break;
+	}
+}
+
+
+uint64_t Dot15d4Packet::extractExtendedSourceAddress() {
+
+	switch (this->extractDestinationAddressMode())
+	{
+	case ADDR_SHORT:
+		if (this->packetSize >= 15 + 1) {
+			return ((uint64_t)(this->packetPointer[8]) |
+						((uint64_t)(this->packetPointer[9]) << 8) |
+						((uint64_t)(this->packetPointer[10]) << 16) |
+						((uint64_t)(this->packetPointer[11]) << 24) |
+						((uint64_t)(this->packetPointer[12]) << 32) |
+						((uint64_t)(this->packetPointer[13]) << 40) |
+						((uint64_t)(this->packetPointer[14]) << 48) |
+						((uint64_t)(this->packetPointer[15]) << 56));
+		}
+		return (uint64_t)0;
+		
+	case ADDR_EXTENDED:
+		if (this->packetSize >= 21 + 1) {
+
+			return ((uint64_t)(this->packetPointer[14]) |
+						((uint64_t)(this->packetPointer[15]) << 8) |
+						((uint64_t)(this->packetPointer[16]) << 16) |
+						((uint64_t)(this->packetPointer[17]) << 24) |
+						((uint64_t)(this->packetPointer[18]) << 32) |
+						((uint64_t)(this->packetPointer[19]) << 40) |
+						((uint64_t)(this->packetPointer[20]) << 48) |
+						((uint64_t)(this->packetPointer[21]) << 56));
+		}
+		return (uint64_t)0;
+
+	default:
 		return ADDR_NONE;
 	}
 }
-
 uint16_t Dot15d4Packet::extractShortDestinationAddress() {
-	return (this->packetPointer[6] | (this->packetPointer[7] << 8));
+	if (this->packetSize >= 7 + 1) {
+		return (this->packetPointer[6] | (this->packetPointer[7] << 8));
+	}
+	return (uint16_t)0;
 }
 
 uint64_t Dot15d4Packet::extractExtendedDestinationAddress() {
-	return (
-					(uint64_t)(this->packetPointer[6]) |
-					((uint64_t)(this->packetPointer[7]) << 8) |
-					((uint64_t)(this->packetPointer[8]) << 16) |
-					((uint64_t)(this->packetPointer[9]) << 24) |
-					((uint64_t)(this->packetPointer[10]) << 32) |
-					((uint64_t)(this->packetPointer[11]) << 40) |
-					((uint64_t)(this->packetPointer[12]) << 48) |
-					((uint64_t)(this->packetPointer[13]) << 56)
-	);
+	if (this->packetSize >= 13 + 1) {
+		return (
+						(uint64_t)(this->packetPointer[6]) |
+						((uint64_t)(this->packetPointer[7]) << 8) |
+						((uint64_t)(this->packetPointer[8]) << 16) |
+						((uint64_t)(this->packetPointer[9]) << 24) |
+						((uint64_t)(this->packetPointer[10]) << 32) |
+						((uint64_t)(this->packetPointer[11]) << 40) |
+						((uint64_t)(this->packetPointer[12]) << 48) |
+						((uint64_t)(this->packetPointer[13]) << 56)
+		);
+	}
+	return (uint64_t)0;
 }
 
+
 uint8_t Dot15d4Packet::extractSequenceNumber() {
-	return this->packetPointer[3];
+	if (this->packetSize >= 4) {
+		return this->packetPointer[3];
+	}
+	return 0;
+}
+
+uint64_t Dot15d4Packet::extractASN(){
+
+	if (this->isWiHARTAdvertisement()) {
+		size_t asn_index = 11; //if both addresses are short
+		//check if address is short or long
+		if(this->extractSourceAddressMode() == ADDR_EXTENDED){
+			asn_index +=6; 
+		} 
+		if(this->extractDestinationAddressMode() == ADDR_EXTENDED){
+			asn_index +=6; 
+		}
+
+		if (this->packetSize >= ((asn_index + 4) + 1)) {
+			return ((uint64_t) (this->packetPointer[asn_index]) << 32 |
+					((uint64_t) (this->packetPointer[asn_index+1]) << 24 ) |
+					((uint64_t) (this->packetPointer[asn_index+2]) << 16) |
+					((uint64_t) (this->packetPointer[asn_index+3]) << 8) |
+					((uint64_t) (this->packetPointer[asn_index+4]) ) );
+		}
+	}
+	
+	return (uint64_t) 0; //not an adv	
+}
+
+uint8_t Dot15d4Packet::extractWiHARTPacketType(){
+	size_t DLspecifier = 10;
+	if(this->extractSourceAddressMode() == ADDR_EXTENDED){
+		DLspecifier += 6; 
+	} 
+	if(this->extractDestinationAddressMode() == ADDR_EXTENDED){
+		DLspecifier += 6; 
+	}
+	if (this->packetSize >= DLspecifier) {
+    	return this->packetPointer[DLspecifier];
+	}
+	return 0;
+}
+
+bool Dot15d4Packet::isWiHARTAcknowledgement(){
+	return (extractWiHARTPacketType() & 0x07 )==0x00;
+}
+
+int16_t Dot15d4Packet::extractTimeAdjustment() {
+    if (this->isWiHARTAcknowledgement() && this->packetSize >= 8) {
+        
+        uint16_t msb = (uint16_t)this->packetPointer[this->packetSize - 8];
+        uint16_t lsb = (uint16_t)this->packetPointer[this->packetSize - 7];
+
+        uint16_t combined = (msb << 8) | lsb;
+
+        return (int16_t)combined;
+    } 
+    
+    return 0;
+}
+
+bool Dot15d4Packet::isWiHARTAdvertisement(){
+	return (extractWiHARTPacketType() & 0x07 )==0x01;
+}
+
+bool Dot15d4Packet::isWiHARTKeepAlive(){
+	return (extractWiHARTPacketType() & 0x07 )==0x02;
+}
+
+bool Dot15d4Packet::isWiHARTDisconnect(){
+	return (extractWiHARTPacketType() & 0x07 )==0x03;
+}
+
+bool Dot15d4Packet::isWiHARTData(){
+	return (extractWiHARTPacketType() & 0x07 )==0x07;
+}
+
+uint16_t Dot15d4Packet::extractChannelMap(){
+	if (this->isWiHARTAdvertisement()) {
+		size_t channel_map_index = 18; //if both addresses are short
+		//check if address is short or long
+		if(this->packetPointer[2] & (0x1<<6)){
+			channel_map_index +=6; //source addres is 8 byte long
+		}
+		if(this->packetPointer[2] & (0x1<<2)){
+			channel_map_index +=6; //dest addres is 8 byte long
+		}
+		if (this->packetSize >= ((channel_map_index + 1) + 1))
+		{
+			return (this->packetPointer[channel_map_index]|
+					(this->packetPointer[channel_map_index+1]<<8));
+		}
+		return 0xFFFF;
+	}
+	else return 0xFFFF; //not an adv
+}
+
+uint16_t Dot15d4Packet::extractPanId(){
+	if (this->packetSize >= 6) {
+		return uint16_t(this->packetPointer[4] | (this->packetPointer[5] << 8));
+	}
+	return 0xFFFF;
 }
 
 uint32_t Dot15d4Packet::getFCS() {

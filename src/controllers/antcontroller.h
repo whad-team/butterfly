@@ -121,7 +121,7 @@ class ANTController : public Controller {
         bool availablePacketsToTransmit(uint8_t channelIndex);
         TXPacket getPacketFromTransmitQueue(uint8_t channelIndex);
 
-		bool addPacketToBurstQueue(uint8_t channelIndex, uint8_t *packet);
+        bool addPacketToBurstQueue(uint8_t channelIndex, uint8_t *packet);
         bool isBurstReady(uint8_t channelIndex);
         TXPacket getPacketFromBurstQueue(uint8_t channelIndex);
 
@@ -164,6 +164,7 @@ class ANTController : public Controller {
 
         bool checkFilter(ANTPacket* packet);
 
+        void send(uint8_t *data, size_t size);
         // Reception callback
     	void onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi);
 		void onJam(uint32_t timestamp);
