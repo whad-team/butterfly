@@ -1,3 +1,10 @@
+# VERSION 1.2.0
+
+- Added support for WHAD protocol v1.3
+- Added support for ANT domain
+- Added support for Wireless Hart domain & TSCH support
+- Fixing minor bugs in multiple domains (PHY, BLE)
+
 # VERSION 1.1.0
 
 - Fixed Bluetooth LE connection sniffing issues
