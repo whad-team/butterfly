@@ -1,3 +1,11 @@
+# VERSION 1.1.0
+
+- Fixed Bluetooth LE connection sniffing issues
+- Added support for Bluetooth LE CSA #2 (only for passive connection sniffing)
+- Added support for Bluetooth 5.x PHY update mechanism
+
+# VERSION 1.0.2
+
 - Github Actions (CI/CD) has been integrated with two main worflows: 
     - compile: check that code compiles properly
     - release: automatically compiles and creates a release when a tag is marked

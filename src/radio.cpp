@@ -315,8 +315,9 @@ Phy Radio::getPhy() {
 }
 
 bool Radio::setPhy(Phy phy) {
-	this->phy = phy;
-	return true;
+    this->phy = phy;
+    this->generateModeRegister();
+    return true;
 }
 
 Whitening Radio::getWhitening() {

@@ -313,6 +313,15 @@ uint8_t BLEPacket::extractLLID() {
 	}
 	return 0xFF;
 }
+
+/*
+ * Extract ChSel field indicating the requested Channel Selection Algorithm. This field is only available
+ * for PDU sent over an advertising channel.
+ */
+uint8_t BLEPacket::extractChSel() {
+    return (this->packetPointer[4] & 0x20) >> 5;
+}
+
 bool BLEPacket::isReadRequest() {
 	if (this->extractPayloadLength() >= 6) {
 		return (this->extractLLID() == LLID_START) && ((this->packetPointer[8] | (this->packetPointer[9] << 8)) == 0x0004) && (this->packetPointer[10] == 0xa);
@@ -348,6 +357,10 @@ bool BLEPacket::isLinkLayerTerminateInd() {
 
 bool BLEPacket::isLinkLayerChannelMapRequest() {
 	return (!this->isAdvertisement() && this->packetSize > 7 && (this->extractLLID() == LLID_CONTROL) && this->packetPointer[5] == 0x08 && this->packetPointer[6] == 0x01);
+}
+
+bool BLEPacket::isLinkLayerPhyUpdateInd() {
+    return (!this->isAdvertisement() && this->packetSize > 7 && (this->extractLLID() == LLID_CONTROL) && this->packetPointer[6] == 0x18);
 }
 
 uint32_t BLEPacket::extractAccessAddress() {
@@ -436,6 +449,9 @@ uint16_t BLEPacket::extractInstant() {
 	else if (this->isLinkLayerConnectionUpdateRequest()) {
 		return (this->packetPointer[16] | (this->packetPointer[17] << 8));
 	}
+    else if (this->isLinkLayerPhyUpdateInd()) {
+        return (this->packetPointer[9] | (this->packetPointer[10] << 8));
+    }
 	else return 0x0000;
 }
 
@@ -443,6 +459,9 @@ uint8_t BLEPacket::extractWindowSize() {
 	if (this->isLinkLayerConnectionUpdateRequest()) {
 		return this->packetPointer[7];
 	}
+    else if (this->isAdvertisement() && (this->extractAdvertisementType() == CONNECT_REQ) && this->packetSize > 16) {
+        return this->packetPointer[14];
+    }
 	else return 0x00;
 }
 
@@ -450,9 +469,25 @@ uint16_t BLEPacket::extractWindowOffset() {
 	if (this->isLinkLayerConnectionUpdateRequest()) {
 		return (this->packetPointer[8] | (this->packetPointer[9] << 8));
 	}
+    else if (this->isAdvertisement() && (this->extractAdvertisementType() == CONNECT_REQ) && this->packetSize > 16) {
+        return this->packetPointer[15] | (this->packetPointer[16] << 8);
+    }
 	else return 0x0000;
 }
 
+uint8_t BLEPacket::extractPhyC2P() {
+    if (this->isLinkLayerPhyUpdateInd()) {
+        return this->packetPointer[7];
+    }
+    else return 0;
+}
+
+uint8_t BLEPacket::extractPhyP2C() {
+    if (this->isLinkLayerPhyUpdateInd()) {
+        return this->packetPointer[8];
+    }
+    else return 0;
+}
 
 uint8_t BLEPacket::extractPayloadLength() {
 	return this->packetPointer[5];

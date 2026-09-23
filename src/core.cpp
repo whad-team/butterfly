@@ -404,7 +404,6 @@ void Core::processBLEInputMessage(whad::ble::BleMsg bleMsg) {
         case whad::ble::SniffAAMsg:
         {
             whad::ble::SniffAccessAddress query(bleMsg);
-
             this->bleController->setChannel(0);
             this->bleController->setMonitoredChannels(query.getChannelMap().getChannelMapBuf());
             this->bleController->sniffAccessAddresses();
@@ -1504,11 +1503,33 @@ void Core::processPhyInputMessage(whad::phy::PhyMsg msg) {
         {
             whad::phy::SetPacketSize query(msg);
 
-            if (query.getSize() <= 252) {
+            /*
+             * WHAD protocol (protobuf) sets packet's payload maximum size to 255,
+             * meaning we cannot accept a packet size that would cause more data to
+             * be written into a received packet's buffer.
+             *
+             * Packet's payload is also expected to contain the configured synchronization
+             * word (that's a bit counter-intuitive no?), thus consuming bytes that are not
+             * available for payload. We need to take this into account to validate the
+             * requested payload size in order not to exceed the 255 bytes limit.
+             *
+             * For now, we are returning a parameter error to notify host that the supplied
+             * parameter is invalid, but will configure the packet size to its maximum
+             * value anyway (we cannot report the expected maximum size to host, so the least
+             * we can do is to accept the maximum size closest to the required value and let
+             * host handle the error we report).
+             */
+
+            if (query.getSize() + this->genericController->getPreambleSize()  <= 255) {
+                /* Supplied size is correct, update packet size and return a success message. */
                 this->genericController->setPacketSize(query.getSize());
                 response = new whad::generic::Success();
             }
             else {
+                /* Update packet size to its maximum value, based on current synchronization word. */
+                this->genericController->setPacketSize(255 - this->genericController->getPreambleSize());
+
+                /* Notify host something went wrong because of an invalid supplied parameter. */
                 response = new whad::generic::ParameterError();
             }
         }
@@ -1517,8 +1538,40 @@ void Core::processPhyInputMessage(whad::phy::PhyMsg msg) {
         case whad::phy::SetSyncWordMsg:
         {
             whad::phy::SetSyncWord query(msg);
-            this->genericController->setPreamble(query.get().get(), query.get().getSize());
-            response = new whad::generic::Success();
+
+            /*
+             * We need to make sure the supplied synchronization word may not interfere with the current
+             * packet size set. If the new synchronization word size + packet size exceeds 255 bytes, we
+             * simply reduce the packet size in order to make everything fit in the 255-byte buffer.
+             */
+          
+            /* Make sure syncword is at most 8-byte long. */
+            if (query.get().getSize() <= 8)
+            {
+                /* Update synchronization word. */
+                this->genericController->setPreamble(query.get().get(), query.get().getSize());
+
+                /* Update packet size if needed and notify host if we had to do so. */
+                if (this->genericController->getPacketSize() + query.get().getSize() > 255)
+                {
+                    /* Update packet size to fit the buffer's maximum size. */
+                    this->genericController->setPacketSize(255 - query.get().getSize());
+
+
+                    /* Notify host that something went wrong. */
+                    response = new whad::generic::ParameterError();
+                }
+                else
+                {
+                    /* Everything is good, return success. */
+                    response = new whad::generic::Success();
+                }
+            }
+            else
+            {
+                /* Supplied synchronization word is too long. */
+                response = new whad::generic::ParameterError();
+            }
         }
         break;
 
@@ -1730,7 +1783,6 @@ bool Core::selectController(Protocol controller) {
 }
 
 void Core::sendDebug(const char *message) {
-	//this->pushMessageToQueue(new DebugNotification(message));
 }
 
 void Core::sendDebug(uint8_t *buffer, uint8_t size) {
@@ -1783,8 +1835,8 @@ Message* Core::popMessageFromQueue() {
 
 void Core::sendVerbose(const char* data) {
   std::string message(data);
-  whad::generic::Verbose verbMsg(message);
-  this->pushMessageToQueue(verbMsg.getRaw());
+  whad::generic::Verbose *verbMsg = new whad::generic::Verbose(message);
+  this->pushMessageToQueue(verbMsg->getRaw());
 }
 
 void Core::loop() {
