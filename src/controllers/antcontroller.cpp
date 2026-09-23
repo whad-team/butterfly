@@ -96,6 +96,40 @@ bool ANTController::addPacketToBurstQueue(uint8_t channelIndex, uint8_t *packet)
     return true;
 }
 
+
+void ANTController::send(uint8_t *data, size_t size) {
+    bsp_board_led_invert(0);
+
+    uint8_t preamble[] = {
+            (uint8_t)(data[0]), 
+            (uint8_t)(data[1])
+    };
+    this->radio->setPreamble(preamble,2);
+    this->radio->setPrefixes();
+    this->radio->setMode(MODE_NORMAL);
+    this->radio->setFastRampUpTime(true);
+    this->radio->setEndianness(BIG);
+    this->radio->setTxPower(POS8_DBM);
+    this->radio->enableRssi();
+    this->radio->setPhy(ESB_1MBITS);
+    this->radio->setHeader(0,0,0);
+    this->radio->setWhitening(NO_WHITENING);
+    this->radio->setWhiteningDataIv(0);
+    this->radio->disableJammingPatterns();
+    this->radio->setCrc(HARDWARE_CRC);
+    this->radio->setCrcSkipAddress(false);
+    this->radio->setCrcSize(2);
+    this->radio->setCrcInit(0xFFFF);
+    this->radio->setCrcPoly(0x1021);
+    this->radio->setPayloadLength(15-2);
+    this->radio->setInterFrameSpacing(0);
+    this->radio->setExpandPayloadLength(15-2);
+    this->radio->setFrequency(this->rfChannel);
+    this->radio->reload();
+
+    this->radio->send(data+2,size-2,this->rfChannel, 0x00);
+}
+
 bool ANTController::isBurstReady(uint8_t channelIndex) {
 	return this->channels[channelIndex].outgoingBurst && !this->channels[channelIndex].burstQueue.empty();
 }
@@ -611,7 +645,7 @@ void ANTController::setHardwareConfiguration() {
     this->radio->setFastRampUpTime(true);
     this->radio->setEndianness(BIG);
     this->radio->setTxPower(POS8_DBM);
-    this->radio->disableRssi();
+    this->radio->enableRssi();
     this->radio->setPhy(ESB_1MBITS);
     this->radio->setHeader(0,0,0);
     this->radio->setWhitening(NO_WHITENING);

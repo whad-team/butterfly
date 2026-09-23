@@ -34,6 +34,17 @@ Dot15d4Controller::Dot15d4Controller(Radio *radio) : Controller(radio) {
 	this->controllerState = RECEIVING;
 	this->shortAddress = 0xFFFF;
 	this->extendedAddress = 0x1122334455667788;
+
+	this->syncTimer = NULL;
+	this->sendTimer = NULL;
+
+	this->known_link = false;
+
+	this->network = tsch::Network();
+}
+
+tsch::Network* Dot15d4Controller::getNetwork() {
+    return &(this->network);
 }
 
 void Dot15d4Controller::setShortAddress(uint16_t shortAddress) {
@@ -58,26 +69,26 @@ void Dot15d4Controller::setChannel(int channel) {
 }
 
 void Dot15d4Controller::send(uint8_t *data, size_t size, bool raw) {
-			if (this->attackStatus.attack == DOT15D4_ATTACK_CORRECTION) {
-				//Core::instance->getLinkModule()->sendSignalToSlave(STOP_SLAVE_RADIO);
-				this->setNativeConfiguration();
-				this->radio->send(data,size,Dot15d4Controller::channelToFrequency(this->channel), 0x00);
-				nrf_delay_us((size+6)*8*1000/250);
-				this->setWazabeeConfiguration();
-				//Core::instance->getLinkModule()->sendSignalToSlave(START_SLAVE_RADIO);
-			}
-			else if (raw) {
-				this->setRawConfiguration();
-				this->radio->send(data,size,Dot15d4Controller::channelToFrequency(this->channel), 0x00);
-				nrf_delay_us((size+6)*8*1000/250);
-				this->setNativeConfiguration();
+	if (this->attackStatus.attack == DOT15D4_ATTACK_CORRECTION) {
+		//Core::instance->getLinkModule()->sendSignalToSlave(STOP_SLAVE_RADIO);
+		this->setNativeConfiguration();
+		this->radio->send(data,size,Dot15d4Controller::channelToFrequency(this->channel), 0x00);
+		nrf_delay_us((size+6)*8*1000/250);
+		this->setWazabeeConfiguration();
+		//Core::instance->getLinkModule()->sendSignalToSlave(START_SLAVE_RADIO);
+	}
+	else if (raw) {
+		this->setRawConfiguration();
+		this->radio->send(data,size,Dot15d4Controller::channelToFrequency(this->channel), 0x00);
+		nrf_delay_us((size+6)*8*1000/250);
+		this->setNativeConfiguration();
 
-			}
-			else {
-				this->setNativeConfiguration();
-				this->radio->send(data,size,Dot15d4Controller::channelToFrequency(this->channel), 0x00);
-				nrf_delay_us((size+6)*8*1000/250);
-			}
+	}
+	else {
+		this->setNativeConfiguration();
+		this->radio->send(data,size,Dot15d4Controller::channelToFrequency(this->channel), 0x00);
+		nrf_delay_us((size+6)*8*1000/250);
+	}
 }
 
 void Dot15d4Controller::setJammerConfiguration() {
@@ -217,8 +228,23 @@ void Dot15d4Controller::enterEDScanMode() {
 }
 
 void Dot15d4Controller::stop() {
-		this->started = false;
+	this->started = false;
     this->radio->disable();
+
+    if (this->syncTimer != NULL) {
+        this->syncTimer->stop();
+		this->syncTimer->release();
+		this->syncTimer = NULL;
+    }
+    if (this->sendTimer != NULL) {
+        this->sendTimer->stop();
+		this->sendTimer->release();
+		this->sendTimer = NULL;
+    }
+    
+	this->getNetwork()->reset();
+    
+    this->known_link = false;
 }
 
 
@@ -349,6 +375,24 @@ Dot15d4Packet* Dot15d4Controller::wazabeeDecoder(uint8_t *buffer, uint8_t size,u
 	return new Dot15d4Packet(output_buffer+1,output_buffer[1]+1-2,timestamp,source,this->channel, rssi, fcsValue, rssi);
 }
 
+/* Time-slotted Channel Hopping related commands */
+bool Dot15d4Controller::isTSCHEnabled() {
+	return this->tsch;
+}
+
+void Dot15d4Controller::configureTSCH(bool enable) {	
+	this->tsch = enable;
+
+	if (enable) {
+		bsp_board_led_on(0);
+		bsp_board_led_on(1);
+	}
+	else {
+		bsp_board_led_off(0);
+		bsp_board_led_off(1);
+	}
+}
+
 void Dot15d4Controller::sendJammingReport(uint32_t timestamp) {
     /* Craft a jammed notification. */
     whad::NanoPbMsg *notification = new whad::dot15d4::Jammed(timestamp);
@@ -360,6 +404,171 @@ void Dot15d4Controller::sendJammingReport(uint32_t timestamp) {
     delete notification;
 }
 
+void Dot15d4Controller::scheduleFrameTx(uint64_t asn, uint8_t* frame, size_t size, uint32_t wait_offset, bool asap) {
+    if (this->txTaskCount >= MAX_TX_TASKS) {
+        return;
+    }
+
+    this->txQueue[this->txTaskCount].target_asn = asn;
+    this->txQueue[this->txTaskCount].buffer_size = size;
+	this->txQueue[this->txTaskCount].wait_offset = wait_offset;
+    this->txQueue[this->txTaskCount].send_asap = asap;
+    memcpy(this->txQueue[this->txTaskCount].buffer, frame, size);
+    
+    this->txTaskCount++;
+}
+
+void Dot15d4Controller::checkAndExecuteTx(uint64_t current_slot) {
+    for (int i = this->txTaskCount - 1; i >= 0; i--) {
+        
+        if ((this->txQueue[i].send_asap) || (this->txQueue[i].target_asn == current_slot)) {
+            
+			this->txTmpBufferSize = this->txQueue[i].buffer_size;
+			memcpy(this->txTmpBuffer, this->txQueue[i].buffer, this->txQueue[i].buffer_size);
+			
+
+			if (this->sendTimer == NULL) {
+				this->sendTimer = TimerModule::instance->getTimer();
+			}
+			else {	
+				this->sendTimer->stop();
+				this->sendTimer->release();
+				this->sendTimer = NULL;
+				this->sendTimer = TimerModule::instance->getTimer();
+			}
+
+			this->sendTimer->setMode(SINGLE_SHOT);
+			int32_t offset = 10000 * (
+				this->getNetwork()->getAsn() - this->getNetwork()->getLastSyncASN()
+			 ) - (
+				TimerModule::instance->getTimestamp() - this->getNetwork()->getLastSyncTimestamp()
+			);
+			offset += this->txQueue[i].wait_offset;
+			
+			if (offset <= 200) {
+				this->sendNow();
+				this->sendTimer->stop();
+				this->sendTimer->release();
+				this->sendTimer = NULL;
+			}
+			else {
+				this->sendTimer->setCallback((ControllerCallback)&Dot15d4Controller::sendNow, this);
+				this->sendTimer->update(offset+TsTxOffset);
+				this->sendTimer->start();
+			}
+			//this->send(this->txQueue[i].buffer, this->txQueue[i].buffer_size, false);
+            
+			if (i < this->txTaskCount - 1) {
+                this->txQueue[i] = this->txQueue[this->txTaskCount - 1];
+            }
+            this->txTaskCount--;
+            break; 
+        }
+
+		else if (this->txQueue[i].target_asn < current_slot) {
+            if (i < this->txTaskCount - 1) {
+                this->txQueue[i] = this->txQueue[this->txTaskCount - 1];
+            }
+            this->txTaskCount--;
+        }
+    }
+}
+
+void Dot15d4Controller::sendNow() {
+	this->radio->send(
+		this->txTmpBuffer, 
+		this->txTmpBufferSize, 
+		Dot15d4Controller::channelToFrequency(this->channel),
+		0x00
+	);
+}
+
+bool Dot15d4Controller::frequencyHop() {
+    if (!this->isTSCHEnabled()) return false;
+    
+    uint32_t timestamp = this->syncTimer->getLastTimestamp();
+    this->getNetwork()->setStartOfSlotTimestamp(timestamp);
+
+	this->getNetwork()->setAsn(this->getNetwork()->getAsn() + 1);
+    
+    if (this->getNetwork()->getChannelMap() == 0) return true;
+
+    int channelOffset = this->getNetwork()->getChannelOffset();
+    if (channelOffset != CHANNEL_OFFSET_NOT_DEFINED) {
+        uint32_t numChannels = this->getNetwork()->getNumberOfActiveChannels();
+        uint32_t channelIndex = (this->getNetwork()->getAsn() + channelOffset) % numChannels;
+        
+        int activeChannel = 11 + this->getNetwork()->getActiveChannel(channelIndex);
+        
+        if (this->getChannel() != activeChannel) {
+            this->setChannel(activeChannel);     
+        }
+		this->known_link = true;
+    }
+	else {
+        if ((uint32_t)(this->getChannel()) != this->getNetwork()->getDefaultChannel()) {
+            this->setChannel(this->getNetwork()->getDefaultChannel());           
+        }
+		this->known_link = false;
+    }
+
+	this->checkAndExecuteTx(this->getNetwork()->getAsn());
+	return true;
+}
+
+bool Dot15d4Controller::handleTSCHSynchronisation(Dot15d4Packet* pkt, uint32_t timestamp) {
+	if (!this->isTSCHEnabled() || pkt == NULL) return false;
+
+	uint64_t timeslotDuration = 10000;
+	
+	if (pkt->isWiHARTAdvertisement()) {
+		if (
+			(pkt->extractPanId() == this->getNetwork()->getPanId()) || 
+			(this->getNetwork()->getPanId() == 0)
+			)
+		{
+			uint64_t advAsn = pkt->extractASN();
+
+			if (this->syncTimer == NULL) {
+				this->syncTimer = TimerModule::instance->getTimer();
+				this->syncTimer->setMode(REPEATED);
+				this->syncTimer->setCallback((ControllerCallback)&Dot15d4Controller::frequencyHop, this);
+				
+				this->getNetwork()->setDefaultChannel(this->getChannel());
+				this->getNetwork()->setPanId(pkt->extractPanId());
+				this->getNetwork()->setAsn(advAsn);
+				this->syncTimer->update(timeslotDuration, timestamp - TsTxOffset);
+				this->syncTimer->start();
+				
+				this->getNetwork()->setStartOfSlotTimestamp(timestamp - TsTxOffset);
+			} else {
+				this->getNetwork()->setAsn(advAsn);
+				this->syncTimer->update(timeslotDuration, timestamp - TsTxOffset);
+				this->getNetwork()->setLastSync(timestamp, pkt->extractASN());
+			}
+		}
+	}
+	else {
+		if (this->known_link && !pkt->isWiHARTAcknowledgement()) {
+			this->getNetwork()->setLastSync(timestamp, pkt->extractASN());
+		}
+
+	}
+
+	uint32_t localStartOfSlot = this->getNetwork()->getStartOfSlotTimestamp();
+
+	pkt->setTSCHMetadata(
+		this->getNetwork()->getAsn(),
+		localStartOfSlot,
+		timeslotDuration,
+		Dot15d4Controller::channelToFrequency(this->channel),
+		this->getNetwork()->getNumberOfActiveChannels(),
+		5000000
+	);
+	
+	return true;
+}
+		
 void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
 	Dot15d4Packet* pkt = NULL;
 
@@ -373,6 +582,10 @@ void Dot15d4Controller::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buf
         crcValue.value = ((crcValue.value & 0xff00) >> 8) | ((crcValue.value & 0xff) << 8);
 
 		pkt = new Dot15d4Packet(buffer,1+buffer[0]-2,timestamp,RECEIVER,this->channel,rssi,crcValue, (uint8_t)(lqi > 63 ? 255 : lqi*4));
+	}
+
+	if (this->isTSCHEnabled()) {
+		this->handleTSCHSynchronisation(pkt, timestamp);
 	}
 
 	if (pkt != NULL) {

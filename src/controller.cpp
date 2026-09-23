@@ -86,6 +86,16 @@ whad::NanoPbMsg *Controller::buildMessageFromPacket(Packet* packet) {
     packet.addFcsValidity(dot15d4Packet->isCrcValid());
     packet.addRssi(dot15d4Packet->getRssi());
     packet.addTimestamp(dot15d4Packet->getTimestamp());
+
+    if (dot15d4Packet->isTSCHMetadataEnabled()) {
+        packet.addAsn(dot15d4Packet->getASN());
+        packet.addStartOfSlotTimestamp(dot15d4Packet->getStartOfSlotTimestamp());
+        packet.addTimeSlot(dot15d4Packet->getTimeSlot());
+        packet.addBaseChannelFrequency(dot15d4Packet->getBaseChannelFrequency());
+        packet.addNumberOfChannels(dot15d4Packet->getNumberOfChannels());
+        packet.addChannelSpacing(dot15d4Packet->getChannelSpacing());
+    
+    }
     message = new whad::dot15d4::RawPduReceived(packet);
   }
   else if (packet->getPacketType() == ESB_PACKET_TYPE) {
