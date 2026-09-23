@@ -390,6 +390,7 @@ class BLEController : public Controller {
 		int getChannel();
 		void setChannel(int channel);
 		int nextChannel();
+        whad::ble::Phy getPhy();
 
 		void updateHopInterval(uint16_t hopInterval);
 		void updateHopIncrement(uint8_t hopIncrement);

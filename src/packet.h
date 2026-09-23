@@ -73,6 +73,7 @@ class BLEPacket : public Packet {
 		uint32_t accessAddress;
 		uint64_t timestampRelative;
 		int connectionHandle;
+        whad::ble::Phy phy;
 
 	public:
 		static bool needResponse(uint8_t *payload, size_t size);
@@ -84,7 +85,7 @@ class BLEPacket : public Packet {
 		static void forgeAdvInd(uint8_t **payload,size_t *size, uint8_t *advertiser, bool advertiserRandom,  uint8_t *data, size_t dataSize);
 		static void forgeScanResponse(uint8_t **payload,size_t *size, uint8_t *advertiser, bool advertiserRandom,  uint8_t *data, size_t dataSize, bool targetRandom);
 
-		BLEPacket(uint32_t accessAddress,uint8_t *packetBuffer, size_t packetSize, uint32_t timestamp, uint32_t timestampRelative, uint8_t source, uint8_t channel,int8_t rssi,CrcValue crcValue);
+		BLEPacket(uint32_t accessAddress,uint8_t *packetBuffer, size_t packetSize, uint32_t timestamp, uint32_t timestampRelative, uint8_t source, uint8_t channel,int8_t rssi,CrcValue crcValue, whad::ble::Phy phy);
 
 		int getConnectionHandle();
 		void setConnectionHandle(int connectionHandle);
@@ -127,6 +128,7 @@ class BLEPacket : public Packet {
 
 		BLEAdvertisementType extractAdvertisementType();
 		uint32_t getAccessAddress();
+        whad::ble::Phy getPhy();
 };
 
 class Dot15d4Packet : public Packet {

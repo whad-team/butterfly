@@ -2,7 +2,7 @@
 
 Packet::Packet(PacketType packetType,uint8_t *packetBuffer, size_t packetSize, uint32_t timestamp, uint8_t source, uint8_t channel, int8_t rssi, CrcValue crcValue) {
 	this->packetType = packetType;
-  this->payload = (uint8_t*)malloc(1+4+1+1+1+1+packetSize);
+    this->payload = (uint8_t*)malloc(1+4+1+1+1+1+packetSize);
 	this->payload[0] = (uint8_t)(this->packetType);
 
 	this->timestamp = timestamp;
@@ -234,9 +234,10 @@ void BLEPacket::forgeChannelMapRequest(uint8_t **payload,size_t *size,uint16_t i
 }
 
 
-BLEPacket::BLEPacket(uint32_t accessAddress,uint8_t *packetBuffer, size_t packetSize, uint32_t timestamp,  uint32_t timestampRelative, uint8_t source, uint8_t channel,int8_t rssi, CrcValue crcValue) : Packet(BLE_PACKET_TYPE, NULL, 4+4+packetSize+3, timestamp,source,channel,rssi,crcValue) {
+BLEPacket::BLEPacket(uint32_t accessAddress,uint8_t *packetBuffer, size_t packetSize, uint32_t timestamp,  uint32_t timestampRelative, uint8_t source, uint8_t channel,int8_t rssi, CrcValue crcValue, whad::ble::Phy phy): Packet(BLE_PACKET_TYPE, NULL, 4+4+packetSize+3, timestamp,source,channel,rssi,crcValue) {
 	this->timestampRelative = timestampRelative;
 	this->connectionHandle = 0;
+    this->phy = phy;
 	this->payload[9] = (uint8_t)(timestampRelative & 0x000000FF);
 	this->payload[10] = (uint8_t)((timestampRelative & 0x0000FF00) >> 8);
 	this->payload[11] = (uint8_t)((timestampRelative & 0x00FF0000) >> 16);
@@ -525,6 +526,10 @@ uint8_t BLEPacket::extractMD() {
 
 uint32_t BLEPacket::getAccessAddress() {
 	return (((this->packetPointer[3]) << 24) & 0xFF000000) | (((this->packetPointer[2]) << 16) & 0x00FF0000) | (((this->packetPointer[1]) << 8) & 0x0000FF00) | (((this->packetPointer[0]) & 0x000000FF));
+}
+
+whad::ble::Phy BLEPacket::getPhy() {
+    return this->phy;
 }
 
 BLEAdvertisementType BLEPacket::extractAdvertisementType() {

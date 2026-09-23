@@ -261,6 +261,7 @@ void BLEController::setAdvertisementsTransmitIndicator(bool advertisementsTransm
 int BLEController::getChannel() {
 	return this->channel;
 }
+
 void BLEController::setChannel(int channel) {
 	if (channel == 37 || channel == 38 || channel == 39) this->lastAdvertisingChannel = channel;
 	this->channel = channel;
@@ -836,6 +837,7 @@ bool BLEController::goToNextChannel() {
 		return this->desyncCounter <= 5;
 	}
 	else if (this->controllerState == SCANNING) {
+#if 1
 		if (this->channel == 37) {
 			this->setChannel(38);
 		}
@@ -848,6 +850,7 @@ bool BLEController::goToNextChannel() {
 		else {
 			this->setChannel(37);
 		}
+#endif
 		return true;
 	}
 	return false;
@@ -2069,7 +2072,7 @@ void BLEController::sendExistingConnectionReport(uint32_t accessAddress, uint32_
     } else {
         chanMap = new whad::ble::ChannelMap();
     }
-    whad::NanoPbMsg *notification = new whad::ble::Synchronized(accessAddress, crcInit, hopInterval, hopIncrement, *chanMap);
+    whad::NanoPbMsg *notification = new whad::ble::Synchronized(accessAddress, crcInit, hopInterval, hopIncrement, *chanMap, this->getPhy());
 
     /* Add notification to our message queue. */
 	Core::instance->pushMessageToQueue(notification);
@@ -2088,7 +2091,7 @@ void BLEController::sendConnectionReport(ConnectionStatus status) {
             /* Craft a synchronization notification. */
             notification = new whad::ble::Synchronized(
                 this->accessAddress, this->crcInit, this->hopInterval, this->hopIncrement,
-                whad::ble::ChannelMap(this->channelMap)
+                whad::ble::ChannelMap(this->channelMap), this->getPhy()
             );
         }
         break;
@@ -2232,7 +2235,7 @@ void BLEController::sendConnectedReport() {
     );
 
     /* Craft a connected notification, enqueue and free wrapper. */
-    whad::NanoPbMsg *notification = new whad::ble::Connected(0, responderAddr, initiatorAddr);
+    whad::NanoPbMsg *notification = new whad::ble::Connected(0, responderAddr, initiatorAddr, this->getPhy());
 	Core::instance->pushMessageToQueue(notification);
     delete notification;
 }
@@ -2271,7 +2274,8 @@ void BLEController::sendSlaveConnectedReport() {
     whad::NanoPbMsg *notification = new whad::ble::Connected(
         0,              /* Connection handle */
         responderAddr,  /* Responder BD address */
-        initiatorAddr   /* Initiator BD address */
+        initiatorAddr,  /* Initiator BD address */
+        this->getPhy()  /* Current PHY settings */
     );
 
     /* Add notification to our message queue. */
@@ -3123,7 +3127,7 @@ void BLEController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer,
 		this->hopIncrementRecoveryProcessing(timestamp, size, buffer ,crcValue, rssi);
 	}
 	else if (crcValue.validity == VALID_CRC) {
-		BLEPacket *pkt = new BLEPacket(this->accessAddress,buffer, size,timestamp, relativeTimestamp, 0, this->channel,rssi, crcValue);
+		BLEPacket *pkt = new BLEPacket(this->accessAddress,buffer, size,timestamp, relativeTimestamp, 0, this->channel, rssi, crcValue, this->getPhy());
 		if (pkt->isAdvertisement()) {
 			// If the packet is an advertisement, call onAdvertisementPacket method
 			this->advertisementPacketProcessing(pkt);
@@ -3153,3 +3157,16 @@ void BLEController::onJam(uint32_t timestamp) {
 }
 
 void BLEController::onEnergyDetection(uint32_t timestamp, uint8_t value) {}
+
+whad::ble::Phy BLEController::getPhy() {
+    switch (this->radio->getPhy()) {
+        case BLE_1MBITS:
+            return whad::ble::Phy::LE1Mbit;
+
+        case BLE_2MBITS:
+            return whad::ble::Phy::LE2Mbit;
+
+        default:
+            return whad::ble::Phy::Undefined;
+    }
+}

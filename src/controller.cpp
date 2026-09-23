@@ -69,7 +69,8 @@ whad::NanoPbMsg *Controller::buildMessageFromPacket(Packet* packet) {
         (blePacket->getAccessAddress()==0x8e89bed6)?0:blePacket->getRelativeTimestamp(),
         (whad::ble::Direction)blePacket->getSource(),
         false,
-        false
+        false,
+        blePacket->getPhy()
     );
   }
   else if (packet->getPacketType() == DOT15D4_PACKET_TYPE) {

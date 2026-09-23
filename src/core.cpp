@@ -1081,7 +1081,7 @@ void Core::processBLEInputMessage(whad::ble::BleMsg bleMsg) {
         case whad::ble::ScanModeMsg:
         {
             whad::ble::ScanMode query(bleMsg);
-            this->bleController->setScanningInterval(query.getScanningInterval() * 1000); // scanning interval provided in ms
+            this->bleController->setScanningInterval(query.getInterval() * 1000); // scanning interval provided in ms
             this->bleController->startScanning(query.isActiveModeEnabled());
             response = new whad::generic::Success();
         }
