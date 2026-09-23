@@ -52,6 +52,14 @@ size_t Packet::getPacketSize() {
 uint64_t Packet::getTimestamp() {
 	return this->timestamp;
 }
+void Packet::updateTimestamp(uint64_t timestamp) {
+	this->timestamp = timestamp;
+	this->payload[1] = (uint8_t)(timestamp & 0x000000FF);
+	this->payload[2] = (uint8_t)((timestamp & 0x0000FF00) >> 8);
+	this->payload[3] = (uint8_t)((timestamp & 0x00FF0000) >> 16);
+	this->payload[4] = (uint8_t)((timestamp & 0xFF000000) >> 24);
+}
+
 
 uint8_t Packet::getSource() {
 	return this->source;
@@ -650,9 +658,12 @@ ANTPacket::ANTPacket(uint8_t *packetBuffer, size_t packetSize, uint32_t timestam
 	}
 	this->packetPointer[2+packetSize] = (uint8_t)((crcValue.value & 0xFF00) >> 8);
 	this->packetPointer[2+packetSize+1] = (uint8_t)(crcValue.value & 0xFF);
-
 }
 
+
+uint16_t ANTPacket::getCrc() {
+	return ((this->packetPointer[this->getPacketSize()-2] << 8) | this->packetPointer[this->getPacketSize()-1]);
+}
 
 uint16_t ANTPacket::getDeviceNumber() {
 	return ((this->packetPointer[3] << 8) | this->packetPointer[2]);
@@ -661,6 +672,29 @@ uint16_t ANTPacket::getDeviceNumber() {
 uint8_t ANTPacket::getDeviceType() {
 	return this->packetPointer[4];
 }
+
+uint8_t ANTPacket::getTransmissionType() {
+	return this->packetPointer[5];
+}
+
+bool ANTPacket::isSlot() {
+	return (this->packetPointer[6] & 0x08) == 0x08;
+}
+bool ANTPacket::isBroadcast() {
+	return (this->packetPointer[6] & 0x80) == 0;
+}
+bool ANTPacket::isEnd() {
+	return (this->packetPointer[6] & 0x20) == 0x20;
+}
+bool ANTPacket::isAck() {
+	return (this->packetPointer[6] & 0x40) == 0x40;
+}
+
+
+uint8_t ANTPacket::getCount() {
+	return (this->packetPointer[6] >> 4) & 1;
+}
+
 
 GenericPacket::GenericPacket(uint8_t *packetBuffer, size_t packetSize, uint32_t timestamp, uint8_t source, uint8_t channel, int8_t rssi, CrcValue crcValue, uint8_t *preamble, size_t preambleSize, uint32_t deviation,uint32_t datarate,whad::phy::ModulationType modulation, bool little) : Packet(GENERIC_PACKET_TYPE, packetBuffer, packetSize+preambleSize, timestamp, source, channel, rssi, crcValue) {
 	for (size_t i=0;i<preambleSize;i++) {

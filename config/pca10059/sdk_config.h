@@ -5091,4 +5091,18 @@
 //==========================================================
 
 // <<< end of configuration section >>>
+
+
+// adding DFU USB Trigger
+
+#define NRF_DFU_TRIGGER_USB_USB_SHARED		1
+#define NRF_DFU_TRIGGER_USB_INTERFACE_NUM	2
+#define APP_USBD_NRF_DFU_TRIGGER_ENABLED	1
+#define APP_NAME				"ButteRFly"
+#define APP_VERSION_MAJOR			0
+#define APP_VERSION_MINOR			1
+#define APP_ID					1
+#define APP_VERSION_PRERELEASE			""
+#define APP_VERSION_METADATA			""
+
 #endif //SDK_CONFIG_H

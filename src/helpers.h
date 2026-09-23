@@ -3,8 +3,29 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
+
+struct ant_netkey {
+    union {
+        uint8_t bytes[8];
+        uint64_t raw;
+    };
+};
+
+struct ant_netkey_preamble {
+    union {
+        struct {
+            uint8_t low;
+            uint8_t high;
+        };
+        uint16_t raw;
+    };
+};
 
 #define DIVIDE_ROUND(N, D) ((N) + (D)/2) / (D)
+
+uint16_t ant_gen_netkey_preamble(uint8_t* key);
+bool ant_is_valid_netkey(uint8_t* key);
 
 uint32_t bytewise_bit_swap(uint32_t inp);
 void sort_array(uint32_t tab[], size_t size);

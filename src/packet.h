@@ -44,6 +44,7 @@ class Packet {
 		uint8_t getChannel();
 		int8_t getRssi();
 		uint64_t getTimestamp();
+		void updateTimestamp(uint64_t timestamp);
 		bool isCrcValid();
 };
 
@@ -165,8 +166,16 @@ class ANTPacket : public Packet {
 	public:
 		ANTPacket(uint8_t *packetBuffer, size_t packetSize, uint32_t timestamp, uint8_t source, uint8_t channel, int8_t rssi, CrcValue crcValue, uint16_t preamble);
 
+		uint16_t getCrc();
 		uint16_t getDeviceNumber();
 		uint8_t getDeviceType();
+		uint8_t getTransmissionType();
+		bool isBroadcast();
+		bool isAck();
+		bool isEnd();
+		bool isSlot();
+		uint8_t getCount();
+
 };
 
 class MosartPacket : public Packet {

@@ -67,6 +67,7 @@ BLEController::BLEController(Radio *radio) : Controller(radio) {
 
 	this->remappingTable = NULL;
 
+	this->scanningInterval = 1250 * 0x10;
 	this->controllerState = IDLE;
 	this->advertisementsTransmitIndicator = true;
 	this->softwareFilterEnabled = false;
@@ -852,6 +853,10 @@ bool BLEController::goToNextChannel() {
 	return false;
 }
 
+void BLEController::setScanningInterval(uint32_t interval) {
+	this->scanningInterval = interval;
+}
+
 void BLEController::start() {
 	if (this->controllerState == CONNECTION_INITIATION) return;
 
@@ -886,7 +891,7 @@ void BLEController::start() {
 			this->scanningTimer = this->timerModule->getTimer();
 			this->scanningTimer->setMode(REPEATED);
 			this->scanningTimer->setCallback((ControllerCallback)&BLEController::goToNextChannel, this);
-			this->scanningTimer->update(500000);
+			this->scanningTimer->update(this->scanningInterval);
 			this->scanningTimer->start();
 		}
 	}
@@ -2331,7 +2336,7 @@ static inline uint64_t ccm_get_packet_counter(EncryptionData *d)
 
 void ccm_set_packet_counter(EncryptionData *d, uint64_t counter)
 {
-    // CCM n’utilise que 39 bits
+    // CCM only uses 39 bits
     counter &= 0x7FFFFFFFFFULL;
 
     d->pktctr[0] = (uint8_t)( counter        & 0xFF);        // LSB

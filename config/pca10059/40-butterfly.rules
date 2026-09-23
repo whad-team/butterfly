@@ -1,0 +1,11 @@
+# Apply to both the App (c0ff:eeee) and the Bootloader (1915:521f)              
+ATTRS{idVendor}=="c0ff", ATTRS{idProduct}=="eeee", ENV{ID_MM_DEVICE_IGNORE}="1", ENV{ID_MM_CANDIDATE}="0"
+ATTRS{idVendor}=="1915", ATTRS{idProduct}=="521f", ENV{ID_MM_DEVICE_IGNORE}="1", ENV{ID_MM_CANDIDATE}="0"
+                                                                                
+# Grant permissions                                                             
+SUBSYSTEM=="tty", ATTRS{idVendor}=="c0ff", ATTRS{idProduct}=="eeee", MODE="0666", SYMLINK+="butterfly"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="c0ff", ATTRS{idProduct}=="eeee", MODE="0666"
+                                                                                
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1915", ATTRS{idProduct}=="521f", MODE="0666"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="1915", ATTRS{idProduct}=="521f", MODE="0666"
+
