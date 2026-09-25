@@ -36,6 +36,7 @@ class Radio
 		Preamble preamble;
 		TxPower txPower;
 		bool rssi;
+        uint8_t last_rssi;
 		Whitening whitening;
 		uint8_t whiteningDataIv;
 		Phy phy;
@@ -155,6 +156,8 @@ class Radio
 
 		bool isRssiEnabled();
 		bool enableRssi();
+        void setLastRssi(uint8_t rssi);
+        uint8_t getLastRssi(void);
 		bool disableRssi();
 
 		Phy getPhy();

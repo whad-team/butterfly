@@ -10,6 +10,7 @@ Radio::Radio() {
 	this->state = NONE;
 	this->txPower = POS0_DBM;
 	this->rssi = false;
+    this->last_rssi = 0;
 	this->autoTXafterRXenabled = false;
 	this->controller = NULL;
 	this->interFrameSpacing = 0;
@@ -308,6 +309,14 @@ bool Radio::enableRssi() {
 bool Radio::disableRssi() {
 	this->rssi = false;
 	return true;
+}
+
+void Radio::setLastRssi(uint8_t rssi) {
+    this->last_rssi = rssi;
+}
+
+uint8_t Radio::getLastRssi(void) {
+    return this->last_rssi;
 }
 
 Phy Radio::getPhy() {
@@ -1024,31 +1033,64 @@ bool Radio::generateCrcRegisters() {
 	return success;
 }
 
-bool Radio::fastFrequencyChange(int frequency,uint8_t iv) {
-	/* Go listening on the new channel. */
 
-	NVIC_DisableIRQ(RADIO_IRQn);
-	NRF_RADIO->EVENTS_DISABLED = 0;
+/**
+ * Re-configure radio to use a different frequency and IV as fast as possible.
+ */
+
+bool Radio::fastFrequencyChange(int frequency,uint8_t iv) {
+    /* Switch radio into frequency change mode. */
+    this->state = FREQ_CHANGE;
+
+    /* Disable radio interrupts. */
+    NVIC_DisableIRQ(RADIO_IRQn);
+
+    /* 
+     * Disable DISABLED->TXEN and DISABLED->RXEN shorts to force
+     * radio to go in idle mode once disabled instead of enabling
+     * TX or RX modes.
+     */
+    NRF_RADIO->SHORTS &= ~(RADIO_SHORTS_DISABLED_TXEN_Msk | RADIO_SHORTS_DISABLED_RXEN_Msk);
+
+    /* Disable radio, block until radio is disabled. */
+    NRF_RADIO->EVENTS_DISABLED = 0;
 	NRF_RADIO->TASKS_DISABLE = 1;
 	while (NRF_RADIO->EVENTS_DISABLED == 0);
 
+    /* Radio is disabled and not in RX or TX state, change frequency. */
 	NRF_RADIO->FREQUENCY = frequency;
 	this->frequency = frequency;
 	NRF_RADIO->DATAWHITEIV = iv;
 	this->whiteningDataIv = iv;
 
+	/* 
+     * Re-configure the shorts, including the DISABLED->RXEN and DISABLED->TXEN
+     * based on current radio configuration.
+     */
+    NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | (this->autoTXafterRXenabled ? RADIO_SHORTS_DISABLED_TXEN_Msk : RADIO_SHORTS_DISABLED_RXEN_Msk);
+
+    /* Configure short for RSSI measurement if required. */
+    if (this->rssi) {
+        NRF_RADIO->SHORTS |= RADIO_SHORTS_ADDRESS_RSSISTART_Msk;
+    }
+
+    /* Clear events. */
+    NRF_RADIO->EVENTS_READY = 0;
+	NRF_RADIO->EVENTS_END = 0;
+    NRF_RADIO->EVENTS_RSSIEND = 0;
+
+    /* Clear pending radio interrupts and enable interrupts again. */
 	NVIC_ClearPendingIRQ(RADIO_IRQn);
 	NVIC_EnableIRQ(RADIO_IRQn);
 
-	// enable receiver
-	NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | (this->autoTXafterRXenabled ? RADIO_SHORTS_DISABLED_TXEN_Msk : RADIO_SHORTS_DISABLED_RXEN_Msk);
+	/* Put radio in reception mode and let our IRQ handler process packets. */
+    NRF_RADIO->TASKS_RXEN = 1;
 
-	// enable receiver (once enabled, it will listen)
-	NRF_RADIO->EVENTS_READY = 0;
-	NRF_RADIO->EVENTS_END = 0;
-	NRF_RADIO->TASKS_RXEN = 1;
+    /* Put radio state back to RX (frequency change successfully performed). */
+    this->state = RX;
 	return true;
 }
+
 bool Radio::enable() {
 	bool success = true;
 	this->disable();
@@ -1117,8 +1159,8 @@ bool Radio::enable() {
 			NRF_RADIO->INTENSET = 0x00000008;
 			NVIC_ClearPendingIRQ(RADIO_IRQn);
 			NVIC_EnableIRQ(RADIO_IRQn);
-
-			NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | (this->autoTXafterRXenabled ? RADIO_SHORTS_DISABLED_TXEN_Msk : RADIO_SHORTS_DISABLED_RXEN_Msk);
+			
+            NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | (this->autoTXafterRXenabled ? RADIO_SHORTS_DISABLED_TXEN_Msk : RADIO_SHORTS_DISABLED_RXEN_Msk);
 			if (this->rssi) {
 				NRF_RADIO->SHORTS |= RADIO_SHORTS_ADDRESS_RSSISTART_Msk;
 			}
@@ -1275,9 +1317,19 @@ extern "C" void RADIO_IRQHandler(void) {
 		NRF_RADIO->TASKS_EDSTART = 1;
 
 	}
+
+    /* Save last RSSI value. */
+    if (NRF_RADIO->EVENTS_RSSIEND) {
+        Radio::instance->setLastRssi(NRF_RADIO->RSSISAMPLE);
+
+        /* Enable RSSI measurement again (triggered by shorts). */
+        NRF_RADIO->EVENTS_RSSIEND = 0;
+    }
 	if (NRF_RADIO->EVENTS_END) {
+        /* Ack event. */
 		NRF_RADIO->EVENTS_END = 0;
-		if (NRF_CCM->MICSTATUS == 1) {
+		
+        if (NRF_CCM->MICSTATUS == 1) {
 			bsp_board_led_on(0);
 			bsp_board_led_on(1);
 		}
@@ -1345,7 +1397,8 @@ extern "C" void RADIO_IRQHandler(void) {
 							crcValue.value = NRF_RADIO->RXCRC;
 						}
 						if (Radio::instance->isRssiEnabled()) {
-							rssi = NRF_RADIO->RSSISAMPLE;
+                            /* Retrieve the last sampled RSSI value. */
+                            rssi = Radio::instance->getLastRssi();
 						}
 						Phy p = Radio::instance->getPhy();
 
@@ -1359,6 +1412,7 @@ extern "C" void RADIO_IRQHandler(void) {
 
 						free(buffer);
 						if (Radio::instance->isAutoTXafterRXenabled()) {
+                            /* Once the TX buffer transmitted, we automatically go back in RX mode. */
 							NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_RXEN_Msk;
 							NRF_RADIO->PACKETPTR = (uint32_t)(Radio::instance->txBuffer);
 							Radio::instance->setState(TX);
@@ -1399,6 +1453,8 @@ extern "C" void RADIO_IRQHandler(void) {
 				}
 			}
 		}
+
+        /* Start radio again. */
 		NRF_RADIO->TASKS_START = 1;
 	}
 }

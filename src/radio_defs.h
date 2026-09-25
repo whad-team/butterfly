@@ -19,7 +19,8 @@ typedef enum RadioState {
 	TX = 0x02,
 	JAM_RX = 0x03,
 	JAM_TX = 0x04,
-	ENERGY_DETECTION = 0x05
+	ENERGY_DETECTION = 0x05,
+    FREQ_CHANGE = 0x06
 } RadioState;
 
 typedef enum Protocol {
