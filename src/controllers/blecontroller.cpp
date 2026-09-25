@@ -837,7 +837,6 @@ bool BLEController::goToNextChannel() {
 		return this->desyncCounter <= 5;
 	}
 	else if (this->controllerState == SCANNING) {
-#if 1
 		if (this->channel == 37) {
 			this->setChannel(38);
 		}
@@ -850,7 +849,6 @@ bool BLEController::goToNextChannel() {
 		else {
 			this->setChannel(37);
 		}
-#endif
 		return true;
 	}
 	return false;
