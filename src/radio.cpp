@@ -1326,8 +1326,6 @@ extern "C" void RADIO_IRQHandler(void) {
         NRF_RADIO->EVENTS_RSSIEND = 0;
     }
 	if (NRF_RADIO->EVENTS_END) {
-        /* Ack event. */
-		NRF_RADIO->EVENTS_END = 0;
 		
         if (NRF_CCM->MICSTATUS == 1) {
 			bsp_board_led_on(0);
@@ -1367,7 +1365,7 @@ extern "C" void RADIO_IRQHandler(void) {
 					Radio::instance->setState(RX);
 				}
 				else if (Radio::instance->getState() == RX) {
-
+                    /* Compute buffer size. */
 					uint8_t bufferSize = 0;
 					if (Radio::instance->getPhy() == DOT15D4_NATIVE)  {
 						bufferSize = 128;
@@ -1386,6 +1384,8 @@ extern "C" void RADIO_IRQHandler(void) {
 							bufferSize += Radio::instance->getPayloadLength();
 						}
 					}
+
+                    /* Process received frame (payload) and forward to controller. */
 					if (bufferSize <= 2+Radio::instance->getPayloadLength()) {
 						uint8_t *buffer = (uint8_t *)malloc(sizeof(uint8_t)*bufferSize);
 						memcpy(buffer,Radio::instance->rxBuffer,bufferSize);
@@ -1408,18 +1408,25 @@ extern "C" void RADIO_IRQHandler(void) {
 						else {
 							Radio::instance->currentTimestamp = now - (Radio::instance->getPreamble().size+bufferSize)  * 4 * (p == BLE_2MBITS || p == ESB_2MBITS ? 1 : 2) - 100;
 						}
-						controller->onReceive(Radio::instance->currentTimestamp,bufferSize,buffer,crcValue, rssi);
 
+                        /* Forward received frame to controller. */
+						controller->onReceive(Radio::instance->currentTimestamp, bufferSize, buffer, crcValue, rssi);
 						free(buffer);
+
+                        /* Post-processing. */
 						if (Radio::instance->isAutoTXafterRXenabled()) {
                             /* Once the TX buffer transmitted, we automatically go back in RX mode. */
 							NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_RXEN_Msk;
 							NRF_RADIO->PACKETPTR = (uint32_t)(Radio::instance->txBuffer);
 							Radio::instance->setState(TX);
 						}
+
+                        /* Add specific short if RSSI measurement is required. */
 						if (Radio::instance->isRssiEnabled()) {
 							NRF_RADIO->SHORTS |= RADIO_SHORTS_ADDRESS_RSSISTART_Msk;
 						}
+
+                        /* Add specific short if filter is enabled. */
 						if (Radio::instance->isMatchingEnabled()) {
 							NRF_RADIO->INTENSET |= 1 << 10; // enable BCMATCH event
 							NRF_RADIO->SHORTS |= RADIO_SHORTS_ADDRESS_BCSTART_Msk;
@@ -1452,7 +1459,16 @@ extern "C" void RADIO_IRQHandler(void) {
 
 				}
 			}
+
+            /* Ack event. */
+            NRF_RADIO->EVENTS_END = 0;
 		}
+
+        /* If Ready->Start short and (disabled->rxen short or disabled->txen short) are set,
+           we don't need to start the radio again as it will be automatically restarted. */
+        if ((NRF_RADIO->SHORTS & RADIO_SHORTS_READY_START_Msk) && ((NRF_RADIO->SHORTS & RADIO_SHORTS_DISABLED_RXEN_Msk) || (NRF_RADIO->SHORTS & RADIO_SHORTS_DISABLED_TXEN_Msk))) {
+            return;
+        }
 
         /* Start radio again. */
 		NRF_RADIO->TASKS_START = 1;
