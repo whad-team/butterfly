@@ -624,6 +624,11 @@ bool Radio::disable() {
 		NRF_RADIO->TASKS_DISABLE = 1;
 		while (NRF_RADIO->EVENTS_DISABLED == 0) {}
 		success = true;
+
+        /* Flush RX list. */
+        while (hasRxDesc()) {
+            pushFreeDesc(popRxDesc());
+        }
 	}
 	return success;
 }
@@ -1485,6 +1490,7 @@ extern "C" void RADIO_IRQHandler(void) {
             switch (Radio::instance->getState()) {
                 case RX:
                     {
+                        radio_desc_t *p_pkt = Radio::instance->rxDesc;
                         if (Radio::instance->isAutoTXafterRXenabled() && Radio::instance->hasTxDesc()) {
 
                             /* Update PACKETPTR as fast as possible to make it point to the TX buffer. */
@@ -1498,11 +1504,6 @@ extern "C" void RADIO_IRQHandler(void) {
                             }
 
                             /* Put the current RX buffer in our RX list. */
-                            if (Radio::instance->rxDesc != NULL) {
-                                Radio::instance->rxDesc->rssi = NRF_RADIO->RSSISAMPLE;
-                                Radio::instance->rxDesc->crc.value = NRF_RADIO->RXCRC;
-                                Radio::instance->pushRxDesc(Radio::instance->rxDesc);
-                            }
                             Radio::instance->rxDesc = Radio::instance->popFreeDesc();
 
                         } else {
@@ -1511,79 +1512,69 @@ extern "C" void RADIO_IRQHandler(void) {
                             NRF_RADIO->PACKETPTR = (uint32_t)(p_next->payload);
                         
                             /* Save current RX descriptor (payload written by Radio). */
-                            radio_desc_t *p_pkt = Radio::instance->rxDesc;
                             Radio::instance->rxDesc = p_next;
+                        }
 
-                            /* From now, if the radio starts receiving a new packet it will be
-                             * written into the new descriptor's buffer.
-                             */
+                        /* From now, if the radio starts receiving a new packet it will be
+                         * written into the new descriptor's buffer.
+                         */
 
-                            /* Retrieve the current timestamp. */
-                            NRF_TIMER4->TASKS_CAPTURE[5] = 1UL;
-                            uint32_t now = NRF_TIMER4->CC[5];
-                           
-                            /* Retrieve the contoller. */
-                            controller = Radio::instance->getController();
+                        /* Retrieve the current timestamp. */
+                        NRF_TIMER4->TASKS_CAPTURE[5] = 1UL;
+                        uint32_t now = NRF_TIMER4->CC[5];
+                       
+                        /* Retrieve the contoller. */
+                        controller = Radio::instance->getController();
 
-                            /* Save RSSI, CRC info and save packet into RX queue. */
-                            if (Radio::instance->isRssiEnabled()) {
-                                p_pkt->rssi = NRF_RADIO->RSSISAMPLE;
+                        /* Save RSSI, CRC info and save packet into RX queue. */
+                        if (Radio::instance->isRssiEnabled()) {
+                            p_pkt->rssi = NRF_RADIO->RSSISAMPLE;
+                        }
+
+                        /* Now we have some time to process incoming packets. */
+                        if (p_pkt != NULL) {
+                            /* Process RX packet. */
+                            uint8_t bufferSize = 0;
+                            if (Radio::instance->getPhy() == DOT15D4_NATIVE)  {
+                                bufferSize = 128;
                             }
-
-                            /* Add packet to RX queue. */
-                            Radio::instance->pushRxDesc(p_pkt);
-
-                            /* Now we have some time to process incoming packets. */
-                            while (Radio::instance->hasRxDesc()) {
-                                p_pkt = Radio::instance->popRxDesc();
-
-                                if (p_pkt != NULL) {
-                                    /* Process RX packet. */
-                                    uint8_t bufferSize = 0;
-                                    if (Radio::instance->getPhy() == DOT15D4_NATIVE)  {
-                                        bufferSize = 128;
-                                    }
-                                    else {
-                                        if (Radio::instance->getHeader().s0 != 0) {
-                                            bufferSize += 1;
-                                        }
-                                        if (Radio::instance->getHeader().s1 != 0) {
-                                            bufferSize += 1;
-                                        }
-                                        if (Radio::instance->getHeader().length != 0) {
-                                            bufferSize += 1+(Radio::instance->getHeader().s0 == 0 ? p_pkt->payload[0] : p_pkt->payload[1]);
-                                        }
-                                        else {
-                                            bufferSize += Radio::instance->getPayloadLength();
-                                        }
-                                    }
-
-                                    /* Process received frame (payload) and add to RX queue. */
-                                    if (bufferSize <= 2+Radio::instance->getPayloadLength()) {
-                                        p_pkt->size = bufferSize;
-                                        Phy p = Radio::instance->getPhy();
-
-                                        if (p == DOT15D4_NATIVE) {
-                                            Radio::instance->currentTimestamp = now - ((bufferSize + 5) * 8 * 4) - 100;
-                                        }
-                                        else {
-                                            Radio::instance->currentTimestamp = now - (Radio::instance->getPreamble().size+bufferSize)  * 4 * (p == BLE_2MBITS || p == ESB_2MBITS ? 1 : 2) - 100;
-                                        }
-
-                                    }
-                                
-                                    /* Notify the controller we received a packet. */
-                                    if ((controller != NULL) /*&& (p_pkt->crc.validity == VALID_CRC)*/) {
-                                        /* Forward received frame to controller. */
-                                        controller->onReceive(Radio::instance->currentTimestamp, p_pkt->size, p_pkt->payload, p_pkt->crc, p_pkt->rssi);
-                                    }
-
-                                    /* Free descriptor. */
-                                    Radio::instance->pushFreeDesc(p_pkt);
-                                } else {
-                                    bsp_board_led_on(0);
+                            else {
+                                if (Radio::instance->getHeader().s0 != 0) {
+                                    bufferSize += 1;
+                                }
+                                if (Radio::instance->getHeader().s1 != 0) {
+                                    bufferSize += 1;
+                                }
+                                if (Radio::instance->getHeader().length != 0) {
+                                    bufferSize += 1+(Radio::instance->getHeader().s0 == 0 ? p_pkt->payload[0] : p_pkt->payload[1]);
+                                }
+                                else {
+                                    bufferSize += Radio::instance->getPayloadLength();
                                 }
                             }
+
+                            /* Process received frame (payload) and add to RX queue. */
+                            if (bufferSize <= 2+Radio::instance->getPayloadLength()) {
+                                p_pkt->size = bufferSize;
+                                Phy p = Radio::instance->getPhy();
+
+                                if (p == DOT15D4_NATIVE) {
+                                    Radio::instance->currentTimestamp = now - ((bufferSize + 5) * 8 * 4) - 100;
+                                }
+                                else {
+                                    Radio::instance->currentTimestamp = now - (Radio::instance->getPreamble().size+bufferSize)  * 4 * (p == BLE_2MBITS || p == ESB_2MBITS ? 1 : 2) - 100;
+                                }
+
+                            }
+                        
+                            /* Notify the controller we received a packet. */
+                            if ((controller != NULL) /*&& (p_pkt->crc.validity == VALID_CRC)*/) {
+                                /* Forward received frame to controller. */
+                                controller->onReceive(Radio::instance->currentTimestamp, p_pkt->size, p_pkt->payload, p_pkt->crc, p_pkt->rssi);
+                            }
+
+                            /* Free descriptor. */
+                            Radio::instance->pushFreeDesc(p_pkt);
                         }
                     }
                     break;

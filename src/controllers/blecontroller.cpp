@@ -2412,6 +2412,8 @@ void BLEController::connect(uint8_t *address, bool random,  uint32_t accessAddre
 	);
 
 
+    this->radio->disable();
+
 	// Send the packet
 	this->radio->updateTXBuffer(connection_request, connection_request_size);
 	free(connection_request);
@@ -2419,7 +2421,7 @@ void BLEController::connect(uint8_t *address, bool random,  uint32_t accessAddre
 	this->setFilter(true, address[0], address[1], address[2], address[3], address[4], address[5]);
 
 	// Reload Radio configuration (to take into account radio custom parameters)
-	this->radio->reload();
+	this->radio->enable();
 }
 
 
