@@ -1374,7 +1374,11 @@ bool Radio::send(uint8_t *data,int size,int frequency, uint8_t channel) {
 	}
 	NRF_RADIO->FREQUENCY = frequency;
 	NRF_RADIO->DATAWHITEIV = channel;
-	NRF_RADIO->PACKETPTR = (uint32_t)data;
+
+    /* Set TX buffer. */
+    updateTXBuffer(data, size);
+    this->txDesc = popTxDesc();
+	NRF_RADIO->PACKETPTR = (uint32_t)this->txDesc->payload;
 
 	if (this->encryption) {
 		memcpy(this->tmpBuffer, data, size);
@@ -1583,7 +1587,7 @@ extern "C" void RADIO_IRQHandler(void) {
                 case TX:
                     {
                         /* RX after TX, set PACKETPTR to our current empty RX descriptor. */
-                        NRF_RADIO->PACKETPTR = (uint32_t)(Radio::instance->rxDesc);
+                        NRF_RADIO->PACKETPTR = (uint32_t)(Radio::instance->rxDesc->payload);
                         Radio::instance->setState(RX);
 
                         /* No need to start RX, shorts will handle it. */
