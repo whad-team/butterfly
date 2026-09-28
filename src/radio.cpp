@@ -20,8 +20,50 @@ Radio::Radio() {
 	this->jammingInterval = 0;
 	this->encryption = false;
 
+    /* Initialize jamming patterns queue. */
 	this->initJammingPatternsQueue();
+
+    /* Update instance reference (pseudo-singleton). */
 	instance = this;
+
+    /* Initialize descriptors pool (linked-list). */
+    for (int i=0; i < MAX_DESCRIPTORS; i++) {
+        this->descPool[i].state = DESC_FREE;
+
+        /* Configure previous and next pointers. */
+        if (i == 0) {
+            this->descPool[i].header.p_prev = &this->descFreeList;
+        } else {
+            this->descPool[i].header.p_prev = &this->descPool[i-1].header;
+        }
+        if (i == (MAX_DESCRIPTORS - 1)) {
+            this->descPool[i].header.p_next = &this->descFreeList;
+        } else {
+            this->descPool[i].header.p_next = &this->descPool[i+1].header;
+        }
+
+        /* Set descriptor as free. */
+        this->descPool[i].state = DESC_FREE;
+
+        /* Initialize descriptor's properties. */
+        this->descPool[i].size = 0;
+        this->descPool[i].crc.value = 0;
+        this->descPool[i].crc.validity = UNKNOWN_CRC; 
+    }
+
+    /* Initialize free descriptors list to our initial pool. */
+    this->descFreeList.p_next = &this->descPool[0].header;
+    this->descFreeList.p_prev = &this->descPool[MAX_DESCRIPTORS - 1].header;
+
+    /* Other lists are empty (no descriptors, point to NULL). */
+    this->descTxList.p_next = &this->descTxList;
+    this->descTxList.p_prev = &this->descTxList;
+    this->descRxList.p_next = &this->descRxList;
+    this->descRxList.p_prev = &this->descRxList;
+
+    /* Current RX descriptor. */
+    this->rxDesc = NULL;
+    this->txDesc = NULL;
 }
 
 bool Radio::enableEncryption(uint32_t encryptionData) {
@@ -311,10 +353,12 @@ bool Radio::disableRssi() {
 	return true;
 }
 
+/* TODO: No more user, to remove */
 void Radio::setLastRssi(uint8_t rssi) {
     this->last_rssi = rssi;
 }
 
+/* TODO: No more user, to remove */
 uint8_t Radio::getLastRssi(void) {
     return this->last_rssi;
 }
@@ -1040,7 +1084,6 @@ bool Radio::generateCrcRegisters() {
 
 bool Radio::fastFrequencyChange(int frequency,uint8_t iv) {
     /* Switch radio into frequency change mode. */
-    this->state = FREQ_CHANGE;
 
     /* Disable radio interrupts. */
     NVIC_DisableIRQ(RADIO_IRQn);
@@ -1057,6 +1100,25 @@ bool Radio::fastFrequencyChange(int frequency,uint8_t iv) {
 	NRF_RADIO->TASKS_DISABLE = 1;
 	while (NRF_RADIO->EVENTS_DISABLED == 0);
 
+    /* If txDesc is set and not sent, place in Tx list. */
+    if (this->txDesc != NULL) {
+        pushTxDesc(this->txDesc);
+        this->txDesc = NULL;
+    }
+
+    /* Flush RX list. */
+    while (hasRxDesc()) {
+        pushFreeDesc(popRxDesc());
+    }
+
+    /* Change PACKETPTR to current RX descriptor. */
+    if (this->rxDesc == NULL) {
+        this->rxDesc = popFreeDesc();
+        if (this->rxDesc == NULL) return false;
+    }
+    
+    NRF_RADIO->PACKETPTR = (uint32_t)(this->rxDesc->payload);
+
     /* Radio is disabled and not in RX or TX state, change frequency. */
 	NRF_RADIO->FREQUENCY = frequency;
 	this->frequency = frequency;
@@ -1067,11 +1129,26 @@ bool Radio::fastFrequencyChange(int frequency,uint8_t iv) {
      * Re-configure the shorts, including the DISABLED->RXEN and DISABLED->TXEN
      * based on current radio configuration.
      */
-    NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | (this->autoTXafterRXenabled ? RADIO_SHORTS_DISABLED_TXEN_Msk : RADIO_SHORTS_DISABLED_RXEN_Msk);
+    if (this->autoTXafterRXenabled) {
+        NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_TXEN_Msk;
+        NRF_RADIO->INTENSET |= RADIO_INTENSET_TXREADY_Msk;
+        NRF_RADIO->EVENTS_TXREADY = 0;
+    } else {
+        NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_RXEN_Msk;
+        NRF_RADIO->INTENSET &= ~(RADIO_INTENSET_TXREADY_Msk);
+        NRF_RADIO->EVENTS_TXREADY = 0;
+    }
 
     /* Configure short for RSSI measurement if required. */
     if (this->rssi) {
         NRF_RADIO->SHORTS |= RADIO_SHORTS_ADDRESS_RSSISTART_Msk;
+    }
+
+    /* If matching is enabled, configure BCC, add short for ADDRESS->BCSTART and enable BCMATCH interrupt. */
+    if (this->isMatchingEnabled()) {
+        NRF_RADIO->BCC = this->matchingSize;
+        NRF_RADIO->SHORTS |= RADIO_SHORTS_ADDRESS_BCSTART_Msk;
+        NRF_RADIO->INTENSET |= 1 << 10; // enable BCMATCH event
     }
 
     /* Clear events. */
@@ -1096,10 +1173,12 @@ bool Radio::enable() {
 	this->disable();
 
 
+    /* Wait for HFCLK to be started. */
 	NRF_CLOCK->EVENTS_HFCLKSTARTED = 0;
 	NRF_CLOCK->TASKS_HFCLKSTART = 1;
 	while (NRF_CLOCK->EVENTS_HFCLKSTARTED == 0);
 
+    /* Configure nRF registers based on current settings. */
 	success = this->generateTxPowerRegister();
 	if (success) success = this->generateModeRegister();
 	if (success) success = this->generateModeCnf0Register();
@@ -1112,8 +1191,20 @@ bool Radio::enable() {
 
 
 	if (success) {
+        /* Configure TIFS register. */
 		NRF_RADIO->TIFS = this->interFrameSpacing;
-		NRF_RADIO->PACKETPTR = (uint32_t)(this->rxBuffer);
+
+        /* Prepare a RX descriptor and configure radio to use it. */
+        this->rxDesc = popFreeDesc();
+        if (this->rxDesc != NULL) {
+            /* Mark descriptor as pending and insert it into our RX queue. */
+            this->rxDesc->state = DESC_PENDING;
+
+            /* Set PACKETPTR to this descriptor's payload. */
+            NRF_RADIO->PACKETPTR = (uint32_t)(this->rxDesc->payload);
+        }
+
+		//NRF_RADIO->PACKETPTR = (uint32_t)(this->rxBuffer);
 		if (this->encryption) {
 			NRF_RADIO->PACKETPTR = (uint32_t)(this->tmpBuffer);
 			NRF_CCM->INPTR = (uint32_t)(this->tmpBuffer);
@@ -1156,24 +1247,44 @@ bool Radio::enable() {
 				NRF_RADIO->DACNF = 0;
 			}
 
-			NRF_RADIO->INTENSET = 0x00000008;
+            /* Ask for END event only. */
+			NRF_RADIO->INTENSET = RADIO_INTENSET_END_Msk | RADIO_INTENSET_CRCOK_Msk | RADIO_INTENSET_CRCERROR_Msk;
+
+            /* Clear and enable interrupts. */
 			NVIC_ClearPendingIRQ(RADIO_IRQn);
 			NVIC_EnableIRQ(RADIO_IRQn);
-			
-            NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | (this->autoTXafterRXenabled ? RADIO_SHORTS_DISABLED_TXEN_Msk : RADIO_SHORTS_DISABLED_RXEN_Msk);
+		
+            /* Configure shorts for continuous RX or TX. */
+            if (this->autoTXafterRXenabled) {
+                NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_TXEN_Msk;
+                NRF_RADIO->INTENSET |= RADIO_INTENSET_TXREADY_Msk;
+                NRF_RADIO->EVENTS_TXREADY = 0;
+            } else {
+                NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_RXEN_Msk;
+                NRF_RADIO->INTENSET &= ~(RADIO_INTENSET_TXREADY_Msk);
+                NRF_RADIO->EVENTS_TXREADY = 0;
+            }
+
+            /* If RSSI measurement is required, configure the ADDRESS->RSSISTART short. */
 			if (this->rssi) {
 				NRF_RADIO->SHORTS |= RADIO_SHORTS_ADDRESS_RSSISTART_Msk;
 			}
 
+            /* If matching is enabled, configure BCC, add short for ADDRESS->BCSTART and enable BCMATCH interrupt. */
 			if (this->isMatchingEnabled()) {
 				NRF_RADIO->BCC = this->matchingSize;
 				NRF_RADIO->SHORTS |= RADIO_SHORTS_ADDRESS_BCSTART_Msk;
 				NRF_RADIO->INTENSET |= 1 << 10; // enable BCMATCH event
 			}
+
+            /* Reset END and READY events. */
 			NRF_RADIO->EVENTS_END = 0;
 			NRF_RADIO->EVENTS_READY = 0;
+            NRF_RADIO->EVENTS_CRCOK = 0;
+            NRF_RADIO->EVENTS_CRCERROR = 0;
 			NRF_RADIO->TASKS_RXEN = 1;
 
+            /* State is RX by default. */
 			this->state = RX;
 
 		}
@@ -1217,9 +1328,27 @@ bool Radio::reload() {
 }
 
 bool Radio::updateTXBuffer(uint8_t *data, uint8_t size) {
-	for (int i=0;i<size;i++) {
+	/*
+    for (int i=0;i<size;i++) {
 		this->txBuffer[i] = data[i];
 	}
+    */
+    
+    /* Get a descriptor. */
+    radio_desc_t *pkt_desc = popFreeDesc();
+    if (pkt_desc == NULL) {
+        return false;
+    }
+
+    /* Set descriptor's properties. */
+    if (size > 255) size = 255;
+    memcpy(pkt_desc->payload, data, size);
+    pkt_desc->size = size;
+    pkt_desc->state = DESC_PENDING;
+
+    /* Add descriptor to TX queue. */
+    pushTxDesc(pkt_desc);
+
 	return true;
 }
 
@@ -1270,26 +1399,29 @@ bool Radio::send(uint8_t *data,int size,int frequency, uint8_t channel) {
 
 static uint8_t jamBuffer[] = {0x00,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
 extern "C" void RADIO_IRQHandler(void) {
+    /* Process filter-related events. */
+    if (Radio::instance->isFilterEnabled()) {
+        if (NRF_RADIO->EVENTS_DEVMATCH == 1) {
+            NRF_RADIO->EVENTS_DEVMATCH = 0;
+        }
+        if (NRF_RADIO->EVENTS_DEVMISS == 1) {
+            NRF_RADIO->EVENTS_DEVMISS = 0;
+            Radio::instance->reload();
+            return;
+        }
+        else {
+            NRF_RADIO->EVENTS_DEVMISS = 0;
+            NRF_RADIO->EVENTS_DEVMATCH = 0;
+        }
+    }
 
-		if (Radio::instance->isFilterEnabled()) {
-			if (NRF_RADIO->EVENTS_DEVMATCH == 1) {
-				NRF_RADIO->EVENTS_DEVMATCH = 0;
-			}
-			if (NRF_RADIO->EVENTS_DEVMISS == 1) {
-				NRF_RADIO->EVENTS_DEVMISS = 0;
-				Radio::instance->reload();
-				return;
-			}
-			else {
-				NRF_RADIO->EVENTS_DEVMISS = 0;
-				NRF_RADIO->EVENTS_DEVMATCH = 0;
-			}
-		}
+    /* Process READY event (should not be triggered, not enabled by default). */
 	if (NRF_RADIO->EVENTS_READY) {
 		NRF_RADIO->EVENTS_READY = 0;
 		NRF_RADIO->TASKS_START = 1;
 	}
 
+    /* Process BCMATCH (enabled when filter is enabled). */
 	if (NRF_RADIO->EVENTS_BCMATCH) {
 		NRF_RADIO->EVENTS_BCMATCH = 0;
 		if (Radio::instance->getMode() == MODE_NORMAL) {
@@ -1297,16 +1429,10 @@ extern "C" void RADIO_IRQHandler(void) {
 			controller->onMatch(Radio::instance->rxBuffer, Radio::instance->getMatchingSize());
 			NRF_RADIO->TASKS_BCSTOP = 1;
 		}
-		/*
-		else if (Radio::instance->getMode() == MODE_JAMMER) {
-			bsp_board_led_invert(0);
-			if (Radio::instance->checkJammingPatterns(Radio::instance->rxBuffer,Radio::instance->getJammingPatternsCounter()/8)) {
-				NRF_RADIO->TASKS_STOP = 1;
-				Radio::instance->reload();
-			}
-		}*/
 	}
-	if (NRF_RADIO->EVENTS_EDEND) {
+	
+    /* Process EDEND interrupt. */
+    if (NRF_RADIO->EVENTS_EDEND) {
 		uint8_t sample = NRF_RADIO->EDSAMPLE;
 		NRF_RADIO->EVENTS_EDEND = 0;
 		NRF_TIMER4->TASKS_CAPTURE[5] = 1UL;
@@ -1318,159 +1444,296 @@ extern "C" void RADIO_IRQHandler(void) {
 
 	}
 
-    /* Save last RSSI value. */
+    /* Process RSSI measure event (disabled by default). */
     if (NRF_RADIO->EVENTS_RSSIEND) {
-        Radio::instance->setLastRssi(NRF_RADIO->RSSISAMPLE);
-
+        /* Set current RX descriptor RSSI. */
+        if (Radio::instance->rxDesc != NULL) {
+            Radio::instance->rxDesc->rssi = NRF_RADIO->RSSISAMPLE;
+        }
         /* Enable RSSI measurement again (triggered by shorts). */
         NRF_RADIO->EVENTS_RSSIEND = 0;
     }
-	if (NRF_RADIO->EVENTS_END) {
-		
-        if (NRF_CCM->MICSTATUS == 1) {
-			bsp_board_led_on(0);
-			bsp_board_led_on(1);
-		}
 
-		/*
-		if (Radio::instance->isFilterEnabled() && Radio::instance->getState() == RX) {
-			if (NRF_RADIO->EVENTS_DEVMATCH == 0) {
-				NRF_RADIO->TASKS_START = 1;
-				NRF_RADIO->EVENTS_DEVMATCH = 0;
-				NRF_RADIO->EVENTS_DEVMISS = 0;
+    if (NRF_RADIO->EVENTS_TXREADY) {
+        /* Check if we need to remove or not the DISABLED_TXEN short. */
+        NRF_RADIO->SHORTS &= ~(RADIO_SHORTS_DISABLED_TXEN_Msk | RADIO_SHORTS_DISABLED_RXEN_Msk);
+        NRF_RADIO->SHORTS |= RADIO_SHORTS_DISABLED_RXEN_Msk;
+        NRF_RADIO->EVENTS_TXREADY = 0;
+    }
 
-				Radio::instance->reload();
-			}
-			else {
-				bsp_board_led_invert(0);
-				bsp_board_led_invert(1);
-				NRF_RADIO->EVENTS_DEVMATCH = 0;
-				NRF_RADIO->EVENTS_DEVMISS = 0;
-			}
-		}
-		else {
-			NRF_RADIO->EVENTS_DEVMATCH = 0;
-			NRF_RADIO->EVENTS_DEVMISS = 0;
-		}*/
-		//NRF_RADIO->TASKS_BCSTART = 1;
-		NRF_TIMER4->TASKS_CAPTURE[5] = 1UL;
-		uint32_t now = NRF_TIMER4->CC[5];
-
-		Controller *controller = Radio::instance->getController();
-		if (controller != NULL) {
-			if (Radio::instance->getMode() == MODE_NORMAL) {
-				if (Radio::instance->getState() == TX) {
-					//LedManager::instance->toggle(LED1);
-					NRF_RADIO->PACKETPTR = (uint32_t)Radio::instance->rxBuffer;
-					Radio::instance->setState(RX);
-				}
-				else if (Radio::instance->getState() == RX) {
-                    /* Compute buffer size. */
-					uint8_t bufferSize = 0;
-					if (Radio::instance->getPhy() == DOT15D4_NATIVE)  {
-						bufferSize = 128;
-					}
-					else {
-						if (Radio::instance->getHeader().s0 != 0) {
-							bufferSize += 1;
-						}
-						if (Radio::instance->getHeader().s1 != 0) {
-							bufferSize += 1;
-						}
-						if (Radio::instance->getHeader().length != 0) {
-							bufferSize += 1+(Radio::instance->getHeader().s0 == 0 ? Radio::instance->rxBuffer[0] : Radio::instance->rxBuffer[1]);
-						}
-						else {
-							bufferSize += Radio::instance->getPayloadLength();
-						}
-					}
-
-                    /* Process received frame (payload) and forward to controller. */
-					if (bufferSize <= 2+Radio::instance->getPayloadLength()) {
-						uint8_t *buffer = (uint8_t *)malloc(sizeof(uint8_t)*bufferSize);
-						memcpy(buffer,Radio::instance->rxBuffer,bufferSize);
-						CrcValue crcValue;
-						crcValue.validity = UNKNOWN_CRC;
-						uint8_t rssi = 0x00;
-						if (Radio::instance->getCrc() == HARDWARE_CRC) {
-							crcValue.validity = (NRF_RADIO->CRCSTATUS == 1 ? VALID_CRC : INVALID_CRC);
-							crcValue.value = NRF_RADIO->RXCRC;
-						}
-						if (Radio::instance->isRssiEnabled()) {
-                            /* Retrieve the last sampled RSSI value. */
-                            rssi = Radio::instance->getLastRssi();
-						}
-						Phy p = Radio::instance->getPhy();
-
-						if (p == DOT15D4_NATIVE) {
-							Radio::instance->currentTimestamp = now - ((bufferSize + 5) * 8 * 4) - 100;
-						}
-						else {
-							Radio::instance->currentTimestamp = now - (Radio::instance->getPreamble().size+bufferSize)  * 4 * (p == BLE_2MBITS || p == ESB_2MBITS ? 1 : 2) - 100;
-						}
-
-                        /* Forward received frame to controller. */
-						controller->onReceive(Radio::instance->currentTimestamp, bufferSize, buffer, crcValue, rssi);
-						free(buffer);
-
-                        /* Post-processing. */
-						if (Radio::instance->isAutoTXafterRXenabled()) {
-                            /* Once the TX buffer transmitted, we automatically go back in RX mode. */
-							NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_RXEN_Msk;
-							NRF_RADIO->PACKETPTR = (uint32_t)(Radio::instance->txBuffer);
-							Radio::instance->setState(TX);
-						}
-
-                        /* Add specific short if RSSI measurement is required. */
-						if (Radio::instance->isRssiEnabled()) {
-							NRF_RADIO->SHORTS |= RADIO_SHORTS_ADDRESS_RSSISTART_Msk;
-						}
-
-                        /* Add specific short if filter is enabled. */
-						if (Radio::instance->isMatchingEnabled()) {
-							NRF_RADIO->INTENSET |= 1 << 10; // enable BCMATCH event
-							NRF_RADIO->SHORTS |= RADIO_SHORTS_ADDRESS_BCSTART_Msk;
-						}
-
-					}
-				}
-			}
-			else if (Radio::instance->getMode() == MODE_JAMMER) {
-				if (Radio::instance->getState() == JAM_RX) {
-					NRF_RADIO->PACKETPTR = (uint32_t)jamBuffer;
-					NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_RXEN_Msk | RADIO_SHORTS_ADDRESS_BCSTART_Msk;
-					Radio::instance->setState(JAM_TX);
-
-				}
-				else if (Radio::instance->getState() == JAM_TX) {
-					NRF_RADIO->PACKETPTR = (uint32_t)Radio::instance->rxBuffer;
-					uint32_t jammingInterval = Radio::instance->getJammingInterval();
-					if (jammingInterval == 0) {
-							NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_TXEN_Msk | RADIO_SHORTS_ADDRESS_BCSTART_Msk;
-							Radio::instance->setState(JAM_RX);
-							controller->onJam(now);
-					}
-					else {
-						NRF_RADIO->SHORTS = 0;
-						nrf_delay_us(jammingInterval);
-						controller->onJam(now);
-						Radio::instance->reload();
-					}
-
-				}
-			}
-
-            /* Ack event. */
-            NRF_RADIO->EVENTS_END = 0;
-		}
-
-        /* If Ready->Start short and (disabled->rxen short or disabled->txen short) are set,
-           we don't need to start the radio again as it will be automatically restarted. */
-        if ((NRF_RADIO->SHORTS & RADIO_SHORTS_READY_START_Msk) && ((NRF_RADIO->SHORTS & RADIO_SHORTS_DISABLED_RXEN_Msk) || (NRF_RADIO->SHORTS & RADIO_SHORTS_DISABLED_TXEN_Msk))) {
-            return;
+    if (NRF_RADIO->EVENTS_CRCOK) {
+        if (Radio::instance->rxDesc != NULL) {
+            Radio::instance->rxDesc->crc.validity = VALID_CRC;
         }
+        NRF_RADIO->EVENTS_CRCOK = 0;
+    }
 
-        /* Start radio again. */
-		NRF_RADIO->TASKS_START = 1;
+    if (NRF_RADIO->EVENTS_CRCERROR) {
+        if (Radio::instance->rxDesc != NULL) {
+            Radio::instance->rxDesc->crc.validity = INVALID_CRC;
+        } else {
+            bsp_board_led_off(0);
+        }
+        NRF_RADIO->EVENTS_CRCERROR = 0;
+    }
+
+    if (NRF_RADIO->EVENTS_END) {
+        Controller *controller = NULL;
+
+        /* Process the received payload. */
+        if (Radio::instance->getMode() == MODE_NORMAL) {
+            switch (Radio::instance->getState()) {
+                case RX:
+                    {
+                        if (Radio::instance->isAutoTXafterRXenabled() && Radio::instance->hasTxDesc()) {
+
+                            /* Update PACKETPTR as fast as possible to make it point to the TX buffer. */
+                            Radio::instance->txDesc = Radio::instance->popTxDesc();
+                            if (Radio::instance->txDesc != NULL) {
+                                NRF_RADIO->PACKETPTR = (uint32_t)(Radio::instance->txDesc->payload);
+
+                                /* Switch to RX state, let hardware send the current TX buffer. */
+                                Radio::instance->setState(TX);
+                                bsp_board_led_on(0);
+                            }
+
+                            /* Put the current RX buffer in our RX list. */
+                            if (Radio::instance->rxDesc != NULL) {
+                                Radio::instance->rxDesc->rssi = NRF_RADIO->RSSISAMPLE;
+                                Radio::instance->rxDesc->crc.value = NRF_RADIO->RXCRC;
+                                Radio::instance->pushRxDesc(Radio::instance->rxDesc);
+                            }
+                            Radio::instance->rxDesc = Radio::instance->popFreeDesc();
+
+                        } else {
+                            /* Give radio another RX descriptor to write into. */
+                            radio_desc_t *p_next = Radio::instance->popFreeDesc();
+                            NRF_RADIO->PACKETPTR = (uint32_t)(p_next->payload);
+                        
+                            /* Save current RX descriptor (payload written by Radio). */
+                            radio_desc_t *p_pkt = Radio::instance->rxDesc;
+                            Radio::instance->rxDesc = p_next;
+
+                            /* From now, if the radio starts receiving a new packet it will be
+                             * written into the new descriptor's buffer.
+                             */
+
+                            /* Retrieve the current timestamp. */
+                            NRF_TIMER4->TASKS_CAPTURE[5] = 1UL;
+                            uint32_t now = NRF_TIMER4->CC[5];
+                           
+                            /* Retrieve the contoller. */
+                            controller = Radio::instance->getController();
+
+                            /* Save RSSI, CRC info and save packet into RX queue. */
+                            if (Radio::instance->isRssiEnabled()) {
+                                p_pkt->rssi = NRF_RADIO->RSSISAMPLE;
+                            }
+
+                            /* Add packet to RX queue. */
+                            Radio::instance->pushRxDesc(p_pkt);
+
+                            /* Now we have some time to process incoming packets. */
+                            while (Radio::instance->hasRxDesc()) {
+                                p_pkt = Radio::instance->popRxDesc();
+
+                                if (p_pkt != NULL) {
+                                    /* Process RX packet. */
+                                    uint8_t bufferSize = 0;
+                                    if (Radio::instance->getPhy() == DOT15D4_NATIVE)  {
+                                        bufferSize = 128;
+                                    }
+                                    else {
+                                        if (Radio::instance->getHeader().s0 != 0) {
+                                            bufferSize += 1;
+                                        }
+                                        if (Radio::instance->getHeader().s1 != 0) {
+                                            bufferSize += 1;
+                                        }
+                                        if (Radio::instance->getHeader().length != 0) {
+                                            bufferSize += 1+(Radio::instance->getHeader().s0 == 0 ? p_pkt->payload[0] : p_pkt->payload[1]);
+                                        }
+                                        else {
+                                            bufferSize += Radio::instance->getPayloadLength();
+                                        }
+                                    }
+
+                                    /* Process received frame (payload) and add to RX queue. */
+                                    if (bufferSize <= 2+Radio::instance->getPayloadLength()) {
+                                        p_pkt->size = bufferSize;
+                                        Phy p = Radio::instance->getPhy();
+
+                                        if (p == DOT15D4_NATIVE) {
+                                            Radio::instance->currentTimestamp = now - ((bufferSize + 5) * 8 * 4) - 100;
+                                        }
+                                        else {
+                                            Radio::instance->currentTimestamp = now - (Radio::instance->getPreamble().size+bufferSize)  * 4 * (p == BLE_2MBITS || p == ESB_2MBITS ? 1 : 2) - 100;
+                                        }
+
+                                    }
+                                
+                                    /* Notify the controller we received a packet. */
+                                    if ((controller != NULL) /*&& (p_pkt->crc.validity == VALID_CRC)*/) {
+                                        /* Forward received frame to controller. */
+                                        controller->onReceive(Radio::instance->currentTimestamp, p_pkt->size, p_pkt->payload, p_pkt->crc, p_pkt->rssi);
+                                    }
+
+                                    /* Free descriptor. */
+                                    Radio::instance->pushFreeDesc(p_pkt);
+                                } else {
+                                    bsp_board_led_on(0);
+                                }
+                            }
+                        }
+                    }
+                    break;
+
+                /* TX buffer sent, we must switch PACKETPTR to rxDesc. */
+                case TX:
+                    {
+                        /* RX after TX, set PACKETPTR to our current empty RX descriptor. */
+                        NRF_RADIO->PACKETPTR = (uint32_t)(Radio::instance->rxDesc);
+                        Radio::instance->setState(RX);
+
+                        /* No need to start RX, shorts will handle it. */
+                        Radio::instance->pushFreeDesc(Radio::instance->txDesc);
+                        Radio::instance->txDesc = NULL;
+
+                        bsp_board_led_off(0);
+                    }
+                    break;
+
+                default:
+                    /* Nothing to do. */
+                    break;
+            }
+        } else if (Radio::instance->getMode() == MODE_JAMMER) {
+            /* Retrieve the current timestamp. */
+            NRF_TIMER4->TASKS_CAPTURE[5] = 1UL;
+            uint32_t now = NRF_TIMER4->CC[5];
+
+            if (Radio::instance->getState() == JAM_RX) {
+                NRF_RADIO->PACKETPTR = (uint32_t)jamBuffer;
+                NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_RXEN_Msk | RADIO_SHORTS_ADDRESS_BCSTART_Msk;
+                Radio::instance->setState(JAM_TX);
+
+            }
+            else if (Radio::instance->getState() == JAM_TX) {
+                NRF_RADIO->PACKETPTR = (uint32_t)Radio::instance->rxBuffer;
+                uint32_t jammingInterval = Radio::instance->getJammingInterval();
+                if (jammingInterval == 0) {
+                        NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_TXEN_Msk | RADIO_SHORTS_ADDRESS_BCSTART_Msk;
+                        Radio::instance->setState(JAM_RX);
+                        controller->onJam(now);
+                }
+                else {
+                    NRF_RADIO->SHORTS = 0;
+                    nrf_delay_us(jammingInterval);
+                    controller->onJam(now);
+                    Radio::instance->reload();
+                }
+            }
+        }
+        
+        /* Ack event. */
+        NRF_RADIO->EVENTS_END = 0;
 	}
 }
+
+/**
+ * Descriptors and list management.
+ **/
+
+radio_desc_t *Radio::popFromList(radio_desc_head_t *p_list) {
+    radio_desc_head_t *p_desc = NULL;
+
+    /* Return NULL if list is empty. */
+    if (p_list->p_next != p_list->p_prev) {
+        /* Pick the first item. */ 
+        p_desc = p_list->p_next; 
+        p_list->p_next = p_desc->p_next;
+        p_desc->p_next = NULL;
+        p_desc->p_prev = NULL;
+    }
+
+    /* Return descriptor as a pointer to a radio_desc_t structure. */
+    return (radio_desc_t *)p_desc;
+}
+
+radio_desc_t *Radio::popFreeDesc(void) {
+    return popFromList(&this->descFreeList);
+}
+
+radio_desc_t *Radio::popTxDesc(void) {
+    return popFromList(&this->descTxList);
+}
+
+radio_desc_t *Radio::popRxDesc(void) {
+    return popFromList(&this->descRxList);
+}
+
+void Radio::pushIntoList(radio_desc_head_t *p_list, radio_desc_t *p_desc) {
+    /* prev <- p_desc */
+    p_desc->header.p_prev = p_list->p_prev;
+
+    /* p_desc -> prev.next */
+    p_desc->header.p_next = p_list->p_prev->p_next;
+
+    /* prev.next -> p_desc */
+    p_list->p_prev->p_next = &p_desc->header;
+
+    /*  p_desc <- tail */
+    p_list->p_prev = &p_desc->header;
+}
+
+void Radio::pushTxDesc(radio_desc_t *p_desc) {
+    pushIntoList(&this->descTxList, p_desc);
+}
+
+void Radio::pushRxDesc(radio_desc_t *p_desc) {
+    pushIntoList(&this->descRxList, p_desc);
+}
+
+void Radio::pushFreeDesc(radio_desc_t *p_desc) {
+    /* Clear descriptor. */
+    p_desc->state = DESC_FREE;
+    p_desc->size = 0;
+    p_desc->crc.validity = UNKNOWN_CRC;
+    memset(p_desc->payload, 0, 256);
+    pushIntoList(&this->descFreeList, p_desc);
+}
+
+bool Radio::isListEmpty(radio_desc_head_t *p_list) {
+    return (p_list->p_next == p_list->p_prev);
+}
+
+size_t Radio::countList(radio_desc_head_t *p_list) {
+    radio_desc_head_t *p = p_list;
+    size_t count = 0;
+    while (p->p_next != p_list) {
+        count++;
+        p = p->p_next;
+    }
+    return count;
+}
+
+size_t Radio::countTxDesc(void) {
+    return countList(&this->descTxList);
+}
+
+size_t Radio::countRxDesc(void) {
+    return countList(&this->descRxList);
+}
+
+bool Radio::hasTxDesc(void) {
+    return !isListEmpty(&this->descTxList);
+}
+
+bool Radio::hasRxDesc(void) {
+    return !isListEmpty(&this->descRxList);
+}
+
+bool Radio::hasFreeDesc(void) {
+    return !isListEmpty(&this->descFreeList);
+}
+

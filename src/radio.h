@@ -10,6 +10,8 @@
 
 #define MAX_PACKET_SIZE 257
 #define SCRATCHPAD_SIZE 273
+#define MAX_DESCRIPTORS 10
+
 class Controller;
 
 class Radio
@@ -80,6 +82,15 @@ class Radio
 		bool generateDataWhiteIvRegister();
 		bool generateCrcRegisters();
 
+        /* Descriptors pool. */
+        radio_desc_t descPool[MAX_DESCRIPTORS];
+
+        /* Descriptors lists. */
+        radio_desc_head_t descFreeList;
+        radio_desc_head_t descTxList;
+        radio_desc_head_t descRxList;
+
+
 	public:
 		static Radio *instance;
 		uint32_t currentTimestamp;
@@ -87,6 +98,24 @@ class Radio
 		uint8_t tmpBuffer[MAX_PACKET_SIZE];
 		uint8_t rxBuffer[MAX_PACKET_SIZE];
 		uint8_t txBuffer[MAX_PACKET_SIZE];
+
+        radio_desc_t *rxDesc;
+        radio_desc_t *txDesc;
+        void pushIntoList(radio_desc_head_t *p_list, radio_desc_t *p_desc);
+        void pushFreeDesc(radio_desc_t *p_desc);
+        void pushTxDesc(radio_desc_t *p_desc);
+        void pushRxDesc(radio_desc_t *p_desc);
+        radio_desc_t *popFromList(radio_desc_head_t *p_list);
+        radio_desc_t *popFreeDesc(void);
+        radio_desc_t *popRxDesc(void);
+        radio_desc_t *popTxDesc(void);
+        size_t countList(radio_desc_head_t *p_list);
+        bool isListEmpty(radio_desc_head_t *p_list);
+        size_t countTxDesc(void);
+        bool hasTxDesc(void);
+        size_t countRxDesc(void);
+        bool hasRxDesc(void);
+        bool hasFreeDesc(void);
 
 		Radio();
 
@@ -212,6 +241,23 @@ class Radio
 		int getChannel();
 
 		bool send(uint8_t *data,int size, int frequency, uint8_t channel);
+
+
+        /**
+         * Descriptors
+         **/
+
+        /* Ask radio for a new descriptor. */
+        radio_desc_t *allocateDesc(void);
+
+        /* Add descriptor to the free list. */
+        void freeDesc(radio_desc_t *p_desc);
+
+        /* Put a descriptor in a TX queue. */
+        bool pushTxQueue(radio_desc_t *p_descriptor);
+
+        /* Retrieve descriptor from RX queue. */
+        radio_desc_t popRxQueue(void);
 };
 
 #endif
