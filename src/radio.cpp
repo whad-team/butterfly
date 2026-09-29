@@ -625,10 +625,13 @@ bool Radio::disable() {
 		while (NRF_RADIO->EVENTS_DISABLED == 0) {}
 		success = true;
 
-        /* Flush RX list. */
+        /* Flush RX and TX list. */
         while (hasRxDesc()) {
             pushFreeDesc(popRxDesc());
         }
+        //while (hasTxDesc()) {
+        //    pushFreeDesc(popTxDesc());
+        //}
 	}
 	return success;
 }
@@ -1105,12 +1108,6 @@ bool Radio::fastFrequencyChange(int frequency,uint8_t iv) {
 	NRF_RADIO->TASKS_DISABLE = 1;
 	while (NRF_RADIO->EVENTS_DISABLED == 0);
 
-    /* If txDesc is set and not sent, place in Tx list. */
-    if (this->txDesc != NULL) {
-        pushTxDesc(this->txDesc);
-        this->txDesc = NULL;
-    }
-
     /* Flush RX list. */
     while (hasRxDesc()) {
         pushFreeDesc(popRxDesc());
@@ -1175,7 +1172,7 @@ bool Radio::fastFrequencyChange(int frequency,uint8_t iv) {
 
 bool Radio::enable() {
 	bool success = true;
-	this->disable();
+	//this->disable();
 
 
     /* Wait for HFCLK to be started. */
@@ -1200,7 +1197,9 @@ bool Radio::enable() {
 		NRF_RADIO->TIFS = this->interFrameSpacing;
 
         /* Prepare a RX descriptor and configure radio to use it. */
-        this->rxDesc = popFreeDesc();
+        if (this->rxDesc == NULL) {
+            this->rxDesc = popFreeDesc();
+        }
         if (this->rxDesc != NULL) {
             /* Mark descriptor as pending and insert it into our RX queue. */
             this->rxDesc->state = DESC_PENDING;
@@ -1333,12 +1332,6 @@ bool Radio::reload() {
 }
 
 bool Radio::updateTXBuffer(uint8_t *data, uint8_t size) {
-	/*
-    for (int i=0;i<size;i++) {
-		this->txBuffer[i] = data[i];
-	}
-    */
-    
     /* Get a descriptor. */
     radio_desc_t *pkt_desc = popFreeDesc();
     if (pkt_desc == NULL) {
@@ -1362,7 +1355,8 @@ int Radio::getMatchingSize() {
 }
 
 bool Radio::send(uint8_t *data,int size,int frequency, uint8_t channel) {
-	NVIC_DisableIRQ(RADIO_IRQn);
+	bsp_board_led_invert(0);
+    NVIC_DisableIRQ(RADIO_IRQn);
 	NRF_RADIO->SHORTS = 0;
 	NRF_RADIO->EVENTS_DISABLED = 0;
 	NRF_RADIO->TASKS_DISABLE = 1;
@@ -1402,7 +1396,6 @@ bool Radio::send(uint8_t *data,int size,int frequency, uint8_t channel) {
 	NRF_RADIO->EVENTS_READY = 0;
 	NRF_RADIO->EVENTS_END = 0;
 	NRF_RADIO->TASKS_TXEN = 1;
-
 	return false;
 }
 
@@ -1499,13 +1492,11 @@ extern "C" void RADIO_IRQHandler(void) {
 
                             /* Update PACKETPTR as fast as possible to make it point to the TX buffer. */
                             Radio::instance->txDesc = Radio::instance->popTxDesc();
-                            if (Radio::instance->txDesc != NULL) {
-                                NRF_RADIO->PACKETPTR = (uint32_t)(Radio::instance->txDesc->payload);
+                            NRF_RADIO->PACKETPTR = (uint32_t)(Radio::instance->txDesc->payload);
 
-                                /* Switch to RX state, let hardware send the current TX buffer. */
-                                Radio::instance->setState(TX);
-                                bsp_board_led_on(0);
-                            }
+                            /* Switch to RX state, let hardware send the current TX buffer. */
+                            Radio::instance->setState(TX);
+                            bsp_board_led_on(0);
 
                             /* Put the current RX buffer in our RX list. */
                             Radio::instance->rxDesc = Radio::instance->popFreeDesc();
@@ -1514,7 +1505,7 @@ extern "C" void RADIO_IRQHandler(void) {
                             /* Give radio another RX descriptor to write into. */
                             radio_desc_t *p_next = Radio::instance->popFreeDesc();
                             NRF_RADIO->PACKETPTR = (uint32_t)(p_next->payload);
-                        
+
                             /* Save current RX descriptor (payload written by Radio). */
                             Radio::instance->rxDesc = p_next;
                         }
@@ -1572,7 +1563,7 @@ extern "C" void RADIO_IRQHandler(void) {
                             }
                         
                             /* Notify the controller we received a packet. */
-                            if ((controller != NULL) /*&& (p_pkt->crc.validity == VALID_CRC)*/) {
+                            if ((controller != NULL) && (p_pkt->crc.validity == VALID_CRC)) {
                                 /* Forward received frame to controller. */
                                 controller->onReceive(Radio::instance->currentTimestamp, p_pkt->size, p_pkt->payload, p_pkt->crc, p_pkt->rssi);
                             }
@@ -1586,6 +1577,9 @@ extern "C" void RADIO_IRQHandler(void) {
                 /* TX buffer sent, we must switch PACKETPTR to rxDesc. */
                 case TX:
                     {
+                        if (Radio::instance->txDesc->payload[1] == 0) {
+                            bsp_board_led_invert(1);
+                        }
                         /* RX after TX, set PACKETPTR to our current empty RX descriptor. */
                         NRF_RADIO->PACKETPTR = (uint32_t)(Radio::instance->rxDesc->payload);
                         Radio::instance->setState(RX);
@@ -1643,10 +1637,11 @@ radio_desc_t *Radio::popFromList(radio_desc_head_t *p_list) {
     radio_desc_head_t *p_desc = NULL;
 
     /* Return NULL if list is empty. */
-    if (p_list->p_next != p_list->p_prev) {
+    if (p_list->p_next != p_list) {
         /* Pick the first item. */ 
         p_desc = p_list->p_next; 
         p_list->p_next = p_desc->p_next;
+        p_list->p_next->p_prev = p_desc->p_prev;
         p_desc->p_next = NULL;
         p_desc->p_prev = NULL;
     }
@@ -1692,14 +1687,14 @@ void Radio::pushRxDesc(radio_desc_t *p_desc) {
 void Radio::pushFreeDesc(radio_desc_t *p_desc) {
     /* Clear descriptor. */
     p_desc->state = DESC_FREE;
-    p_desc->size = 0;
+    //p_desc->size = 0;
     p_desc->crc.validity = UNKNOWN_CRC;
-    memset(p_desc->payload, 0, 256);
+    //memset(p_desc->payload, 0, 256);
     pushIntoList(&this->descFreeList, p_desc);
 }
 
 bool Radio::isListEmpty(radio_desc_head_t *p_list) {
-    return (p_list->p_next == p_list->p_prev);
+    return (p_list->p_next == p_list);
 }
 
 size_t Radio::countList(radio_desc_head_t *p_list) {
@@ -1718,6 +1713,10 @@ size_t Radio::countTxDesc(void) {
 
 size_t Radio::countRxDesc(void) {
     return countList(&this->descRxList);
+}
+
+size_t Radio::countFreeDesc(void) {
+    return countList(&this->descFreeList);
 }
 
 bool Radio::hasTxDesc(void) {

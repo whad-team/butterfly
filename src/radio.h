@@ -6,11 +6,12 @@
 #include "nrf_delay.h"
 #include "controller.h"
 #include "radio_defs.h"
+#include "desc.h"
 #include "helpers.h"
 
 #define MAX_PACKET_SIZE 257
 #define SCRATCHPAD_SIZE 273
-#define MAX_DESCRIPTORS 10
+#define MAX_DESCRIPTORS 30
 
 class Controller;
 
@@ -114,6 +115,7 @@ class Radio
         size_t countTxDesc(void);
         bool hasTxDesc(void);
         size_t countRxDesc(void);
+        size_t countFreeDesc(void);
         bool hasRxDesc(void);
         bool hasFreeDesc(void);
 

@@ -2373,15 +2373,12 @@ void BLEController::connect(uint8_t *address, bool random,  uint32_t accessAddre
 	this->scanningTimer->setCallback((ControllerCallback)&BLEController::goToNextInitiationChannel, this);
 	this->scanningTimer->update(500000);
 	this->scanningTimer->start();
-
 	// Enter Connection Initiation mode
 	this->controllerState = CONNECTION_INITIATION;
 
 	// Configure encryption counter
 	ccm_set_packet_counter(&(this->encryptionData),  0);
 
-	// Configure Hardware to monitor advertisements
-	this->setHardwareConfiguration(0x8e89bed6,0x555555);
 
 
 	this->radio->setFastRampUpTime(false);
@@ -2411,17 +2408,18 @@ void BLEController::connect(uint8_t *address, bool random,  uint32_t accessAddre
 			this->connectionInitiationData.channelMap
 	);
 
+	// Configure Hardware to monitor advertisements
+	this->setHardwareConfiguration(0x8e89bed6,0x555555);
 
-    this->radio->disable();
-
-	// Send the packet
-	this->radio->updateTXBuffer(connection_request, connection_request_size);
-	free(connection_request);
 	// Configure radio to monitor only advertisements from targeted device (hardware filter needed)
 	this->setFilter(true, address[0], address[1], address[2], address[3], address[4], address[5]);
 
 	// Reload Radio configuration (to take into account radio custom parameters)
-	this->radio->enable();
+	this->radio->reload();
+
+	// Send the packet
+	this->radio->updateTXBuffer(connection_request, connection_request_size);
+	free(connection_request);
 }
 
 
@@ -2467,6 +2465,9 @@ void BLEController::initializeConnection() {
 	this->clearConnectionUpdate();
     this->clearPhyUpdate();
 
+	// Radio configuration
+	this->setHardwareConfiguration(this->connectionInitiationData.accessAddress, this->connectionInitiationData.crcInit);
+
 	// Timers configuration
 	if (this->connectionTimer == NULL) {
 		this->connectionTimer = this->timerModule->getTimer();
@@ -2486,9 +2487,6 @@ void BLEController::initializeConnection() {
 
 	this->setAnchorPoint(TimerModule::instance->getTimestamp());
 
-	// Radio configuration
-	this->setHardwareConfiguration(this->connectionInitiationData.accessAddress, this->connectionInitiationData.crcInit);
-
 	this->masterSCA = this->connectionInitiationData.sca;
 	this->slaveSCA = 20;
 
@@ -2502,7 +2500,7 @@ void BLEController::initializeConnection() {
 }
 
 bool BLEController::sendFirstConnectionPacket() {
-	this->initializeConnection();
+    this->initializeConnection();
 	this->simulatedMasterSequenceNumbers.nesn = 0;
 	this->simulatedMasterSequenceNumbers.sn = 0;
 
@@ -2510,11 +2508,10 @@ bool BLEController::sendFirstConnectionPacket() {
 	this->temporaryPayload.payload[1] = 0x00;
 	this->temporaryPayload.size = 2;
 	this->radio->send(this->temporaryPayload.payload, this->temporaryPayload.size, BLEController::channelToFrequency(this->channel), this->channel);
-	return false;
+    return false;
 }
 
 void BLEController::connectionInitiationAdvertisementProcessing(BLEPacket *pkt) {
-
 	// Update the packet direction
 	pkt->updateSource(DIRECTION_UNKNOWN);
 	// Transmit the packet to host
@@ -2567,7 +2564,7 @@ void BLEController::connectionInitiationConnectedSlaveProcessing(BLEPacket *pkt)
 	}
 }
 void BLEController::advertisementScanningProcessing(BLEPacket *pkt) {
-	if (this->activeScanning) {
+    if (this->activeScanning) {
 		// Build connection request
 		size_t scan_request_size;
 		uint8_t *scan_request;
@@ -3127,7 +3124,7 @@ void BLEController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer,
 		this->hopIncrementRecoveryProcessing(timestamp, size, buffer ,crcValue, rssi);
 	}
 	else if (crcValue.validity == VALID_CRC) {
-		BLEPacket *pkt = new BLEPacket(this->accessAddress,buffer, size,timestamp, relativeTimestamp, 0, this->channel, rssi, crcValue, this->getPhy());
+		BLEPacket *pkt = new BLEPacket(this->accessAddress, buffer, size,timestamp, relativeTimestamp, 0, this->channel, rssi, crcValue, this->getPhy());
 		if (pkt->isAdvertisement()) {
 			// If the packet is an advertisement, call onAdvertisementPacket method
 			this->advertisementPacketProcessing(pkt);
