@@ -1224,10 +1224,14 @@ bool Radio::enable() {
 		// TODO: update the INPTR and OUTPTR
 		}
 		if (this->mode == MODE_NORMAL) {
+            /* Ask for END event only. */
+			NRF_RADIO->INTENSET = RADIO_INTENSET_END_Msk | RADIO_INTENSET_CRCOK_Msk | RADIO_INTENSET_CRCERROR_Msk;
+
 			if (this->isFilterEnabled()) {
 
 				NRF_RADIO->EVENTS_DEVMISS = 0;
 				NRF_RADIO->EVENTS_DEVMATCH = 0;
+                NRF_RADIO->INTENSET |= RADIO_INTENSET_DEVMATCH_Msk;
 
 				NRF_RADIO->DAB[0] = ((uint32_t)(this->filter.bytes[2] << 24) |
 				(uint32_t)(this->filter.bytes[3] << 16) |
@@ -1250,24 +1254,17 @@ bool Radio::enable() {
 				NRF_RADIO->DACNF = 0;
 			}
 
-            /* Ask for END event only. */
-			NRF_RADIO->INTENSET = RADIO_INTENSET_END_Msk | RADIO_INTENSET_CRCOK_Msk | RADIO_INTENSET_CRCERROR_Msk;
 
             /* Clear and enable interrupts. */
 			NVIC_ClearPendingIRQ(RADIO_IRQn);
 			NVIC_EnableIRQ(RADIO_IRQn);
 		
             /* Configure shorts for continuous RX or TX. */
-            if (this->autoTXafterRXenabled) {
-                NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_TXEN_Msk;
-                //NRF_RADIO->INTENSET |= RADIO_INTENSET_TXREADY_Msk;
-                NRF_RADIO->EVENTS_TXREADY = 0;
-            } else {
+            //if (this->autoTXafterRXenabled) {
+            //    NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_TXEN_Msk;
+            //} else {
                 NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_RXEN_Msk;
-                //NRF_RADIO->INTENCLR = RADIO_INTENSET_TXREADY_Msk;
-                NRF_RADIO->EVENTS_TXREADY = 0;
-            }
-
+            //}
             /* If RSSI measurement is required, configure the ADDRESS->RSSISTART short. */
 			if (this->rssi) {
 				NRF_RADIO->SHORTS |= RADIO_SHORTS_ADDRESS_RSSISTART_Msk;
@@ -1330,22 +1327,29 @@ bool Radio::reload() {
 	return this->enable();
 }
 
-bool Radio::updateTXBuffer(uint8_t *data, uint8_t size) {
-    /* Get a descriptor. */
+bool Radio::updateTXBuffer(uint8_t *data, size_t size) {
+    /* Get a free descriptor, return false if no descriptor is available. */
     radio_desc_t *pkt_desc = popFreeDesc();
     if (pkt_desc == NULL) {
         return false;
     }
 
-    /* Set descriptor's properties. */
-    if (size > 255) size = 255;
+    /* Descriptor size cannot exceed MAX_PAYLOAD_SIZE. */
+    if (size > MAX_PAYLOAD_SIZE) {
+        size = MAX_PAYLOAD_SIZE;
+    }
 
+    /* Store the provided buffer into the descriptor's memory. */
     memcpy(pkt_desc->payload, data, size);
     pkt_desc->size = size;
     pkt_desc->state = DESC_PENDING;
 
-    /* Add descriptor to TX queue. */
-    pushTxDesc(pkt_desc);
+    /* Add this descriptor to the descriptors to send. */
+    if (this->txDesc == NULL) {
+        this->txDesc = pkt_desc;
+    } else {
+        pushTxDesc(pkt_desc);
+    }
 
 	return true;
 }
@@ -1369,9 +1373,10 @@ bool Radio::send(uint8_t *data,int size,int frequency, uint8_t channel) {
 	NRF_RADIO->FREQUENCY = frequency;
 	NRF_RADIO->DATAWHITEIV = channel;
 
-    /* Set TX buffer. */
+    /* Add the provided PDU to our pending TX descriptors. */
     updateTXBuffer(data, size);
-    this->txDesc = popTxDesc();
+
+    /* We need to set our PACKETPTR to the first descriptor's payload. */
 	NRF_RADIO->PACKETPTR = (uint32_t)this->txDesc->payload;
 
 	if (this->encryption) {
@@ -1404,11 +1409,19 @@ extern "C" void RADIO_IRQHandler(void) {
     /* Process filter-related events. */
     if (Radio::instance->isFilterEnabled()) {
         if (NRF_RADIO->EVENTS_DEVMATCH == 1) {
+            /* enable auto TX after this packet. */
+            Radio::instance->enableAutoTXafterRX();
+
+            /* Enable the DISABLED->TXEN short, disable the DISABLED->RXEN short. */
+            NRF_RADIO->SHORTS &= ~(RADIO_SHORTS_DISABLED_RXEN_Msk | RADIO_SHORTS_DISABLED_TXEN_Msk);
+            NRF_RADIO->SHORTS |= RADIO_SHORTS_DISABLED_TXEN_Msk;
+
+            /* Ack event. */
             NRF_RADIO->EVENTS_DEVMATCH = 0;
         }
         if (NRF_RADIO->EVENTS_DEVMISS == 1) {
             NRF_RADIO->EVENTS_DEVMISS = 0;
-            Radio::instance->reload();
+            //Radio::instance->reload();
             return;
         }
         else {
@@ -1458,8 +1471,6 @@ extern "C" void RADIO_IRQHandler(void) {
 
     if (NRF_RADIO->EVENTS_TXREADY) {
         /* Check if we need to remove or not the DISABLED_TXEN short. */
-        //NRF_RADIO->SHORTS &= ~(RADIO_SHORTS_DISABLED_TXEN_Msk | RADIO_SHORTS_DISABLED_RXEN_Msk);
-        //NRF_RADIO->SHORTS |= RADIO_SHORTS_DISABLED_RXEN_Msk;
         NRF_RADIO->EVENTS_TXREADY = 0;
     }
 
@@ -1491,11 +1502,10 @@ extern "C" void RADIO_IRQHandler(void) {
                 case RX:
                     {
                         radio_desc_t *p_pkt = Radio::instance->rxDesc;
-                        if (Radio::instance->isAutoTXafterRXenabled() && Radio::instance->hasTxDesc()) {
+                        if (Radio::instance->isAutoTXafterRXenabled() && (Radio::instance->txDesc != NULL)) {
 
                             /* Update PACKETPTR as fast as possible to make it point to the TX buffer. */
-                            Radio::instance->txDesc = Radio::instance->popTxDesc();
-                            NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_RXEN_Msk;        
+                            //NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_RXEN_Msk;        
                             NRF_RADIO->PACKETPTR = (uint32_t)(Radio::instance->txDesc->payload);
 
                             /* Switch to RX state, let hardware send the current TX buffer. */
@@ -1504,7 +1514,6 @@ extern "C" void RADIO_IRQHandler(void) {
 
                             /* Put the current RX buffer in our RX list. */
                             Radio::instance->rxDesc = Radio::instance->popFreeDesc();
-
                         } else {
                             /* Give radio another RX descriptor to write into. */
                             radio_desc_t *p_next = Radio::instance->popFreeDesc();
@@ -1585,9 +1594,13 @@ extern "C" void RADIO_IRQHandler(void) {
                         NRF_RADIO->PACKETPTR = (uint32_t)(Radio::instance->rxDesc->payload);
                         Radio::instance->setState(RX);
 
-                        /* No need to start RX, shorts will handle it. */
+                        /* Disable auto TX, will be re-enabled once a DEVMATCH event is received. */
+                        Radio::instance->disableAutoTXafterRX();
+
+                        /* Free the sent descriptor and fetch a new one. */
                         Radio::instance->pushFreeDesc(Radio::instance->txDesc);
-                        Radio::instance->txDesc = NULL;
+                        Radio::instance->txDesc = Radio::instance->popTxDesc();
+
 
                         bsp_board_led_off(0);
                     }

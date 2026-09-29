@@ -2377,9 +2377,13 @@ void BLEController::connect(uint8_t *address, bool random,  uint32_t accessAddre
 	// Configure encryption counter
 	ccm_set_packet_counter(&(this->encryptionData),  0);
 
+	// Configure Hardware to monitor advertisements
+	this->setHardwareConfiguration(0x8e89bed6,0x555555);
+
 	this->radio->setFastRampUpTime(false);
 	this->radio->setInterFrameSpacing(145);
-	this->radio->enableAutoTXafterRX();
+	this->radio->disableAutoTXafterRX();
+    //this->radio->enableAutoTXafterRX();
 
 	// Build connection request
 	size_t connection_request_size;
@@ -2406,14 +2410,8 @@ void BLEController::connect(uint8_t *address, bool random,  uint32_t accessAddre
 
     this->radio->disable();
 
-	// Configure Hardware to monitor advertisements
-	this->setHardwareConfiguration(0x8e89bed6,0x555555);
-
 	// Configure radio to monitor only advertisements from targeted device (hardware filter needed)
 	this->setFilter(true, address[0], address[1], address[2], address[3], address[4], address[5]);
-
-	// Reload Radio configuration (to take into account radio custom parameters)
-	//this->radio->reload();
 
 	// Send the packet
 	this->radio->updateTXBuffer(connection_request, connection_request_size);

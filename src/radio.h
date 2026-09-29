@@ -183,7 +183,7 @@ class Radio
 		bool enableAutoTXafterRX();
 		bool disableAutoTXafterRX();
 
-		bool updateTXBuffer(uint8_t *data, uint8_t size);
+		bool updateTXBuffer(uint8_t *data, size_t size);
 
 		bool isRssiEnabled();
 		bool enableRssi();
