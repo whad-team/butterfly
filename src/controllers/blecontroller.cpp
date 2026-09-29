@@ -2373,13 +2373,9 @@ void BLEController::connect(uint8_t *address, bool random,  uint32_t accessAddre
 	this->scanningTimer->setCallback((ControllerCallback)&BLEController::goToNextInitiationChannel, this);
 	this->scanningTimer->update(500000);
 	this->scanningTimer->start();
-	// Enter Connection Initiation mode
-	this->controllerState = CONNECTION_INITIATION;
 
 	// Configure encryption counter
 	ccm_set_packet_counter(&(this->encryptionData),  0);
-
-
 
 	this->radio->setFastRampUpTime(false);
 	this->radio->setInterFrameSpacing(145);
@@ -2408,6 +2404,8 @@ void BLEController::connect(uint8_t *address, bool random,  uint32_t accessAddre
 			this->connectionInitiationData.channelMap
 	);
 
+    this->radio->disable();
+
 	// Configure Hardware to monitor advertisements
 	this->setHardwareConfiguration(0x8e89bed6,0x555555);
 
@@ -2415,11 +2413,15 @@ void BLEController::connect(uint8_t *address, bool random,  uint32_t accessAddre
 	this->setFilter(true, address[0], address[1], address[2], address[3], address[4], address[5]);
 
 	// Reload Radio configuration (to take into account radio custom parameters)
-	this->radio->reload();
+	//this->radio->reload();
 
 	// Send the packet
 	this->radio->updateTXBuffer(connection_request, connection_request_size);
 	free(connection_request);
+
+	// Enter Connection Initiation mode
+	this->controllerState = CONNECTION_INITIATION;
+    this->radio->enable();
 }
 
 

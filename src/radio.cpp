@@ -1133,12 +1133,12 @@ bool Radio::fastFrequencyChange(int frequency,uint8_t iv) {
      */
     if (this->autoTXafterRXenabled) {
         NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_TXEN_Msk;
-        NRF_RADIO->INTENSET |= RADIO_INTENSET_TXREADY_Msk;
-        NRF_RADIO->EVENTS_TXREADY = 0;
+        //NRF_RADIO->INTENSET |= RADIO_INTENSET_TXREADY_Msk;
+        //NRF_RADIO->EVENTS_TXREADY = 0;
     } else {
         NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_RXEN_Msk;
-        NRF_RADIO->INTENSET &= ~(RADIO_INTENSET_TXREADY_Msk);
-        NRF_RADIO->EVENTS_TXREADY = 0;
+        //NRF_RADIO->INTENCLR = RADIO_INTENSET_TXREADY_Msk;
+        //NRF_RADIO->EVENTS_TXREADY = 0;
     }
 
     /* Configure short for RSSI measurement if required. */
@@ -1173,7 +1173,6 @@ bool Radio::fastFrequencyChange(int frequency,uint8_t iv) {
 bool Radio::enable() {
 	bool success = true;
 	//this->disable();
-
 
     /* Wait for HFCLK to be started. */
 	NRF_CLOCK->EVENTS_HFCLKSTARTED = 0;
@@ -1261,11 +1260,11 @@ bool Radio::enable() {
             /* Configure shorts for continuous RX or TX. */
             if (this->autoTXafterRXenabled) {
                 NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_TXEN_Msk;
-                NRF_RADIO->INTENSET |= RADIO_INTENSET_TXREADY_Msk;
+                //NRF_RADIO->INTENSET |= RADIO_INTENSET_TXREADY_Msk;
                 NRF_RADIO->EVENTS_TXREADY = 0;
             } else {
                 NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_RXEN_Msk;
-                NRF_RADIO->INTENSET &= ~(RADIO_INTENSET_TXREADY_Msk);
+                //NRF_RADIO->INTENCLR = RADIO_INTENSET_TXREADY_Msk;
                 NRF_RADIO->EVENTS_TXREADY = 0;
             }
 
@@ -1340,6 +1339,7 @@ bool Radio::updateTXBuffer(uint8_t *data, uint8_t size) {
 
     /* Set descriptor's properties. */
     if (size > 255) size = 255;
+
     memcpy(pkt_desc->payload, data, size);
     pkt_desc->size = size;
     pkt_desc->state = DESC_PENDING;
@@ -1458,8 +1458,8 @@ extern "C" void RADIO_IRQHandler(void) {
 
     if (NRF_RADIO->EVENTS_TXREADY) {
         /* Check if we need to remove or not the DISABLED_TXEN short. */
-        NRF_RADIO->SHORTS &= ~(RADIO_SHORTS_DISABLED_TXEN_Msk | RADIO_SHORTS_DISABLED_RXEN_Msk);
-        NRF_RADIO->SHORTS |= RADIO_SHORTS_DISABLED_RXEN_Msk;
+        //NRF_RADIO->SHORTS &= ~(RADIO_SHORTS_DISABLED_TXEN_Msk | RADIO_SHORTS_DISABLED_RXEN_Msk);
+        //NRF_RADIO->SHORTS |= RADIO_SHORTS_DISABLED_RXEN_Msk;
         NRF_RADIO->EVENTS_TXREADY = 0;
     }
 
@@ -1480,6 +1480,9 @@ extern "C" void RADIO_IRQHandler(void) {
     }
 
     if (NRF_RADIO->EVENTS_END) {
+
+        /* Ack event. */
+        NRF_RADIO->EVENTS_END = 0;
         Controller *controller = NULL;
 
         /* Process the received payload. */
@@ -1492,6 +1495,7 @@ extern "C" void RADIO_IRQHandler(void) {
 
                             /* Update PACKETPTR as fast as possible to make it point to the TX buffer. */
                             Radio::instance->txDesc = Radio::instance->popTxDesc();
+                            NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_RXEN_Msk;        
                             NRF_RADIO->PACKETPTR = (uint32_t)(Radio::instance->txDesc->payload);
 
                             /* Switch to RX state, let hardware send the current TX buffer. */
@@ -1577,9 +1581,6 @@ extern "C" void RADIO_IRQHandler(void) {
                 /* TX buffer sent, we must switch PACKETPTR to rxDesc. */
                 case TX:
                     {
-                        if (Radio::instance->txDesc->payload[1] == 0) {
-                            bsp_board_led_invert(1);
-                        }
                         /* RX after TX, set PACKETPTR to our current empty RX descriptor. */
                         NRF_RADIO->PACKETPTR = (uint32_t)(Radio::instance->rxDesc->payload);
                         Radio::instance->setState(RX);
@@ -1623,9 +1624,6 @@ extern "C" void RADIO_IRQHandler(void) {
                 }
             }
         }
-        
-        /* Ack event. */
-        NRF_RADIO->EVENTS_END = 0;
 	}
 }
 
