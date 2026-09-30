@@ -1558,7 +1558,6 @@ int Radio::getMatchingSize() {
 }
 
 bool Radio::send(uint8_t *data,int size,int frequency, uint8_t channel) {
-#if 0
 	bsp_board_led_invert(0);
     NVIC_DisableIRQ(RADIO_IRQn);
 	NRF_RADIO->SHORTS = 0;
@@ -1601,7 +1600,6 @@ bool Radio::send(uint8_t *data,int size,int frequency, uint8_t channel) {
 	NRF_RADIO->EVENTS_READY = 0;
 	NRF_RADIO->EVENTS_END = 0;
 	NRF_RADIO->TASKS_TXEN = 1;
-#endif
     return false;
 }
 

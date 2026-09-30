@@ -2385,12 +2385,10 @@ void BLEController::connect(uint8_t *address, bool random,  uint32_t accessAddre
 		this->scanningTimer = this->timerModule->getTimer();
 	}
 	
-    /*
     this->scanningTimer->setMode(REPEATED);
 	this->scanningTimer->setCallback((ControllerCallback)&BLEController::goToNextInitiationChannel, this);
 	this->scanningTimer->update(500000);
 	this->scanningTimer->start();
-    */
 
 	// Configure encryption counter
 	ccm_set_packet_counter(&(this->encryptionData),  0);
@@ -2406,7 +2404,6 @@ void BLEController::connect(uint8_t *address, bool random,  uint32_t accessAddre
 	size_t connection_request_size;
 	uint8_t *connection_request;
 
-#if 0
 	BLEPacket::forgeConnectionRequest(
 			&connection_request,
 			&connection_request_size,
@@ -2425,7 +2422,7 @@ void BLEController::connect(uint8_t *address, bool random,  uint32_t accessAddre
 			this->connectionInitiationData.hopIncrement,
 			this->connectionInitiationData.channelMap
 	);
-#endif
+#if 0
     BLEPacket::forgeScanRequest(
             &connection_request,
             &connection_request_size,
@@ -2434,7 +2431,7 @@ void BLEController::connect(uint8_t *address, bool random,  uint32_t accessAddre
             address,
             random
     );
-
+#endif
     this->radio->disable();
 
 	// Configure radio to monitor only advertisements from targeted device (hardware filter needed)
@@ -2550,7 +2547,7 @@ void BLEController::connectionInitiationAdvertisementProcessing(BLEPacket *pkt) 
 			this->initTimer->setMode(SINGLE_SHOT);
 			this->initTimer->setCallback((ControllerCallback)&BLEController::sendFirstConnectionPacket, this);
 			this->initTimer->update(150 + 43*8 + 1250 + this->connectionInitiationData.windowOffset * 1250);
-			//this->initTimer->start();
+			this->initTimer->start();
 		}
 	}
 
