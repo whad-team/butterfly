@@ -102,6 +102,8 @@ class Radio
 
         radio_desc_t *rxDesc;
         radio_desc_t *txDesc;
+        bool addrMatch;
+
         void pushIntoList(radio_desc_head_t *p_list, radio_desc_t *p_desc);
         void pushFreeDesc(radio_desc_t *p_desc);
         void pushTxDesc(radio_desc_t *p_desc);

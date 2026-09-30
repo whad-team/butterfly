@@ -2369,10 +2369,13 @@ void BLEController::connect(uint8_t *address, bool random,  uint32_t accessAddre
 	if (this->scanningTimer == NULL) {
 		this->scanningTimer = this->timerModule->getTimer();
 	}
-	this->scanningTimer->setMode(REPEATED);
+	
+    /*
+    this->scanningTimer->setMode(REPEATED);
 	this->scanningTimer->setCallback((ControllerCallback)&BLEController::goToNextInitiationChannel, this);
 	this->scanningTimer->update(500000);
 	this->scanningTimer->start();
+    */
 
 	// Configure encryption counter
 	ccm_set_packet_counter(&(this->encryptionData),  0);
@@ -2381,14 +2384,14 @@ void BLEController::connect(uint8_t *address, bool random,  uint32_t accessAddre
 	this->setHardwareConfiguration(0x8e89bed6,0x555555);
 
 	this->radio->setFastRampUpTime(false);
-	this->radio->setInterFrameSpacing(145);
-	this->radio->disableAutoTXafterRX();
-    //this->radio->enableAutoTXafterRX();
+	this->radio->setInterFrameSpacing(150);
+	this->radio->enableAutoTXafterRX();
 
 	// Build connection request
 	size_t connection_request_size;
 	uint8_t *connection_request;
 
+#if 0
 	BLEPacket::forgeConnectionRequest(
 			&connection_request,
 			&connection_request_size,
@@ -2407,6 +2410,15 @@ void BLEController::connect(uint8_t *address, bool random,  uint32_t accessAddre
 			this->connectionInitiationData.hopIncrement,
 			this->connectionInitiationData.channelMap
 	);
+#endif
+    BLEPacket::forgeScanRequest(
+            &connection_request,
+            &connection_request_size,
+            this->own.bytes,
+            this->ownRandom,
+            address,
+            random
+    );
 
     this->radio->disable();
 
@@ -2523,7 +2535,7 @@ void BLEController::connectionInitiationAdvertisementProcessing(BLEPacket *pkt) 
 			this->initTimer->setMode(SINGLE_SHOT);
 			this->initTimer->setCallback((ControllerCallback)&BLEController::sendFirstConnectionPacket, this);
 			this->initTimer->update(150 + 43*8 + 1250 + this->connectionInitiationData.windowOffset * 1250);
-			this->initTimer->start();
+			//this->initTimer->start();
 		}
 	}
 
