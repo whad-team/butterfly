@@ -3158,13 +3158,8 @@ void BLEController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer,
 			 * address field, so a declared length below 6 can't be a real
 			 * advertisement - it's noise (RF artifact, coincidental CRC
 			 * match on a short/garbled reception, etc). Drop it instead of
-			 * reporting a structurally-invalid PDU to the host.
-			 *
-			 * TEMPORARILY DISABLED for debugging: we suspect packets this
-			 * filters out may actually be the auto-TX-after-RX matched
-			 * ADV_IND with a mis-captured/truncated length, rather than
-			 * unrelated noise. Re-enable once that's confirmed either way. */
-			if (/* pkt->extractPayloadLength() >= 6 */ true) {
+			 * reporting a structurally-invalid PDU to the host. */
+			if (pkt->extractPayloadLength() >= 6) {
 				// If the packet is an advertisement, call onAdvertisementPacket method
 				this->advertisementPacketProcessing(pkt);
 			}

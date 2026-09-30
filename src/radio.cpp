@@ -44,6 +44,31 @@ void __malloc_unlock(struct _reent *) {
 
 }
 
+/*
+ * PPI channels used to route TASKS_RXEN/TASKS_TXEN after a reception,
+ * conditionally on whether RADIO->EVENTS_DEVMATCH fired for it, entirely in
+ * hardware (see setupAddressMatchPPI()/armAddressMatchTX() below). This is
+ * required, not just an alternative to a software decision: EVENTS_DISABLED
+ * follows EVENTS_END essentially immediately via the hardware END_DISABLE
+ * short, so deciding SHORTS reactively in software (in the END handler) can
+ * lose that race. Deciding it as early as DEVMATCH gives comfortable margin,
+ * but reacting to DEVMATCH with a CPU interrupt corrupts the in-flight
+ * EasyDMA transfer on this chip (confirmed experimentally - see enable()'s
+ * comment on why RADIO_INTENSET_DEVMATCH_Msk is deliberately never enabled).
+ * PPI is the way to react that early with zero CPU/interrupt involvement.
+ *
+ * nRF52840 PPI channels 20-31 are pre-programmed/fixed-function (channels
+ * 24-25 are already used by enableEncryption() above, wired to
+ * RADIO->EVENTS_READY -> CCM->TASKS_KSGEN and RADIO->EVENTS_ADDRESS ->
+ * CCM->TASKS_CRYPT); only channels 0-19 are freely programmable, and FORK is
+ * only available on that range, so RADIO_PPI_CH_DEVMATCH (which needs it)
+ * must come from there. Nothing else in this codebase currently uses PPI
+ * channels 0-19 or groups 0-1.
+ */
+#define RADIO_PPI_CH_DEVMATCH 0
+#define RADIO_PPI_CH_RXEN     1
+#define RADIO_PPI_CH_TXEN     2
+
 Radio::Radio() {
 	this->setProtocol(GENERIC_PROTOCOL);
 	this->ready = false;
@@ -117,6 +142,80 @@ Radio::Radio() {
     /* Current RX descriptor. */
     this->rxDesc = NULL;
     this->txDesc = NULL;
+
+    /* One-time PPI wiring for address-match-conditional auto-TX-after-RX.
+     * Only the static EEP/TEP/FORK/CHG-membership shape is set up here;
+     * which channels are actually enabled is managed dynamically by
+     * armAddressMatchTX(), called at every safe (no DMA in flight) point
+     * where RX gets (re-)armed. */
+    this->setupAddressMatchPPI();
+}
+
+void Radio::setupAddressMatchPPI() {
+    /* CH_RXEN/CH_TXEN: after any reception or transmission completes
+     * (EVENTS_DISABLED), go back to RX or switch to TX. Which of the two is
+     * actually wired to fire is entirely determined by CHG[1]/CHG[0]'s
+     * enable state (see below), never by directly touching these channels'
+     * own enable bit outside of that. */
+    NRF_PPI->CH[RADIO_PPI_CH_RXEN].EEP = (uint32_t)&NRF_RADIO->EVENTS_DISABLED;
+    NRF_PPI->CH[RADIO_PPI_CH_RXEN].TEP = (uint32_t)&NRF_RADIO->TASKS_RXEN;
+
+    NRF_PPI->CH[RADIO_PPI_CH_TXEN].EEP = (uint32_t)&NRF_RADIO->EVENTS_DISABLED;
+    NRF_PPI->CH[RADIO_PPI_CH_TXEN].TEP = (uint32_t)&NRF_RADIO->TASKS_TXEN;
+
+    /* CH_DEVMATCH: the instant a reception's device address matches (well
+     * before that reception's END/DISABLED), atomically flip which of the
+     * two channels above is enabled - main task enables the TX path's
+     * group, fork task disables the RX path's group. This is pure PPI
+     * routing: it never writes to a RADIO register, so unlike a direct
+     * SHORTS/PACKETPTR write from software, it's safe to fire mid-packet -
+     * and unlike the CPU taking an interrupt for the same event, it never
+     * touches the CPU/NVIC at all, so it can't disturb EasyDMA either. */
+    NRF_PPI->CH[RADIO_PPI_CH_DEVMATCH].EEP = (uint32_t)&NRF_RADIO->EVENTS_DEVMATCH;
+    NRF_PPI->CH[RADIO_PPI_CH_DEVMATCH].TEP = (uint32_t)&NRF_PPI->TASKS_CHG[0].EN;
+    NRF_PPI->FORK[RADIO_PPI_CH_DEVMATCH].TEP = (uint32_t)&NRF_PPI->TASKS_CHG[1].DIS;
+
+    NRF_PPI->CHG[0] = (1 << RADIO_PPI_CH_TXEN);   // "go TX" path
+    NRF_PPI->CHG[1] = (1 << RADIO_PPI_CH_RXEN);   // "go RX" path (default)
+
+    /* Establish the safe default (go RX, no pending match redirect) and
+     * leave the whole scheme disabled until armAddressMatchTX() actually
+     * wants it - see there for why. */
+    NRF_PPI->TASKS_CHG[1].EN = 1;
+    NRF_PPI->TASKS_CHG[0].DIS = 1;
+    NRF_PPI->CHENCLR = (1 << RADIO_PPI_CH_RXEN) | (1 << RADIO_PPI_CH_TXEN) | (1 << RADIO_PPI_CH_DEVMATCH);
+}
+
+void Radio::armAddressMatchTX() {
+    if (this->isFilterEnabled()) {
+        /* Filtering is active: RXEN/TXEN after this reception are routed
+         * entirely through PPI, not SHORTS - enable()/fastFrequencyChange()
+         * intentionally omit DISABLED_RXEN/DISABLED_TXEN from SHORTS
+         * whenever filtering is on, so there's no redundant/conflicting
+         * auto-chain fighting this one.
+         *
+         * Both writes below only ever run here, at a point with no DMA
+         * transfer in flight (mode entry, channel change, or after the
+         * previous reception/transmission has fully completed) - never
+         * reactively while a packet is being received. */
+        NRF_PPI->TASKS_CHG[1].EN = 1;
+        NRF_PPI->TASKS_CHG[0].DIS = 1;
+
+        /* Only let a match actually redirect us to TX if we truly have
+         * something queued to send; otherwise a match would route to
+         * TASKS_TXEN with PACKETPTR still pointing at the RX descriptor,
+         * transmitting garbage. */
+        if (this->isAutoTXafterRXenabled() && (this->txDesc != NULL)) {
+            NRF_PPI->CHENSET = (1 << RADIO_PPI_CH_DEVMATCH);
+        } else {
+            NRF_PPI->CHENCLR = (1 << RADIO_PPI_CH_DEVMATCH);
+        }
+    } else {
+        /* No filter: every other protocol/mode relies on SHORTS's own
+         * DISABLED_RXEN/DISABLED_TXEN bits directly, as before. Keep this
+         * scheme fully disabled so it can never fire alongside them. */
+        NRF_PPI->CHENCLR = (1 << RADIO_PPI_CH_RXEN) | (1 << RADIO_PPI_CH_TXEN) | (1 << RADIO_PPI_CH_DEVMATCH);
+    }
 }
 
 bool Radio::enableEncryption(uint32_t encryptionData) {
@@ -672,6 +771,14 @@ bool Radio::disable() {
 		NVIC_ClearPendingIRQ(RADIO_IRQn);
 		NVIC_DisableIRQ(RADIO_IRQn);
 
+        /* Disable the address-match PPI routing before triggering DISABLE
+         * below: CH_RXEN/CH_TXEN both fire on EVENTS_DISABLED, so if left
+         * enabled they would immediately re-arm the radio (RXEN or TXEN)
+         * right after this explicit disable, defeating it. Must happen
+         * before TASKS_DISABLE, not after - the DISABLED event this
+         * triggers is exactly what those channels react to. */
+        NRF_PPI->CHENCLR = (1 << RADIO_PPI_CH_RXEN) | (1 << RADIO_PPI_CH_TXEN) | (1 << RADIO_PPI_CH_DEVMATCH);
+
 		NRF_RADIO->EVENTS_DISABLED = 0;
 		NRF_RADIO->TASKS_EDSTOP = 1;
 		NRF_RADIO->TASKS_DISABLE = 1;
@@ -1156,6 +1263,13 @@ bool Radio::fastFrequencyChange(int frequency,uint8_t iv) {
      */
     NRF_RADIO->SHORTS &= ~(RADIO_SHORTS_DISABLED_TXEN_Msk | RADIO_SHORTS_DISABLED_RXEN_Msk);
 
+    /* Same reasoning as SHORTS above, for the PPI-based routing: CH_RXEN/
+     * CH_TXEN both fire on EVENTS_DISABLED, so leaving them enabled here
+     * would immediately re-arm RX/TX on the OLD frequency the instant
+     * TASKS_DISABLE completes below, before FREQUENCY gets updated further
+     * down. armAddressMatchTX() re-establishes the right state afterwards. */
+    NRF_PPI->CHENCLR = (1 << RADIO_PPI_CH_RXEN) | (1 << RADIO_PPI_CH_TXEN) | (1 << RADIO_PPI_CH_DEVMATCH);
+
     /* Disable radio, block until radio is disabled. */
     NRF_RADIO->EVENTS_DISABLED = 0;
 	NRF_RADIO->TASKS_DISABLE = 1;
@@ -1180,19 +1294,21 @@ bool Radio::fastFrequencyChange(int frequency,uint8_t iv) {
 	NRF_RADIO->DATAWHITEIV = iv;
 	this->whiteningDataIv = iv;
 
-	/* 
-     * Re-configure the shorts, including the DISABLED->RXEN and DISABLED->TXEN
-     * based on current radio configuration.
+	/*
+     * Re-configure the shorts, including DISABLED->RXEN, based on current
+     * radio configuration. As in enable(), DISABLED_RXEN is only wired
+     * directly here when there is no address filter; with a filter active,
+     * DAB/DAP/DACNF (set by enable() and untouched by this function) are
+     * still in effect across this channel change, so RXEN/TXEN routing
+     * after the next reception must keep going through PPI instead (see
+     * armAddressMatchTX()) rather than being decided reactively at
+     * DEVMATCH time or too late in the END handler.
      */
-    //if (this->autoTXafterRXenabled) {
-    //    NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_TXEN_Msk;
-        //NRF_RADIO->INTENSET |= RADIO_INTENSET_TXREADY_Msk;
-        //NRF_RADIO->EVENTS_TXREADY = 0;
-    //} else {
-        NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_RXEN_Msk;
-        //NRF_RADIO->INTENCLR = RADIO_INTENSET_TXREADY_Msk;
-        //NRF_RADIO->EVENTS_TXREADY = 0;
-    //}
+    NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk;
+    if (!this->isFilterEnabled()) {
+        NRF_RADIO->SHORTS |= RADIO_SHORTS_DISABLED_RXEN_Msk;
+    }
+    this->armAddressMatchTX();
 
     /* Configure short for RSSI measurement if required. */
     if (this->rssi) {
@@ -1285,8 +1401,21 @@ bool Radio::enable() {
 
 				NRF_RADIO->EVENTS_DEVMISS = 0;
 				NRF_RADIO->EVENTS_DEVMATCH = 0;
-                NRF_RADIO->INTENSET |= RADIO_INTENSET_DEVMATCH_Msk;
 
+				/* Deliberately NOT enabling RADIO_INTENSET_DEVMATCH_Msk: taking
+				 * a CPU interrupt for DEVMATCH while a reception can still be
+				 * in progress corrupts the in-flight EasyDMA transfer on this
+				 * chip, regardless of what the handler does in response (this
+				 * was confirmed experimentally - disabling the interrupt while
+				 * forcing the match decision in software made the corruption
+				 * disappear entirely). The comparator still sets
+				 * EVENTS_DEVMATCH/EVENTS_DEVMISS on its own either way, so we
+				 * just read that flag later, after the reception has fully
+				 * completed (see the END handler in RADIO_IRQHandler) instead
+				 * of reacting to it via an interrupt. */
+
+				/* Match either address type (random or public) against the
+				 * same target address, using both device address slots. */
 				NRF_RADIO->DAB[0] = ((uint32_t)(this->filter.bytes[2] << 24) |
 				(uint32_t)(this->filter.bytes[3] << 16) |
 				(uint32_t)(this->filter.bytes[4] << 8) |
@@ -1312,13 +1441,21 @@ bool Radio::enable() {
             /* Clear and enable interrupts. */
 			NVIC_ClearPendingIRQ(RADIO_IRQn);
 			NVIC_EnableIRQ(RADIO_IRQn);
-		
-            /* Configure shorts for continuous RX or TX. */
-            //if (this->autoTXafterRXenabled) {
-            //    NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_TXEN_Msk;
-            //} else {
-                NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_RXEN_Msk;
-            //}
+
+            /* Configure shorts for continuous RX (or TX after a matched RX).
+             * DISABLED_RXEN is only wired here directly when there is no
+             * address filter: with a filter active, RXEN/TXEN after this
+             * reception are routed entirely through PPI instead (see
+             * armAddressMatchTX()), since deciding this reactively - whether
+             * from the DEVMATCH IRQ (corrupts the in-flight EasyDMA transfer)
+             * or from software in the END handler (loses the race against
+             * the hardware's own END_DISABLE auto-chain) - doesn't work. */
+            NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk;
+            if (!this->isFilterEnabled()) {
+                NRF_RADIO->SHORTS |= RADIO_SHORTS_DISABLED_RXEN_Msk;
+            }
+            this->armAddressMatchTX();
+
             /* If RSSI measurement is required, configure the ADDRESS->RSSISTART short. */
 			if (this->rssi) {
 				NRF_RADIO->SHORTS |= RADIO_SHORTS_ADDRESS_RSSISTART_Msk;
@@ -1411,6 +1548,8 @@ bool Radio::updateTXBuffer(uint8_t *data, size_t size) {
         exitCritical(primask);
     }
 
+    this->addrMatch = true;
+
 	return true;
 }
 
@@ -1468,18 +1607,26 @@ bool Radio::send(uint8_t *data,int size,int frequency, uint8_t channel) {
 
 static uint8_t jamBuffer[] = {0x00,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
 extern "C" void RADIO_IRQHandler(void) {
-    /* Process filter-related events. */
+    /* Process filter-related events.
+     *
+     * This block only ever runs as part of an invocation triggered by some
+     * other, already-enabled interrupt (in practice: EVENTS_END, since that's
+     * unconditionally enabled) - never as its own interrupt entry, since
+     * RADIO_INTENSET_DEVMATCH_Msk is deliberately never set (see enable()).
+     * The comparator still sets EVENTS_DEVMATCH/EVENTS_DEVMISS on its own
+     * regardless of INTENSET, so simply reading/clearing them here, safely
+     * after whatever reception is in progress has already completed, is all
+     * that's needed - no separate interrupt for them is required or wanted.
+     *
+     * The actual RXEN/TXEN hardware routing for auto-TX-after-RX is decided
+     * independently and much earlier (at DEVMATCH time) via PPI - see
+     * armAddressMatchTX(). addrMatch here is only software bookkeeping, used
+     * by case RX below to decide the matching PACKETPTR/descriptor handling,
+     * safe to do late since it doesn't have to win a hardware timing race. */
     if (Radio::instance->isFilterEnabled()) {
         if (NRF_RADIO->EVENTS_DEVMATCH == 1) {
             Radio::instance->addrMatch = true;
 
-#if 0
-            if (Radio::instance->isAutoTXafterRXenabled() && (Radio::instance->txDesc != NULL)) {
-                NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk |  RADIO_SHORTS_DISABLED_TXEN_Msk;
-            } else {
-                NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk |  RADIO_SHORTS_DISABLED_RXEN_Msk;
-            }
-#endif
             /* Ack event. */
             NRF_RADIO->EVENTS_DEVMATCH = 0;
         }
@@ -1570,11 +1717,15 @@ extern "C" void RADIO_IRQHandler(void) {
                 case RX:
                     {
                         radio_desc_t *p_pkt = Radio::instance->rxDesc;
-                        if (Radio::instance->isAutoTXafterRXenabled() && (Radio::instance->txDesc != NULL) && Radio::instance->addrMatch && false) {
+                        if (Radio::instance->isAutoTXafterRXenabled() && (Radio::instance->txDesc != NULL) && Radio::instance->addrMatch) {
 
-                            /* Update PACKETPTR as fast as possible to make it point to the TX buffer. */
-                            //NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_TXEN_Msk;        
-                            //NRF_RADIO->PACKETPTR = (uint32_t)(Radio::instance->txDesc->payload);
+                            /* RXEN/TXEN routing for THIS reception was already
+                             * decided in hardware by PPI the instant DEVMATCH
+                             * fired (see armAddressMatchTX()) - nothing to do for
+                             * SHORTS here. Safe to write PACKETPTR here though:
+                             * this reception is fully complete (we're in the END
+                             * handler), so no DMA transfer is in flight anymore. */
+                            NRF_RADIO->PACKETPTR = (uint32_t)(Radio::instance->txDesc->payload);
 
                             /* Update RX descriptor. If we run out of descriptors, keep the
                              * one we have and drop this frame (skip it below) instead of
@@ -1611,6 +1762,13 @@ extern "C" void RADIO_IRQHandler(void) {
                             } else {
                                 p_pkt = NULL;
                             }
+
+                            /* Re-evaluate whether the *next* reception should be
+                             * allowed to auto-TX on a match: txDesc may have been
+                             * populated (or emptied) since this was last decided.
+                             * Safe here for the same reason as above - no transfer
+                             * is active yet for the reception this arms. */
+                            Radio::instance->armAddressMatchTX();
                         }
 
                         /* From now, if the radio starts receiving a new packet it will be
@@ -1696,6 +1854,16 @@ extern "C" void RADIO_IRQHandler(void) {
                         Radio::instance->pushFreeDesc(Radio::instance->txDesc);
                         Radio::instance->txDesc = Radio::instance->popTxDesc();
                         exitCritical(primask);
+
+                        /* Re-arm the PPI routing for the reception this TX's own
+                         * DISABLED is about to trigger via RXEN: reset it back to
+                         * the default "go RX" state (DEVMATCH's fork left it
+                         * pointed at "go TX" for this cycle) before that DISABLED
+                         * event occurs, and decide whether the *next* reception
+                         * should auto-TX again based on the txDesc we just fetched.
+                         * Must happen promptly here, before this TX's DISABLED -
+                         * same timing margin PACKETPTR above already relies on. */
+                        Radio::instance->armAddressMatchTX();
 
                         Radio::instance->addrMatch = false;
                         Radio::instance->setState(RX);

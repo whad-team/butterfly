@@ -83,6 +83,10 @@ class Radio
 		bool generateDataWhiteIvRegister();
 		bool generateCrcRegisters();
 
+        /* One-time PPI wiring for address-match-conditional auto-TX-after-RX,
+         * see armAddressMatchTX() (public, below) for the full explanation. */
+        void setupAddressMatchPPI();
+
         /* Descriptors pool. */
         radio_desc_t descPool[MAX_DESCRIPTORS];
 
@@ -120,6 +124,16 @@ class Radio
         size_t countFreeDesc(void);
         bool hasRxDesc(void);
         bool hasFreeDesc(void);
+
+        /* Called from RADIO_IRQHandler (a free function, hence public) at
+         * every point where RX gets (re-)armed with no DMA transfer active -
+         * enable(), fastFrequencyChange(), after a non-matched reception,
+         * and after a TX completes - to decide whether a device address
+         * match on the *next* reception should redirect it to TX, entirely
+         * via PPI. See radio.cpp for the full explanation of why this can
+         * never be decided reactively (e.g. from the DEVMATCH IRQ, or from
+         * software in the END handler, which is too late) instead. */
+        void armAddressMatchTX();
 
 		Radio();
 
