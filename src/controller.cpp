@@ -56,13 +56,24 @@ whad::NanoPbMsg *Controller::buildMessageFromPacket(Packet* packet) {
   if (packet->getPacketType() == BLE_PACKET_TYPE) {
     BLEPacket *blePacket = static_cast<BLEPacket*>(packet);
 
-    /* Craft a BLE Raw PDU packet notification. */
+    /* Craft a BLE Raw PDU packet notification.
+     *
+     * The PDU length must come from the size we actually captured
+     * (getPacketSize() - 11: minus the 4-byte access address prefix, the
+     * 4-byte relative timestamp, and the 3-byte CRC suffix BLEPacket's
+     * buffer is laid out with), NOT from extractPayloadLength(), which
+     * reads a length byte taken at face value from the received-over-the-
+     * air data. If that byte disagrees with what was actually captured
+     * (e.g. a declared length larger than the radio's configured MAXLEN,
+     * or any other corruption upstream), trusting it here reads past
+     * BLEPacket's own buffer - a heap over-read whose garbage then gets
+     * reported to the host as if it were the packet. */
     message = new whad::ble::RawPdu(
         blePacket->getChannel(),
         blePacket->getRssi(),
         blePacket->getConnectionHandle(),
         blePacket->getAccessAddress(),
-        whad::ble::PDU(packet->getPacketBuffer()+4, blePacket->extractPayloadLength() + 2),
+        whad::ble::PDU(packet->getPacketBuffer()+4, blePacket->getPacketSize() - 11),
         blePacket->getCrc(),
         blePacket->isCrcValid(),
         blePacket->getTimestamp(),

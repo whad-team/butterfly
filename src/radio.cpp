@@ -4,6 +4,46 @@
 // Global instance of Radio
 Radio* Radio::instance = NULL;
 
+static inline uint32_t enterCritical()
+{
+    uint32_t primask = __get_PRIMASK();
+    __disable_irq();
+    __DMB();
+    return primask;
+}
+
+static inline void exitCritical(uint32_t primask)
+{
+    __DMB();
+    __set_PRIMASK(primask);
+}
+
+/*
+ * newlib-nano's malloc/free/realloc (used directly by BLEPacket/NanoPbMsg via
+ * new/delete, and transitively by the WHAD message queue) are not reentrant:
+ * nothing in this project defines __malloc_lock()/__malloc_unlock(), so they
+ * default to no-ops. Controller code allocates from directly inside
+ * RADIO_IRQHandler (via onReceive()), which can preempt a malloc/free already
+ * in progress on the main loop or a timer callback and corrupt the heap.
+ * These override newlib's weak hooks to serialize every allocation against
+ * that IRQ, the same way enterCritical()/exitCritical() serialize descriptor
+ * list access above.
+ */
+extern "C" {
+
+struct _reent;
+static uint32_t s_malloc_primask;
+
+void __malloc_lock(struct _reent *) {
+    s_malloc_primask = enterCritical();
+}
+
+void __malloc_unlock(struct _reent *) {
+    exitCritical(s_malloc_primask);
+}
+
+}
+
 Radio::Radio() {
 	this->setProtocol(GENERIC_PROTOCOL);
 	this->ready = false;
@@ -15,6 +55,16 @@ Radio::Radio() {
 	this->controller = NULL;
 	this->interFrameSpacing = 0;
 	this->filterEnabled = false;
+	/* Radio is heap-allocated (new Radio() in core.cpp), so any member not
+	 * explicitly set here holds whatever garbage was in that heap block, not
+	 * zero. matchingEnable/matchingSize were never initialized: if that
+	 * garbage happened to make isMatchingEnabled() true, enable() would arm
+	 * NRF_RADIO->BCC with a garbage bit count and turn on BCMATCH - a
+	 * hardware feature that fires at an arbitrary bit offset into the
+	 * packet, and nothing in this codebase currently calls enableMatch()
+	 * for BLE, so it should always be off unless explicitly requested. */
+	this->matchingEnable = false;
+	this->matchingSize = 0;
 	this->jammingPatternsEnabled = false;
 	this->jammingPatternsCounter = 0;
 	this->jammingInterval = 0;
@@ -51,6 +101,7 @@ Radio::Radio() {
         this->descPool[i].size = 0;
         this->descPool[i].crc.value = 0;
         this->descPool[i].crc.validity = UNKNOWN_CRC; 
+        this->descPool[i].payload[0] = 0x42;
     }
 
     /* Initialize free descriptors list to our initial pool. */
@@ -1226,8 +1277,9 @@ bool Radio::enable() {
 		// TODO: update the INPTR and OUTPTR
 		}
 		if (this->mode == MODE_NORMAL) {
-            /* Ask for END event only. */
-			NRF_RADIO->INTENSET = RADIO_INTENSET_END_Msk | RADIO_INTENSET_CRCOK_Msk | RADIO_INTENSET_CRCERROR_Msk;
+
+            /* Ask for END, CRCOK, CRCERROR and DISABLE events only. */
+			NRF_RADIO->INTENSET = RADIO_INTENSET_END_Msk /* | RADIO_INTENSET_CRCOK_Msk | RADIO_INTENSET_CRCERROR_Msk*/ | RADIO_INTENSET_TXREADY_Msk;
 
 			if (this->isFilterEnabled()) {
 
@@ -1284,6 +1336,7 @@ bool Radio::enable() {
 			NRF_RADIO->EVENTS_READY = 0;
             NRF_RADIO->EVENTS_CRCOK = 0;
             NRF_RADIO->EVENTS_CRCERROR = 0;
+            NRF_RADIO->EVENTS_TXREADY = 0;
 			NRF_RADIO->TASKS_RXEN = 1;
 
             /* State is RX by default. */
@@ -1346,11 +1399,16 @@ bool Radio::updateTXBuffer(uint8_t *data, size_t size) {
     pkt_desc->size = size;
     pkt_desc->state = DESC_PENDING;
 
-    /* Add this descriptor to the descriptors to send. */
+    /* Add this descriptor to the descriptors to send. Reading/updating txDesc
+     * itself (as opposed to the TX list) is not protected by pushTxDesc(), so
+     * it must be guarded here against a concurrent RADIO IRQ. */
+    uint32_t primask = enterCritical();
     if (this->txDesc == NULL) {
         this->txDesc = pkt_desc;
+        exitCritical(primask);
     } else {
         pushTxDesc(pkt_desc);
+        exitCritical(primask);
     }
 
 	return true;
@@ -1361,6 +1419,7 @@ int Radio::getMatchingSize() {
 }
 
 bool Radio::send(uint8_t *data,int size,int frequency, uint8_t channel) {
+#if 0
 	bsp_board_led_invert(0);
     NVIC_DisableIRQ(RADIO_IRQn);
 	NRF_RADIO->SHORTS = 0;
@@ -1403,7 +1462,8 @@ bool Radio::send(uint8_t *data,int size,int frequency, uint8_t channel) {
 	NRF_RADIO->EVENTS_READY = 0;
 	NRF_RADIO->EVENTS_END = 0;
 	NRF_RADIO->TASKS_TXEN = 1;
-	return false;
+#endif
+    return false;
 }
 
 static uint8_t jamBuffer[] = {0x00,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
@@ -1413,11 +1473,13 @@ extern "C" void RADIO_IRQHandler(void) {
         if (NRF_RADIO->EVENTS_DEVMATCH == 1) {
             Radio::instance->addrMatch = true;
 
+#if 0
             if (Radio::instance->isAutoTXafterRXenabled() && (Radio::instance->txDesc != NULL)) {
-                NRF_RADIO->SHORTS &= ~(RADIO_SHORTS_DISABLED_TXEN_Msk | RADIO_SHORTS_DISABLED_RXEN_Msk);
-                NRF_RADIO->SHORTS |= RADIO_SHORTS_DISABLED_TXEN_Msk;
+                NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk |  RADIO_SHORTS_DISABLED_TXEN_Msk;
+            } else {
+                NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk |  RADIO_SHORTS_DISABLED_RXEN_Msk;
             }
-
+#endif
             /* Ack event. */
             NRF_RADIO->EVENTS_DEVMATCH = 0;
         }
@@ -1471,10 +1533,14 @@ extern "C" void RADIO_IRQHandler(void) {
     }
 
     if (NRF_RADIO->EVENTS_TXREADY) {
+        /* TX is in progress, disable the DISABLED->TXEN short and prepare PACKETPTR for the next RX. */
+        NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_RXEN_Msk;        
+
         /* Check if we need to remove or not the DISABLED_TXEN short. */
         NRF_RADIO->EVENTS_TXREADY = 0;
     }
 
+#if 0
     if (NRF_RADIO->EVENTS_CRCOK) {
         if (Radio::instance->rxDesc != NULL) {
             Radio::instance->rxDesc->crc.validity = VALID_CRC;
@@ -1490,6 +1556,7 @@ extern "C" void RADIO_IRQHandler(void) {
         }
         NRF_RADIO->EVENTS_CRCERROR = 0;
     }
+#endif
 
     if (NRF_RADIO->EVENTS_END) {
         /* Ack event. */
@@ -1503,26 +1570,47 @@ extern "C" void RADIO_IRQHandler(void) {
                 case RX:
                     {
                         radio_desc_t *p_pkt = Radio::instance->rxDesc;
-                        if (Radio::instance->isAutoTXafterRXenabled() && (Radio::instance->txDesc != NULL)) {
+                        if (Radio::instance->isAutoTXafterRXenabled() && (Radio::instance->txDesc != NULL) && Radio::instance->addrMatch && false) {
 
                             /* Update PACKETPTR as fast as possible to make it point to the TX buffer. */
-                            NRF_RADIO->PACKETPTR = (uint32_t)(Radio::instance->txDesc->payload);
-                            NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_RXEN_Msk;        
+                            //NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_TXEN_Msk;        
+                            //NRF_RADIO->PACKETPTR = (uint32_t)(Radio::instance->txDesc->payload);
 
-                            /* Put the current RX buffer in our RX list. */
-                            Radio::instance->rxDesc = Radio::instance->popFreeDesc();
+                            /* Update RX descriptor. If we run out of descriptors, keep the
+                             * one we have and drop this frame (skip it below) instead of
+                             * both freeing it and leaving it as the active rxDesc/PACKETPTR
+                             * target, which would let it be handed out again while still
+                             * being written to by the radio.
+                             *
+                             * No critical section needed here: popFreeDesc() locks itself,
+                             * and rxDesc is only ever touched from this handler or from
+                             * enable()/fastFrequencyChange() which disable RADIO_IRQn first. */
+                            radio_desc_t *p_next = Radio::instance->popFreeDesc();
+                            if (p_next != NULL) {
+                                Radio::instance->rxDesc = p_next;
+                            } else {
+                                p_pkt = NULL;
+                            }
+
+                            Radio::instance->setState(TX);
 
                             /* Switch to RX state, let hardware send the current TX buffer. */
-                            Radio::instance->setState(TX);
                             bsp_board_led_on(0);
 
                         } else {
-                            /* Give radio another RX descriptor to write into. */
+                            /* Give radio another RX descriptor to write into. If the pool
+                             * is exhausted, keep using the current one (PACKETPTR/rxDesc
+                             * stay untouched) and drop this frame below instead of freeing
+                             * it, to avoid it being both "free" and the live DMA target.
+                             *
+                             * No critical section needed here: see the comment above. */
                             radio_desc_t *p_next = Radio::instance->popFreeDesc();
-                            NRF_RADIO->PACKETPTR = (uint32_t)(p_next->payload);
-
-                            /* Save current RX descriptor (payload written by Radio). */
-                            Radio::instance->rxDesc = p_next;
+                            if (p_next != NULL) {
+                                NRF_RADIO->PACKETPTR = (uint32_t)(p_next->payload);
+                                Radio::instance->rxDesc = p_next;
+                            } else {
+                                p_pkt = NULL;
+                            }
                         }
 
                         /* From now, if the radio starts receiving a new packet it will be
@@ -1534,17 +1622,26 @@ extern "C" void RADIO_IRQHandler(void) {
                         uint32_t now = NRF_TIMER4->CC[5];
                        
                         /* Retrieve the contoller. */
-                        controller = Radio::instance->getController();
+                        Controller *controller = Radio::instance->getController();
 
                         /* Save RSSI, CRC info and save packet into RX queue. */
-                        if (Radio::instance->isRssiEnabled()) {
-                            p_pkt->rssi = NRF_RADIO->RSSISAMPLE;
-                        }
-
-                        /* Now we have some time to process incoming packets. */
                         if (p_pkt != NULL) {
-                            /* Process RX packet. */
-                            uint8_t bufferSize = 0;
+                            if (Radio::instance->isRssiEnabled()) {
+                                p_pkt->rssi = NRF_RADIO->RSSISAMPLE;
+                            }
+
+                            if (Radio::instance->getCrc() == HARDWARE_CRC) {
+                                p_pkt->crc.validity = (NRF_RADIO->CRCSTATUS == 1)?VALID_CRC:INVALID_CRC;
+                                p_pkt->crc.value = NRF_RADIO->RXCRC;
+                            }
+
+                            /* Process RX packet. Widened to avoid an 8-bit wraparound: a
+                             * sender-declared length near 254-255 would otherwise make
+                             * "2+length" wrap back to a tiny value, sail past the sanity
+                             * check below, and get reported as if that few bytes were
+                             * genuinely captured (they weren't - DMA only wrote the
+                             * hardware's configured MAXLEN). */
+                            uint16_t bufferSize = 0;
                             if (Radio::instance->getPhy() == DOT15D4_NATIVE)  {
                                 bufferSize = 128;
                             }
@@ -1575,15 +1672,15 @@ extern "C" void RADIO_IRQHandler(void) {
                                     Radio::instance->currentTimestamp = now - (Radio::instance->getPreamble().size+bufferSize)  * 4 * (p == BLE_2MBITS || p == ESB_2MBITS ? 1 : 2) - 100;
                                 }
 
-                            }
                         
-                            /* Notify the controller we received a packet. */
-                            if ((controller != NULL) && (p_pkt->crc.validity == VALID_CRC)) {
-                                /* Forward received frame to controller. */
-                                controller->onReceive(Radio::instance->currentTimestamp, p_pkt->size, p_pkt->payload, p_pkt->crc, p_pkt->rssi);
+                                /* Notify the controller we received a packet. */
+                                if ((controller != NULL) && (p_pkt->crc.validity == VALID_CRC)) {
+                                    /* Forward received frame to controller. */
+                                    controller->onReceive(Radio::instance->currentTimestamp, p_pkt->size, p_pkt->payload, p_pkt->crc, p_pkt->rssi);
+                                }
                             }
 
-                            /* Free descriptor. */
+                            /* Free descriptor. pushFreeDesc() locks itself. */
                             Radio::instance->pushFreeDesc(p_pkt);
                         }
                     }
@@ -1592,15 +1689,15 @@ extern "C" void RADIO_IRQHandler(void) {
                 /* TX buffer sent, we must switch PACKETPTR to rxDesc. */
                 case TX:
                     {
-                        /* RX after TX, set PACKETPTR to our current empty RX descriptor. */
                         NRF_RADIO->PACKETPTR = (uint32_t)(Radio::instance->rxDesc->payload);
 
                         /* Free the sent descriptor and fetch a new one. */
+                        uint32_t primask = enterCritical();
                         Radio::instance->pushFreeDesc(Radio::instance->txDesc);
                         Radio::instance->txDesc = Radio::instance->popTxDesc();
+                        exitCritical(primask);
 
                         Radio::instance->addrMatch = false;
-
                         Radio::instance->setState(RX);
 
 
@@ -1650,15 +1747,23 @@ extern "C" void RADIO_IRQHandler(void) {
 radio_desc_t *Radio::popFromList(radio_desc_head_t *p_list) {
     radio_desc_head_t *p_desc = NULL;
 
+    /* Descriptor lists are shared between the RADIO IRQ and callers running
+     * with interrupts enabled (main loop, timer callbacks, updateTXBuffer()),
+     * so every mutation is protected here, once, rather than relying on each
+     * call site to remember to do it. */
+    uint32_t primask = enterCritical();
+
     /* Return NULL if list is empty. */
     if (p_list->p_next != p_list) {
-        /* Pick the first item. */ 
-        p_desc = p_list->p_next; 
+        /* Pick the first item. */
+        p_desc = p_list->p_next;
         p_list->p_next = p_desc->p_next;
         p_list->p_next->p_prev = p_desc->p_prev;
         p_desc->p_next = NULL;
         p_desc->p_prev = NULL;
     }
+
+    exitCritical(primask);
 
     /* Return descriptor as a pointer to a radio_desc_t structure. */
     return (radio_desc_t *)p_desc;
@@ -1677,6 +1782,9 @@ radio_desc_t *Radio::popRxDesc(void) {
 }
 
 void Radio::pushIntoList(radio_desc_head_t *p_list, radio_desc_t *p_desc) {
+    /* Same reasoning as popFromList(): protect against a concurrent IRQ. */
+    uint32_t primask = enterCritical();
+
     /* prev <- p_desc */
     p_desc->header.p_prev = p_list->p_prev;
 
@@ -1688,6 +1796,8 @@ void Radio::pushIntoList(radio_desc_head_t *p_list, radio_desc_t *p_desc) {
 
     /*  p_desc <- tail */
     p_list->p_prev = &p_desc->header;
+
+    exitCritical(primask);
 }
 
 void Radio::pushTxDesc(radio_desc_t *p_desc) {
@@ -1703,6 +1813,7 @@ void Radio::pushFreeDesc(radio_desc_t *p_desc) {
     p_desc->state = DESC_FREE;
     //p_desc->size = 0;
     p_desc->crc.validity = UNKNOWN_CRC;
+    p_desc->payload[0] = 0x42;
     //memset(p_desc->payload, 0, 256);
     pushIntoList(&this->descFreeList, p_desc);
 }

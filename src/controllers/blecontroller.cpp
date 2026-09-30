@@ -1263,6 +1263,10 @@ void BLEController::sniffAccessAddresses() {
 }
 
 void BLEController::setAccessAddressDiscoveryConfiguration(uint8_t preamble) {
+  /* Disable the radio (and its IRQ) before touching its configuration fields,
+   * so an in-flight reception can't be interpreted with a half-old/half-new
+   * config. reload() below re-enables it once everything is set. */
+  this->radio->disable();
   uint8_t two_bytes_preamble[] = {preamble, 0xff};
   this->radio->setPreamble(two_bytes_preamble, 2);
   this->radio->setPrefixes(0xa8,0x1f,0x9f,0xaf, 0xa9,0x00,0xFF);
@@ -1291,6 +1295,8 @@ void BLEController::setAccessAddressDiscoveryConfiguration(uint8_t preamble) {
   this->radio->reload();
 }
 void BLEController::setReactiveJammerConfiguration(uint8_t *pattern, size_t size, int position) {
+	/* See setAccessAddressDiscoveryConfiguration() for why this comes first. */
+	this->radio->disable();
 	this->controllerState = REACTIVE_JAMMING;
 	memcpy(this->reactiveJammingPattern.pattern, pattern, size);
 	this->reactiveJammingPattern.size = size;
@@ -1325,6 +1331,8 @@ void BLEController::setReactiveJammerConfiguration(uint8_t *pattern, size_t size
 
 }
 void BLEController::setJammerConfiguration() {
+	/* See setAccessAddressDiscoveryConfiguration() for why this comes first. */
+	this->radio->disable();
 	this->controllerState = JAMMING_CONNECT_REQ;
 	uint8_t connectReq[4] = {dewhiten_byte_ble(0x05,0,this->channel),0x8e,0x89,0xbe};
 	this->radio->setPrefixes(dewhiten_byte_ble(0x45,0,this->channel), dewhiten_byte_ble(0x85,0,this->channel), dewhiten_byte_ble(0xc5,0,this->channel));
@@ -1350,6 +1358,8 @@ void BLEController::setJammerConfiguration() {
 }
 
 void BLEController::setCrcRecoveryConfiguration(uint32_t accessAddress) {
+	/* See setAccessAddressDiscoveryConfiguration() for why this comes first. */
+	this->radio->disable();
 	this->accessAddress = accessAddress;
 	uint8_t accessAddressPreamble[4] = {(uint8_t)((accessAddress & 0xFF000000) >> 24),
 						(uint8_t)((accessAddress & 0x00FF0000) >> 16),
@@ -1397,6 +1407,11 @@ bool BLEController::rawInject(uint8_t* pdu, size_t size, int channel, uint32_t a
 }
 
 void BLEController::setHardwareConfiguration(uint32_t accessAddress, uint32_t crcInit) {
+	/* See setAccessAddressDiscoveryConfiguration() for why this comes first:
+	 * this is called live (e.g. from disconnect()/initializeConnection())
+	 * while the radio may still be receiving, and every setter below mutates
+	 * shared Radio state the IRQ reads to interpret a completing packet. */
+	this->radio->disable();
 	this->accessAddress = accessAddress;
 	this->crcInit = crcInit;
 	uint8_t accessAddressPreamble[4] = {(uint8_t)((accessAddress & 0xFF000000) >> 24),
@@ -3138,8 +3153,21 @@ void BLEController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer,
 	else if (crcValue.validity == VALID_CRC) {
 		BLEPacket *pkt = new BLEPacket(this->accessAddress, buffer, size,timestamp, relativeTimestamp, 0, this->channel, rssi, crcValue, this->getPhy());
 		if (pkt->isAdvertisement()) {
-			// If the packet is an advertisement, call onAdvertisementPacket method
-			this->advertisementPacketProcessing(pkt);
+			/* Every advertising-channel PDU type (ADV_IND, ADV_NONCONN_IND,
+			 * SCAN_REQ/RSP, CONNECT_REQ, ...) carries at least a 6-byte
+			 * address field, so a declared length below 6 can't be a real
+			 * advertisement - it's noise (RF artifact, coincidental CRC
+			 * match on a short/garbled reception, etc). Drop it instead of
+			 * reporting a structurally-invalid PDU to the host.
+			 *
+			 * TEMPORARILY DISABLED for debugging: we suspect packets this
+			 * filters out may actually be the auto-TX-after-RX matched
+			 * ADV_IND with a mis-captured/truncated length, rather than
+			 * unrelated noise. Re-enable once that's confirmed either way. */
+			if (/* pkt->extractPayloadLength() >= 6 */ true) {
+				// If the packet is an advertisement, call onAdvertisementPacket method
+				this->advertisementPacketProcessing(pkt);
+			}
 		}
 		else {
 			// If the packet is a connection packet, call onConnectionPacket
