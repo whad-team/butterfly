@@ -30,18 +30,16 @@ static inline void exitCritical(uint32_t primask)
  * list access above.
  */
 extern "C" {
+    struct _reent;
+    static uint32_t s_malloc_primask;
 
-struct _reent;
-static uint32_t s_malloc_primask;
+    void __malloc_lock(struct _reent *) {
+        s_malloc_primask = enterCritical();
+    }
 
-void __malloc_lock(struct _reent *) {
-    s_malloc_primask = enterCritical();
-}
-
-void __malloc_unlock(struct _reent *) {
-    exitCritical(s_malloc_primask);
-}
-
+    void __malloc_unlock(struct _reent *) {
+        exitCritical(s_malloc_primask);
+    }
 }
 
 /*
@@ -1548,8 +1546,6 @@ bool Radio::updateTXBuffer(uint8_t *data, size_t size) {
         exitCritical(primask);
     }
 
-    this->addrMatch = true;
-
 	return true;
 }
 
@@ -1862,10 +1858,10 @@ extern "C" void RADIO_IRQHandler(void) {
                          * Must happen promptly here, before this TX's DISABLED -
                          * same timing margin PACKETPTR above already relies on. */
                         Radio::instance->armAddressMatchTX();
-
                         Radio::instance->addrMatch = false;
+                        
+                        /* Next step: process received frame. */
                         Radio::instance->setState(RX);
-
 
                         bsp_board_led_off(0);
                     }
