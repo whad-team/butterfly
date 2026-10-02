@@ -791,9 +791,13 @@ bool Radio::disable() {
         if (this->txDesc != NULL) {
             pushFreeDesc(this->txDesc);
         }
-        //while (hasTxDesc()) {
-        //    pushFreeDesc(popTxDesc());
-        //}
+        while (hasTxDesc()) {
+            pushFreeDesc(popTxDesc());
+        }
+        if (this->txDesc != NULL) {
+            pushFreeDesc(this->txDesc);
+        }
+        this->txDesc = NULL;
         exitCritical(primask);
 	}
     
