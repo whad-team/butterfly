@@ -1785,8 +1785,21 @@ extern "C" void RADIO_IRQHandler(void) {
                       
                         /* If filter is enabled, we must only send packets that match
                          * the specified address.
-                         */
+                         *
+                         * p_pkt (the descriptor the rejected packet landed in) must be
+                         * returned to the free list here before bailing out: by this
+                         * point the hardware has already been handed a fresh descriptor
+                         * for the next reception (above), so p_pkt is not referenced
+                         * anywhere else and this is its only chance to be freed.
+                         * Without this, every rejected packet leaks one descriptor
+                         * permanently - with filtering typically enabled while waiting
+                         * for one specific device's advertisement amid otherwise-busy
+                         * RF traffic, this exhausts the entire 30-descriptor pool within
+                         * seconds. */
                         if (Radio::instance->isFilterEnabled() && !Radio::instance->addrMatch) {
+                            if (p_pkt != NULL) {
+                                Radio::instance->pushFreeDesc(p_pkt);
+                            }
                             return;
                         }
 

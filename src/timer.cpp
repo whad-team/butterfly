@@ -106,19 +106,21 @@ void Timer::update(int duration) {
 }
 
 void Timer::update(int duration, int timestamp) {
-  this->duration = duration;
-  if (this->isStarted()) {
-    	//NVIC_DisableIRQ(TIMER4_IRQn);
-			if (this->base == 4) {
-	      NRF_TIMER4->CC[this->id] = timestamp + duration;
-				NRF_TIMER4->INTENSET |= 1 << (16+this->id);
-			}
-			else if (this->base == 3) {
-	      NRF_TIMER3->CC[this->id] = timestamp + duration;
-				NRF_TIMER3->INTENSET |= 1 << (16+this->id);
-			}
-    	//NVIC_ClearPendingIRQ(TIMER4_IRQn);
-    	//NVIC_EnableIRQ(TIMER4_IRQn);
+    this->duration = duration;
+    if (this->isStarted()) {
+        if (this->base == 4) {
+            NVIC_DisableIRQ(TIMER4_IRQn);
+            NRF_TIMER4->CC[this->id] = timestamp + duration;
+            NRF_TIMER4->INTENSET |= 1 << (16+this->id);
+            NVIC_ClearPendingIRQ(TIMER4_IRQn);
+            NVIC_EnableIRQ(TIMER4_IRQn);
+        } else if (this->base == 3) {
+			NVIC_DisableIRQ(TIMER3_IRQn);
+            NRF_TIMER3->CC[this->id] = timestamp + duration;
+            NRF_TIMER3->INTENSET |= 1 << (16+this->id);
+            NVIC_ClearPendingIRQ(TIMER3_IRQn);
+            NVIC_EnableIRQ(TIMER3_IRQn);
+        }
   }
 }
 
@@ -143,33 +145,21 @@ void Timer::start() {
     this->start(TimerModule::instance->getTimestamp());
 }
 
-/*
- * Starts the timer anchored to a caller-supplied timestamp (e.g. the precise
- * hardware-captured moment a packet was received, such as
- * Radio::instance->currentTimestamp) instead of re-reading "now" at this
- * call. Without this, any processing delay between that moment and the
- * point the code gets around to calling start() (e.g. the synchronous
- * BLEPacket/WHAD-message reporting pipeline running first) silently pushes
- * the timer's absolute fire time back by the same amount - fine for most
- * uses, but enough to miss a tight BLE timing slot (e.g. the master's first
- * connection-event transmission) under RF traffic load.
- */
 void Timer::start(int timestamp) {
     this->started = true;
-		if (this->base == 4) {
-	    NVIC_DisableIRQ(TIMER4_IRQn);
-	    NRF_TIMER4->CC[this->id] = timestamp + this->duration;
-	    NRF_TIMER4->INTENSET |= 1 << (16+this->id);
-	    NVIC_ClearPendingIRQ(TIMER4_IRQn);
-	    NVIC_EnableIRQ(TIMER4_IRQn);
-		}
-		else if (this->base == 3) {
-			NVIC_DisableIRQ(TIMER3_IRQn);
-	    NRF_TIMER3->CC[this->id] = timestamp + this->duration;
-	    NRF_TIMER3->INTENSET |= 1 << (16+this->id);
-	    NVIC_ClearPendingIRQ(TIMER3_IRQn);
-	    NVIC_EnableIRQ(TIMER3_IRQn);
-		}
+    if (this->base == 4) {
+        NVIC_DisableIRQ(TIMER4_IRQn);
+        NRF_TIMER4->CC[this->id] = timestamp + duration;
+        NRF_TIMER4->INTENSET |= 1 << (16+this->id);
+        NVIC_ClearPendingIRQ(TIMER4_IRQn);
+        NVIC_EnableIRQ(TIMER4_IRQn);
+    } else if (this->base == 3) {
+        NVIC_DisableIRQ(TIMER3_IRQn);
+        NRF_TIMER3->CC[this->id] = timestamp + duration;
+        NRF_TIMER3->INTENSET |= 1 << (16+this->id);
+        NVIC_ClearPendingIRQ(TIMER3_IRQn);
+        NVIC_EnableIRQ(TIMER3_IRQn);
+    }
 }
 
 void Timer::stop() {

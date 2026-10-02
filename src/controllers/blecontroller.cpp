@@ -2711,12 +2711,26 @@ void BLEController::connectionManagementProcessing(BLEPacket *pkt) {
 
 
 void BLEController::disconnect() {
+	/** 
+     * Must release timers when disconnecting from either an established
+	 * connection (SIMULATING_MASTER) or a still-in-progress connection
+	 * attempt (CONNECTION_INITIATION: connectionTimer/timeoutTimer/
+	 * initTimer started by connect()/initializeConnection()). Without this,
+	 * a Disconnect sent before the connection fully establishes leaves
+	 * those timers allocated and never released, and enough such cycles
+	 * exhaust the timer pool (TimerModule only has 10 slots) - which then
+	 * crashes the next time any getTimer() call elsewhere in this
+	 * controller dereferences its unchecked NULL result.
+     **/
 	if (this->controllerState == SIMULATING_MASTER) {
 		uint8_t *terminate_ind;
 		size_t terminate_ind_size;
 		BLEPacket::forgeTerminateInd(&terminate_ind, &terminate_ind_size,0x13);
 		this->setMasterPayload(terminate_ind,terminate_ind_size);
 		this->connectionLost();
+	}
+	else if (this->controllerState == CONNECTION_INITIATION) {
+		this->releaseTimers();
 	}
 }
 void BLEController::masterPacketProcessing(BLEPacket *pkt) {
