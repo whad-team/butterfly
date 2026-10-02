@@ -1714,6 +1714,9 @@ extern "C" void RADIO_IRQHandler(void) {
         /* Ack event. */
         NRF_RADIO->EVENTS_END = 0;
 
+        /* Retrieve the current timestamp. */
+        NRF_TIMER4->TASKS_CAPTURE[5] = 1UL;
+        uint32_t now = NRF_TIMER4->CC[5];
         Controller *controller = NULL;
 
         /* Process the received payload. */
@@ -1779,11 +1782,14 @@ extern "C" void RADIO_IRQHandler(void) {
                         /* From now, if the radio starts receiving a new packet it will be
                          * written into the new descriptor's buffer.
                          */
+                      
+                        /* If filter is enabled, we must only send packets that match
+                         * the specified address.
+                         */
+                        if (Radio::instance->isFilterEnabled() && !Radio::instance->addrMatch) {
+                            return;
+                        }
 
-                        /* Retrieve the current timestamp. */
-                        NRF_TIMER4->TASKS_CAPTURE[5] = 1UL;
-                        uint32_t now = NRF_TIMER4->CC[5];
-                       
                         /* Retrieve the contoller. */
                         Controller *controller = Radio::instance->getController();
 
