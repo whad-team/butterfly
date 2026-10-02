@@ -783,14 +783,21 @@ bool Radio::disable() {
 		while (NRF_RADIO->EVENTS_DISABLED == 0) {}
 		success = true;
 
-        /* Flush RX and TX list. */
+        /* Flush RX list. */
+        uint32_t primask = enterCritical();
         while (hasRxDesc()) {
             pushFreeDesc(popRxDesc());
+        }
+        if (this->txDesc != NULL) {
+            pushFreeDesc(this->txDesc);
         }
         //while (hasTxDesc()) {
         //    pushFreeDesc(popTxDesc());
         //}
+        exitCritical(primask);
 	}
+    
+
 	return success;
 }
 bool Radio::generateTxPowerRegister() {
