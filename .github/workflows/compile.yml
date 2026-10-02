@@ -32,6 +32,6 @@ jobs:
     - name: make
       run: |
         make SDK_ROOT=$(pwd)/.sdk/nRF5_SDK_17.1.0_ddde560
-        make PLATFORM=BOARD_MDK_DONGLE SDK_ROOT=$(pwd)/.sdk/nRF5_SDK_17.1.0_ddde560 
-        make PLATFORM=BOARD_MDK_CONNECTKIT SDK_ROOT=$(pwd)/.sdk/nRF5_SDK_17.1.0_ddde560 
+        make clean && make PLATFORM=BOARD_MDK_DONGLE SDK_ROOT=$(pwd)/.sdk/nRF5_SDK_17.1.0_ddde560 
+        make clean && make PLATFORM=BOARD_MDK_CONNECTKIT SDK_ROOT=$(pwd)/.sdk/nRF5_SDK_17.1.0_ddde560 
 
