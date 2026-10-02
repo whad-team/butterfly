@@ -14,7 +14,7 @@ ifeq ($(SERIAL_PORT),)
 endif
 
 
-SUPPORTED_PLATFORMS = BOARD_PCA10059 BOARD_MDK_DONGLE
+SUPPORTED_PLATFORMS = BOARD_PCA10059 BOARD_MDK_DONGLE BOARD_MDK_CONNECTKIT
 
 ifeq ($(filter $(PLATFORM), $(SUPPORTED_PLATFORMS)),)
     $(error "PLATFORM not in $(SUPPORTED_PLATFORMS)")
@@ -74,6 +74,49 @@ ifeq ($(PLATFORM),BOARD_MDK_DONGLE)
 	CFLAGS += $(OPT)
 	CFLAGS += -DBOARD_CUSTOM
 	CFLAGS += -DNRF52840_MDK_DONGLE
+	#CFLAGS += -DCONFIG_GPIO_AS_PINRESET
+	CFLAGS += -DDEBUG
+	CFLAGS += -DDEBUG_NRF
+	CFLAGS += -DFLOAT_ABI_HARD
+	CFLAGS += -DNRF52840_XXAA
+	CFLAGS += -DSWI_DISABLE0
+	CFLAGS += -mcpu=cortex-m4
+	CFLAGS += -mthumb -mabi=aapcs
+	CFLAGS += -Wall -Werror
+	CFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
+	# keep every function in a separate section, this allows linker to discard unused ones
+	CFLAGS += -ffunction-sections -fdata-sections -fno-strict-aliasing
+	CFLAGS += -fno-builtin -fshort-enums
+
+	# C++ flags common to all targets
+	CXXFLAGS += $(OPT)
+
+	# Assembler flags common to all targets
+	ASMFLAGS += -g3
+	ASMFLAGS += -mcpu=cortex-m4
+	ASMFLAGS += -mthumb -mabi=aapcs
+	ASMFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
+	ASMFLAGS += -DBOARD_CUSTOM
+	ASMFLAGS += -DNRF52840_MDK_DONGLE
+	#ASMFLAGS += -DCONFIG_GPIO_AS_PINRESET
+	ASMFLAGS += -DDEBUG
+	ASMFLAGS += -DDEBUG_NRF
+	ASMFLAGS += -DFLOAT_ABI_HARD
+	ASMFLAGS += -DNRF52840_XXAA
+	ASMFLAGS += -DSWI_DISABLE0
+
+	SRC_FILES += $(SDK_ROOT)/components/libraries/timer/app_timer.c
+endif
+
+ifeq ($(PLATFORM),BOARD_MDK_CONNECTKIT)
+    LINKER_FILE := config/mdk-connectkit/mdk-connectkit.ld
+    CONF_DIR := config/mdk-connectkit
+    MDK_MOUNTPOINT := $(shell mount | grep UF2BOOT | awk '{print $$3}')
+
+	# C flags common to all targets
+	CFLAGS += $(OPT)
+	CFLAGS += -DBOARD_CUSTOM
+	CFLAGS += -DNRF52840_MDK_CONNECTKIT
 	#CFLAGS += -DCONFIG_GPIO_AS_PINRESET
 	CFLAGS += -DDEBUG
 	CFLAGS += -DDEBUG_NRF
@@ -224,6 +267,7 @@ INC_FOLDERS += \
 	$(SDK_ROOT)/components/libraries/bsp \
 	$(PROJ_DIR) \
 	$(CONF_DIR) \
+	config/common \
 	$(SDK_ROOT)/components/libraries/usbd/class/cdc \
 	$(SDK_ROOT)/components/libraries/balloc \
 	$(SDK_ROOT)/components/libraries/ringbuf \
@@ -311,6 +355,11 @@ ifeq ($(PLATFORM),BOARD_MDK_DONGLE)
 	cp $(OUTPUT_DIRECTORY)/nrf52840_xxaa.hex $(DIST_DIRECTORY)/butterfly-mdk.hex
 	python3 $(CONF_DIR)/uf2conv.py $(DIST_DIRECTORY)/butterfly-mdk.hex -c -f 0xADA52840 -o $(DIST_DIRECTORY)/butterfly-mdk-fwupgrade.uf2
 endif
+ifeq ($(PLATFORM),BOARD_MDK_CONNECTKIT)
+	mkdir -p $(DIST_DIRECTORY)
+	cp $(OUTPUT_DIRECTORY)/nrf52840_xxaa.hex $(DIST_DIRECTORY)/butterfly-mdk-connectkit.hex
+	python3 $(CONF_DIR)/uf2conv.py $(DIST_DIRECTORY)/butterfly-mdk-connectkit.hex -c -f 0xADA52840 -o $(DIST_DIRECTORY)/butterfly-mdk-connectkit-fwupgrade.uf2
+endif
 # Print all targets that can be built
 help:
 	@echo following targets are available:
@@ -352,3 +401,17 @@ ifeq ($(MDK_MOUNTPOINT),)
 	@echo "Mountpoint not detected, aborting ..."
 endif
 endif
+ifeq ($(PLATFORM),BOARD_MDK_CONNECTKIT)
+ifneq ($(MDK_MOUNTPOINT),)
+	@echo "Generating DFU package ..."
+	rm -f $(OUTPUT_DIRECTORY)/flash.uf2
+	python3 $(CONF_DIR)/uf2conv.py $(OUTPUT_DIRECTORY)/nrf52840_xxaa.hex -c -f 0xADA52840 -o $(OUTPUT_DIRECTORY)/flash.uf2
+	@echo "Flashing device ..."
+	cp $(OUTPUT_DIRECTORY)/flash.uf2 $(MDK_MOUNTPOINT)
+	@echo "Done :)"
+endif
+ifeq ($(MDK_MOUNTPOINT),)
+	@echo "Mountpoint not detected, aborting ..."
+endif
+endif
+
