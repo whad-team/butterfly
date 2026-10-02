@@ -2546,8 +2546,14 @@ void BLEController::connectionInitiationAdvertisementProcessing(BLEPacket *pkt) 
 			this->initTimer = this->timerModule->getTimer();
 			this->initTimer->setMode(SINGLE_SHOT);
 			this->initTimer->setCallback((ControllerCallback)&BLEController::sendFirstConnectionPacket, this);
+			/* Anchor to this ADV_IND's own hardware-captured reception
+			 * timestamp, not "now": addPacket() above already ran the full
+			 * synchronous reporting pipeline (BLEPacket/WHAD message
+			 * allocation and serialization, queue push), and under RF
+			 * traffic load that delay alone is enough to push a plain
+			 * start() past this timer's intended BLE slot. */
 			this->initTimer->update(150 + 43*8 + 1250 + this->connectionInitiationData.windowOffset * 1250);
-			this->initTimer->start();
+			this->initTimer->start((int)pkt->getTimestamp());
 		}
 	}
 

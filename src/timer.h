@@ -35,6 +35,7 @@ class Timer {
     void update(int duration, int timestamp);
     void update(int duration);
     void start();
+    void start(int timestamp);
     void stop();
     bool isStarted();
     bool isUsed();
