@@ -788,9 +788,6 @@ bool Radio::disable() {
         while (hasRxDesc()) {
             pushFreeDesc(popRxDesc());
         }
-        if (this->txDesc != NULL) {
-            pushFreeDesc(this->txDesc);
-        }
         while (hasTxDesc()) {
             pushFreeDesc(popTxDesc());
         }
