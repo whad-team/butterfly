@@ -109,17 +109,17 @@ void Timer::update(int duration, int timestamp) {
     this->duration = duration;
     if (this->isStarted()) {
         if (this->base == 4) {
-            NVIC_DisableIRQ(TIMER4_IRQn);
+            //NVIC_DisableIRQ(TIMER4_IRQn);
             NRF_TIMER4->CC[this->id] = timestamp + duration;
             NRF_TIMER4->INTENSET |= 1 << (16+this->id);
-            NVIC_ClearPendingIRQ(TIMER4_IRQn);
-            NVIC_EnableIRQ(TIMER4_IRQn);
+            //NVIC_ClearPendingIRQ(TIMER4_IRQn);
+            //NVIC_EnableIRQ(TIMER4_IRQn);
         } else if (this->base == 3) {
-			NVIC_DisableIRQ(TIMER3_IRQn);
+			//NVIC_DisableIRQ(TIMER3_IRQn);
             NRF_TIMER3->CC[this->id] = timestamp + duration;
             NRF_TIMER3->INTENSET |= 1 << (16+this->id);
-            NVIC_ClearPendingIRQ(TIMER3_IRQn);
-            NVIC_EnableIRQ(TIMER3_IRQn);
+            //NVIC_ClearPendingIRQ(TIMER3_IRQn);
+            //NVIC_EnableIRQ(TIMER3_IRQn);
         }
   }
 }

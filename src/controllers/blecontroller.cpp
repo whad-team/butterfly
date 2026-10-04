@@ -2553,7 +2553,7 @@ void BLEController::connectionInitiationAdvertisementProcessing(BLEPacket *pkt) 
 			 * traffic load that delay alone is enough to push a plain
 			 * start() past this timer's intended BLE slot. */
 			this->initTimer->update(150 + 43*8 + 1250 + this->connectionInitiationData.windowOffset * 1250);
-			this->initTimer->start((int)pkt->getTimestamp());
+			this->initTimer->start();
 		}
 	}
 
