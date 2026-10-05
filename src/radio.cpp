@@ -78,14 +78,6 @@ Radio::Radio() {
 	this->controller = NULL;
 	this->interFrameSpacing = 0;
 	this->filterEnabled = false;
-	/* Radio is heap-allocated (new Radio() in core.cpp), so any member not
-	 * explicitly set here holds whatever garbage was in that heap block, not
-	 * zero. matchingEnable/matchingSize were never initialized: if that
-	 * garbage happened to make isMatchingEnabled() true, enable() would arm
-	 * NRF_RADIO->BCC with a garbage bit count and turn on BCMATCH - a
-	 * hardware feature that fires at an arbitrary bit offset into the
-	 * packet, and nothing in this codebase currently calls enableMatch()
-	 * for BLE, so it should always be off unless explicitly requested. */
 	this->matchingEnable = false;
 	this->matchingSize = 0;
 	this->jammingPatternsEnabled = false;
@@ -132,14 +124,14 @@ Radio::Radio() {
     this->descFreeList.p_prev = &this->descPool[MAX_DESCRIPTORS - 1].header;
 
     /* Other lists are empty (no descriptors, point to NULL). */
-    this->descTxList.p_next = &this->descTxList;
-    this->descTxList.p_prev = &this->descTxList;
     this->descRxList.p_next = &this->descRxList;
     this->descRxList.p_prev = &this->descRxList;
 
     /* Current RX descriptor. */
     this->rxDesc = NULL;
-    this->txDesc = NULL;
+
+    /* No pending TX. */
+    this->pendingTx = false;
 
     /* One-time PPI wiring for address-match-conditional auto-TX-after-RX.
      * Only the static EEP/TEP/FORK/CHG-membership shape is set up here;
@@ -203,7 +195,7 @@ void Radio::armAddressMatchTX() {
          * something queued to send; otherwise a match would route to
          * TASKS_TXEN with PACKETPTR still pointing at the RX descriptor,
          * transmitting garbage. */
-        if (this->isAutoTXafterRXenabled() && (this->txDesc != NULL)) {
+        if (this->isAutoTXafterRXenabled() && this->pendingTx) {
             NRF_PPI->CHENSET = (1 << RADIO_PPI_CH_DEVMATCH);
         } else {
             NRF_PPI->CHENCLR = (1 << RADIO_PPI_CH_DEVMATCH);
@@ -788,13 +780,6 @@ bool Radio::disable() {
         while (hasRxDesc()) {
             pushFreeDesc(popRxDesc());
         }
-        while (hasTxDesc()) {
-            pushFreeDesc(popTxDesc());
-        }
-        if (this->txDesc != NULL) {
-            pushFreeDesc(this->txDesc);
-        }
-        this->txDesc = NULL;
         exitCritical(primask);
 	}
     
@@ -1526,34 +1511,18 @@ bool Radio::reload() {
 }
 
 bool Radio::updateTXBuffer(uint8_t *data, size_t size) {
-    /* Get a free descriptor, return false if no descriptor is available. */
-    radio_desc_t *pkt_desc = popFreeDesc();
-    if (pkt_desc == NULL) {
-        return false;
-    }
-
     /* Descriptor size cannot exceed MAX_PAYLOAD_SIZE. */
     if (size > MAX_PAYLOAD_SIZE) {
         size = MAX_PAYLOAD_SIZE;
     }
 
-    /* Store the provided buffer into the descriptor's memory. */
-    memcpy(pkt_desc->payload, data, size);
-    pkt_desc->size = size;
-    pkt_desc->state = DESC_PENDING;
+    /* Update our TX buffer with the provided data. */
+    memcpy(this->txBuffer, data, size);
 
-    /* Add this descriptor to the descriptors to send. Reading/updating txDesc
-     * itself (as opposed to the TX list) is not protected by pushTxDesc(), so
-     * it must be guarded here against a concurrent RADIO IRQ. */
-    uint32_t primask = enterCritical();
-    if (this->txDesc == NULL) {
-        this->txDesc = pkt_desc;
-        exitCritical(primask);
-    } else {
-        pushTxDesc(pkt_desc);
-        exitCritical(primask);
-    }
+    /* Pending TX buffer to transmit. */
+    this->pendingTx = true;
 
+    /* Success ! */
 	return true;
 }
 
@@ -1576,11 +1545,8 @@ bool Radio::send(uint8_t *data,int size,int frequency, uint8_t channel) {
 	NRF_RADIO->FREQUENCY = frequency;
 	NRF_RADIO->DATAWHITEIV = channel;
 
-    /* Add the provided PDU to our pending TX descriptors. */
-    updateTXBuffer(data, size);
-
-    /* We need to set our PACKETPTR to the first descriptor's payload. */
-	NRF_RADIO->PACKETPTR = (uint32_t)this->txDesc->payload;
+    /* We need to set our PACKETPTR to the provided buffer's address. */
+	NRF_RADIO->PACKETPTR = (uint32_t)data;
 
 	if (this->encryption) {
 		memcpy(this->tmpBuffer, data, size);
@@ -1722,7 +1688,7 @@ extern "C" void RADIO_IRQHandler(void) {
                 case RX:
                     {
                         radio_desc_t *p_pkt = Radio::instance->rxDesc;
-                        if (Radio::instance->isAutoTXafterRXenabled() && (Radio::instance->txDesc != NULL) && Radio::instance->addrMatch) {
+                        if (Radio::instance->isAutoTXafterRXenabled() && Radio::instance->addrMatch && Radio::instance->pendingTx) {
 
                             /* RXEN/TXEN routing for THIS reception was already
                              * decided in hardware by PPI the instant DEVMATCH
@@ -1730,7 +1696,7 @@ extern "C" void RADIO_IRQHandler(void) {
                              * SHORTS here. Safe to write PACKETPTR here though:
                              * this reception is fully complete (we're in the END
                              * handler), so no DMA transfer is in flight anymore. */
-                            NRF_RADIO->PACKETPTR = (uint32_t)(Radio::instance->txDesc->payload);
+                            NRF_RADIO->PACKETPTR = (uint32_t)(Radio::instance->txBuffer);
 
                             /* Update RX descriptor. If we run out of descriptors, keep the
                              * one we have and drop this frame (skip it below) instead of
@@ -1769,7 +1735,7 @@ extern "C" void RADIO_IRQHandler(void) {
                             }
 
                             /* Re-evaluate whether the *next* reception should be
-                             * allowed to auto-TX on a match: txDesc may have been
+                             * allowed to auto-TX on a match: txBuffer may have been
                              * populated (or emptied) since this was last decided.
                              * Safe here for the same reason as above - no transfer
                              * is active yet for the reception this arms. */
@@ -1870,20 +1836,10 @@ extern "C" void RADIO_IRQHandler(void) {
                     {
                         NRF_RADIO->PACKETPTR = (uint32_t)(Radio::instance->rxDesc->payload);
 
-                        /* Free the sent descriptor and fetch a new one. */
-                        uint32_t primask = enterCritical();
-                        Radio::instance->pushFreeDesc(Radio::instance->txDesc);
-                        Radio::instance->txDesc = Radio::instance->popTxDesc();
-                        exitCritical(primask);
+                        /* Pending TX is no more pending (sent). */
+                        Radio::instance->pendingTx = false;
 
-                        /* Re-arm the PPI routing for the reception this TX's own
-                         * DISABLED is about to trigger via RXEN: reset it back to
-                         * the default "go RX" state (DEVMATCH's fork left it
-                         * pointed at "go TX" for this cycle) before that DISABLED
-                         * event occurs, and decide whether the *next* reception
-                         * should auto-TX again based on the txDesc we just fetched.
-                         * Must happen promptly here, before this TX's DISABLED -
-                         * same timing margin PACKETPTR above already relies on. */
+                        /* Re-arm PPI for RX-only. */
                         Radio::instance->armAddressMatchTX();
                         Radio::instance->addrMatch = false;
                         
@@ -1962,10 +1918,6 @@ radio_desc_t *Radio::popFreeDesc(void) {
     return popFromList(&this->descFreeList);
 }
 
-radio_desc_t *Radio::popTxDesc(void) {
-    return popFromList(&this->descTxList);
-}
-
 radio_desc_t *Radio::popRxDesc(void) {
     return popFromList(&this->descRxList);
 }
@@ -1987,10 +1939,6 @@ void Radio::pushIntoList(radio_desc_head_t *p_list, radio_desc_t *p_desc) {
     p_list->p_prev = &p_desc->header;
 
     exitCritical(primask);
-}
-
-void Radio::pushTxDesc(radio_desc_t *p_desc) {
-    pushIntoList(&this->descTxList, p_desc);
 }
 
 void Radio::pushRxDesc(radio_desc_t *p_desc) {
@@ -2021,20 +1969,12 @@ size_t Radio::countList(radio_desc_head_t *p_list) {
     return count;
 }
 
-size_t Radio::countTxDesc(void) {
-    return countList(&this->descTxList);
-}
-
 size_t Radio::countRxDesc(void) {
     return countList(&this->descRxList);
 }
 
 size_t Radio::countFreeDesc(void) {
     return countList(&this->descFreeList);
-}
-
-bool Radio::hasTxDesc(void) {
-    return !isListEmpty(&this->descTxList);
 }
 
 bool Radio::hasRxDesc(void) {

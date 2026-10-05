@@ -92,7 +92,6 @@ class Radio
 
         /* Descriptors lists. */
         radio_desc_head_t descFreeList;
-        radio_desc_head_t descTxList;
         radio_desc_head_t descRxList;
 
 
@@ -105,8 +104,8 @@ class Radio
 		uint8_t txBuffer[MAX_PACKET_SIZE];
 
         radio_desc_t *rxDesc;
-        radio_desc_t *txDesc;
         bool addrMatch;
+        bool pendingTx;
 
         void pushIntoList(radio_desc_head_t *p_list, radio_desc_t *p_desc);
         void pushFreeDesc(radio_desc_t *p_desc);
