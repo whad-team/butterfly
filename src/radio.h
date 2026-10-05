@@ -11,7 +11,7 @@
 
 #define MAX_PACKET_SIZE 257
 #define SCRATCHPAD_SIZE 273
-#define MAX_DESCRIPTORS 30
+#define MAX_RX_DESCRIPTORS 5
 
 class Controller;
 
@@ -88,12 +88,9 @@ class Radio
         void setupAddressMatchPPI();
 
         /* Descriptors pool. */
-        radio_desc_t descPool[MAX_DESCRIPTORS];
-
-        /* Descriptors lists. */
-        radio_desc_head_t descFreeList;
-        radio_desc_head_t descRxList;
-
+        radio_desc_t rxDescPool[MAX_RX_DESCRIPTORS];
+        unsigned int rxHead;
+        unsigned int rxTail;
 
 	public:
 		static Radio *instance;
@@ -103,26 +100,18 @@ class Radio
 		uint8_t rxBuffer[MAX_PACKET_SIZE];
 		uint8_t txBuffer[MAX_PACKET_SIZE];
 
+        /* RX queue management. */
         radio_desc_t *rxDesc;
-        bool addrMatch;
-        bool pendingTx;
+        size_t countFreeRxDesc(void);
+        radio_desc_t *allocRxDesc(void);
+        radio_desc_t *lastRxDesc(void);
+        void freeLastRxDesc(void);
 
-        void pushIntoList(radio_desc_head_t *p_list, radio_desc_t *p_desc);
-        void pushFreeDesc(radio_desc_t *p_desc);
-        void pushTxDesc(radio_desc_t *p_desc);
-        void pushRxDesc(radio_desc_t *p_desc);
-        radio_desc_t *popFromList(radio_desc_head_t *p_list);
-        radio_desc_t *popFreeDesc(void);
-        radio_desc_t *popRxDesc(void);
-        radio_desc_t *popTxDesc(void);
-        size_t countList(radio_desc_head_t *p_list);
-        bool isListEmpty(radio_desc_head_t *p_list);
-        size_t countTxDesc(void);
-        bool hasTxDesc(void);
-        size_t countRxDesc(void);
-        size_t countFreeDesc(void);
-        bool hasRxDesc(void);
-        bool hasFreeDesc(void);
+        /* Device address matching status (when filter is enabled). */
+        bool addrMatch;
+
+        /* TX buffer pending status. */
+        bool pendingTx;
 
         /* Called from RADIO_IRQHandler (a free function, hence public) at
          * every point where RX gets (re-)armed with no DMA transfer active -

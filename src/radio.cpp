@@ -93,41 +93,8 @@ Radio::Radio() {
     /* Update instance reference (pseudo-singleton). */
 	instance = this;
 
-    /* Initialize descriptors pool (linked-list). */
-    for (int i=0; i < MAX_DESCRIPTORS; i++) {
-        this->descPool[i].state = DESC_FREE;
-
-        /* Configure previous and next pointers. */
-        if (i == 0) {
-            this->descPool[i].header.p_prev = &this->descFreeList;
-        } else {
-            this->descPool[i].header.p_prev = &this->descPool[i-1].header;
-        }
-        if (i == (MAX_DESCRIPTORS - 1)) {
-            this->descPool[i].header.p_next = &this->descFreeList;
-        } else {
-            this->descPool[i].header.p_next = &this->descPool[i+1].header;
-        }
-
-        /* Set descriptor as free. */
-        this->descPool[i].state = DESC_FREE;
-
-        /* Initialize descriptor's properties. */
-        this->descPool[i].size = 0;
-        this->descPool[i].crc.value = 0;
-        this->descPool[i].crc.validity = UNKNOWN_CRC; 
-        this->descPool[i].payload[0] = 0x42;
-    }
-
-    /* Initialize free descriptors list to our initial pool. */
-    this->descFreeList.p_next = &this->descPool[0].header;
-    this->descFreeList.p_prev = &this->descPool[MAX_DESCRIPTORS - 1].header;
-
-    /* Other lists are empty (no descriptors, point to NULL). */
-    this->descRxList.p_next = &this->descRxList;
-    this->descRxList.p_prev = &this->descRxList;
-
-    /* Current RX descriptor. */
+    /* Initialize our RX queue. */
+    this->rxHead = this->rxTail = 0;
     this->rxDesc = NULL;
 
     /* No pending TX. */
@@ -777,9 +744,7 @@ bool Radio::disable() {
 
         /* Flush RX list. */
         uint32_t primask = enterCritical();
-        while (hasRxDesc()) {
-            pushFreeDesc(popRxDesc());
-        }
+        this->rxHead = this->rxTail = 0;
         exitCritical(primask);
 	}
     
@@ -1266,14 +1231,9 @@ bool Radio::fastFrequencyChange(int frequency,uint8_t iv) {
 	NRF_RADIO->TASKS_DISABLE = 1;
 	while (NRF_RADIO->EVENTS_DISABLED == 0);
 
-    /* Flush RX list. */
-    while (hasRxDesc()) {
-        pushFreeDesc(popRxDesc());
-    }
-
     /* Change PACKETPTR to current RX descriptor. */
     if (this->rxDesc == NULL) {
-        this->rxDesc = popFreeDesc();
+        this->rxDesc = allocRxDesc();
         if (this->rxDesc == NULL) return false;
     }
     
@@ -1357,7 +1317,7 @@ bool Radio::enable() {
 
         /* Prepare a RX descriptor and configure radio to use it. */
         if (this->rxDesc == NULL) {
-            this->rxDesc = popFreeDesc();
+            this->rxDesc = allocRxDesc();
         }
         if (this->rxDesc != NULL) {
             /* Mark descriptor as pending and insert it into our RX queue. */
@@ -1707,7 +1667,7 @@ extern "C" void RADIO_IRQHandler(void) {
                              * No critical section needed here: popFreeDesc() locks itself,
                              * and rxDesc is only ever touched from this handler or from
                              * enable()/fastFrequencyChange() which disable RADIO_IRQn first. */
-                            radio_desc_t *p_next = Radio::instance->popFreeDesc();
+                            radio_desc_t *p_next = Radio::instance->allocRxDesc();
                             if (p_next != NULL) {
                                 Radio::instance->rxDesc = p_next;
                             } else {
@@ -1726,7 +1686,7 @@ extern "C" void RADIO_IRQHandler(void) {
                              * it, to avoid it being both "free" and the live DMA target.
                              *
                              * No critical section needed here: see the comment above. */
-                            radio_desc_t *p_next = Radio::instance->popFreeDesc();
+                            radio_desc_t *p_next = Radio::instance->allocRxDesc();
                             if (p_next != NULL) {
                                 NRF_RADIO->PACKETPTR = (uint32_t)(p_next->payload);
                                 Radio::instance->rxDesc = p_next;
@@ -1761,7 +1721,7 @@ extern "C" void RADIO_IRQHandler(void) {
                          * seconds. */
                         if (Radio::instance->isFilterEnabled() && !Radio::instance->addrMatch) {
                             if (p_pkt != NULL) {
-                                Radio::instance->pushFreeDesc(p_pkt);
+                                Radio::instance->freeLastRxDesc();
                             }
                             return;
                         }
@@ -1826,7 +1786,7 @@ extern "C" void RADIO_IRQHandler(void) {
                             }
 
                             /* Free descriptor. pushFreeDesc() locks itself. */
-                            Radio::instance->pushFreeDesc(p_pkt);
+                            Radio::instance->freeLastRxDesc();
                         }
                     }
                     break;
@@ -1886,102 +1846,100 @@ extern "C" void RADIO_IRQHandler(void) {
 }
 
 /**
- * Descriptors and list management.
+ * RX FIFO management.
+ *
+ * This is a basic pre-allocated FIFO used to store up to MAX_RX_DESCRIPTORS
+ * RX descriptors (payload + metadata) in a form of a ring buffer.
+ *
+ * Our FIFO is a simple array of `radio_desc_t` structures and we track its
+ * head and tail with `rxHead` and `rxTail`. When `rxHead` and `rxTail` are
+ * equal, the FIFO is empty. 
+ *
+ * When we allocate a descriptor, we simply increments `rxHead` (moving forward)
+ * and return the address of the corresponding descriptor. If `rxHead` is just
+ * behind `rxTail`, the FIFO is full and allocation fails. The allocated descriptor
+ * is then passed to the radio and used to receive a payload.
+ *
+ * Once a payload has been written into the allocated descriptor and processed,
+ * we "free" it by incrementing `rxTail`.
+ *
+ * As a summary:
+ * - `rxTail` never goes past `rxHead`;
+ * - When `rxHead` and `rxTail` are equal, FIFO is empty;
+ * - When next `rxHead` value equals `rxTail`, FIFO is full;
+ * - `rxTail` refers to the last pending RX payload to process;
+ * - `rxHead` refers to the last available buffer where payload must be written.
  **/
 
-radio_desc_t *Radio::popFromList(radio_desc_head_t *p_list) {
-    radio_desc_head_t *p_desc = NULL;
 
-    /* Descriptor lists are shared between the RADIO IRQ and callers running
-     * with interrupts enabled (main loop, timer callbacks, updateTXBuffer()),
-     * so every mutation is protected here, once, rather than relying on each
-     * call site to remember to do it. */
-    uint32_t primask = enterCritical();
+/**
+ * Count the free remaining descriptors in our RX FIFO.
+ **/
 
-    /* Return NULL if list is empty. */
-    if (p_list->p_next != p_list) {
-        /* Pick the first item. */
-        p_desc = p_list->p_next;
-        p_list->p_next = p_desc->p_next;
-        p_list->p_next->p_prev = p_desc->p_prev;
-        p_desc->p_next = NULL;
-        p_desc->p_prev = NULL;
-    }
-
-    exitCritical(primask);
-
-    /* Return descriptor as a pointer to a radio_desc_t structure. */
-    return (radio_desc_t *)p_desc;
-}
-
-radio_desc_t *Radio::popFreeDesc(void) {
-    return popFromList(&this->descFreeList);
-}
-
-radio_desc_t *Radio::popRxDesc(void) {
-    return popFromList(&this->descRxList);
-}
-
-void Radio::pushIntoList(radio_desc_head_t *p_list, radio_desc_t *p_desc) {
-    /* Same reasoning as popFromList(): protect against a concurrent IRQ. */
-    uint32_t primask = enterCritical();
-
-    /* prev <- p_desc */
-    p_desc->header.p_prev = p_list->p_prev;
-
-    /* p_desc -> prev.next */
-    p_desc->header.p_next = p_list->p_prev->p_next;
-
-    /* prev.next -> p_desc */
-    p_list->p_prev->p_next = &p_desc->header;
-
-    /*  p_desc <- tail */
-    p_list->p_prev = &p_desc->header;
-
-    exitCritical(primask);
-}
-
-void Radio::pushRxDesc(radio_desc_t *p_desc) {
-    pushIntoList(&this->descRxList, p_desc);
-}
-
-void Radio::pushFreeDesc(radio_desc_t *p_desc) {
-    /* Clear descriptor. */
-    p_desc->state = DESC_FREE;
-    //p_desc->size = 0;
-    p_desc->crc.validity = UNKNOWN_CRC;
-    p_desc->payload[0] = 0x42;
-    //memset(p_desc->payload, 0, 256);
-    pushIntoList(&this->descFreeList, p_desc);
-}
-
-bool Radio::isListEmpty(radio_desc_head_t *p_list) {
-    return (p_list->p_next == p_list);
-}
-
-size_t Radio::countList(radio_desc_head_t *p_list) {
-    radio_desc_head_t *p = p_list;
+size_t Radio::countFreeRxDesc(void) {
     size_t count = 0;
-    while (p->p_next != p_list) {
-        count++;
-        p = p->p_next;
+
+    /* Check if we still have a free slot. */
+    uint32_t primask = enterCritical();
+    if (this->rxHead < this->rxTail) {
+        count = (this->rxHead + MAX_RX_DESCRIPTORS) - this->rxTail - 1;
+    } else if (this->rxHead > this->rxTail) {
+        count = this->rxHead - this->rxTail;
     }
+    exitCritical(primask);
+    
+    /* Return result. */
     return count;
 }
 
-size_t Radio::countRxDesc(void) {
-    return countList(&this->descRxList);
+
+/**
+ * "Allocate" a new RX descriptor by moving our FIFO's head forward
+ * (if not full) and returning a pointer to the new head's descriptor.
+ **/
+
+radio_desc_t *Radio::allocRxDesc(void) {
+    radio_desc_t *p_slot = NULL;
+    unsigned int new_head = (this->rxHead + 1) % MAX_RX_DESCRIPTORS;
+
+    uint32_t primask = enterCritical();
+    if (new_head != this->rxTail) {
+        /* Move head one slot ahead, return NULL if full. */
+        this->rxHead = new_head;
+        /* Return current slot (head). */
+        p_slot = &this->rxDescPool[this->rxHead];
+    }
+    exitCritical(primask);
+
+    /* Return allocated slot. */
+    return p_slot;
 }
 
-size_t Radio::countFreeDesc(void) {
-    return countList(&this->descFreeList);
+
+/**
+ * Return the last item in our RX FIFO, leaves FIFO's tail
+ * untouched.
+ **/
+
+radio_desc_t *Radio::lastRxDesc(void) {
+    radio_desc_t *p_slot = NULL;
+
+    uint32_t primask = enterCritical();
+    p_slot = &this->rxDescPool[this->rxTail];
+    exitCritical(primask);
+
+    return p_slot;
 }
 
-bool Radio::hasRxDesc(void) {
-    return !isListEmpty(&this->descRxList);
-}
+/**
+ * Advance our RX FIFO's tail ("free" the last descriptor
+ * of the FIFO after it has been processed).
+ **/
 
-bool Radio::hasFreeDesc(void) {
-    return !isListEmpty(&this->descFreeList);
+void Radio::freeLastRxDesc(void) {
+    uint32_t primask = enterCritical();
+    if (this->rxTail != this->rxHead) {
+        this->rxTail = (this->rxTail + 1) % MAX_RX_DESCRIPTORS;
+    }
+    exitCritical(primask);
 }
-

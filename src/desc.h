@@ -14,16 +14,7 @@ typedef enum {
     DESC_DONE       /* Descriptor successfully sent/received, can be post-processed and freed. */
 } radio_desc_state_t;
 
-typedef struct _radio_desc_head_t {
-    /* Linked-list pointers. */
-    struct _radio_desc_head_t *p_prev;
-    struct _radio_desc_head_t *p_next;
-} radio_desc_head_t;
-
 typedef struct _radio_desc_t {
-    /* Descriptor header. */
-    radio_desc_head_t header;
-
     /* Current descriptor state. */
     radio_desc_state_t state;
 
@@ -35,10 +26,5 @@ typedef struct _radio_desc_t {
     CrcValue crc;
     uint8_t rssi;
 } radio_desc_t;
-
-radio_desc_t *radio_desc_pop(radio_desc_head_t *p_list);
-void radio_desc_push(radio_desc_head_t *p_list, radio_desc_t *p_desc);
-bool is_desc_list_empty(radio_desc_head_t *p_list);
-size_t desc_list_count(radio_desc_head_t *p_list);
 
 #endif /* RADIO_DESC_H */
