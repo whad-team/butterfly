@@ -11,9 +11,16 @@
 
 #define MAX_PACKET_SIZE 257
 #define SCRATCHPAD_SIZE 273
-#define MAX_RX_DESCRIPTORS 5
+#define MAX_RX_DESCRIPTORS 30
 
 class Controller;
+
+enum class FilterMode {
+    Disabled,
+    RxOnly,
+    TxOnly,
+    RxTx
+};
 
 class Radio
 {
@@ -109,6 +116,9 @@ class Radio
 
         /* Device address matching status (when filter is enabled). */
         bool addrMatch;
+        bool reportPdu;
+        bool switchToTx;
+        FilterMode filterMode;
 
         /* TX buffer pending status. */
         bool pendingTx;
@@ -159,7 +169,7 @@ class Radio
 		bool setPrefixes(uint8_t a,uint8_t b,uint8_t c, uint8_t d, uint8_t e, uint8_t f);
 		bool setPrefixes(uint8_t a,uint8_t b,uint8_t c, uint8_t d, uint8_t e, uint8_t f, uint8_t g);
 
-		bool enableFilter(BLEAddress address);
+		bool enableFilter(BLEAddress address, FilterMode mode);
 		bool isFilterEnabled();
 		bool disableFilter();
 
@@ -184,6 +194,7 @@ class Radio
 		bool setTxPower(int txPower);
 
 		bool isAutoTXafterRXenabled();
+        bool mustSwitchToTx(void); 
 		bool enableAutoTXafterRX();
 		bool disableAutoTXafterRX();
 
@@ -248,6 +259,18 @@ class Radio
 
 		bool send(uint8_t *data,int size, int frequency, uint8_t channel);
 
+        /**
+         * Event handlers
+         **/
+
+        void onDevMatchEvt();
+        void onDevMissEvt();
+        void onEnergyDetectionEvt();
+        void onRssiEvt();
+        void onPacketEvt();
+
+        bool hasPendingRx();
+        void processPendingRx();
 
         /**
          * Descriptors

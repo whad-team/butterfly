@@ -25,6 +25,7 @@ typedef struct _radio_desc_t {
     /* Metadata. */
     CrcValue crc;
     uint8_t rssi;
+    uint32_t timestamp;
 } radio_desc_t;
 
 #endif /* RADIO_DESC_H */

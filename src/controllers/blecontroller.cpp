@@ -878,7 +878,7 @@ void BLEController::start() {
 		this->setHardwareConfiguration(0x8e89bed6, 0x555555);
 
         /* Disable hardware address filtering. */
-        this->setFilter(true, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF);
+        this->setFilter(true, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, FilterMode::Disabled);
 
         /* Configure radio if active scanning is required. */
 		if (this->activeScanning) {
@@ -1456,7 +1456,7 @@ void BLEController::startScanning(bool active) {
 
 void BLEController::followAdvertisingDevice(uint8_t a,uint8_t b,uint8_t c,uint8_t d,uint8_t e,uint8_t f) {
 	this->controllerState = COLLECTING_ADVINTERVAL;
-	this->setFilter(true, a,b,c,d,e,f);
+	this->setFilter(true, a,b,c,d,e,f, FilterMode::RxOnly);
 	this->collectedIntervals = 0;
 	this->setChannel(37);
 }
@@ -1474,7 +1474,7 @@ void BLEController::calculateAdvertisingIntervals() {
 	this->controllerState = SNIFFING_ADVERTISEMENTS;
 	this->collectedIntervals = 0;
 }
-void BLEController::setFilter(bool hardwareFilter, uint8_t a,uint8_t b,uint8_t c,uint8_t d,uint8_t e,uint8_t f) {
+void BLEController::setFilter(bool hardwareFilter, uint8_t a,uint8_t b,uint8_t c,uint8_t d,uint8_t e,uint8_t f, FilterMode mode) {
 	this->filter.bytes[0] = a;
 	this->filter.bytes[1] = b;
 	this->filter.bytes[2] = c;
@@ -1492,7 +1492,7 @@ void BLEController::setFilter(bool hardwareFilter, uint8_t a,uint8_t b,uint8_t c
 		else {
 
 			//this->radio->disable();
-			this->radio->enableFilter(this->filter);
+			this->radio->enableFilter(this->filter, mode);
 			this->radio->reload();
 		}
 	}
@@ -1541,7 +1541,7 @@ bool BLEController::newAdvertisingTransmission() {
 	}
 
 	// Configure radio to monitor only advertisements from targeted device (hardware filter needed)
-	this->setFilter(false, this->own.bytes[5], this->own.bytes[4],this->own.bytes[3], this->own.bytes[2], this->own.bytes[1],this->own.bytes[0]);
+	this->setFilter(false, this->own.bytes[5], this->own.bytes[4],this->own.bytes[3], this->own.bytes[2], this->own.bytes[1],this->own.bytes[0], FilterMode::RxOnly);
 
 	this->advertisingData.lastAdvertisingEvent = this->timerModule->getTimestamp();
 	uint8_t *adv_ind;
@@ -2435,7 +2435,7 @@ void BLEController::connect(uint8_t *address, bool random,  uint32_t accessAddre
     this->radio->disable();
 
 	// Configure radio to monitor only advertisements from targeted device (hardware filter needed)
-	this->setFilter(true, address[0], address[1], address[2], address[3], address[4], address[5]);
+	this->setFilter(true, address[0], address[1], address[2], address[3], address[4], address[5], FilterMode::RxTx);
 
 	// Send the packet
 	this->radio->updateTXBuffer(connection_request, connection_request_size);
@@ -2553,7 +2553,7 @@ void BLEController::connectionInitiationAdvertisementProcessing(BLEPacket *pkt) 
 			 * traffic load that delay alone is enough to push a plain
 			 * start() past this timer's intended BLE slot. */
 			this->initTimer->update(150 + 43*8 + 1250 + this->connectionInitiationData.windowOffset * 1250);
-			this->initTimer->start();
+			this->initTimer->start(pkt->getTimestamp());
 		}
 	}
 

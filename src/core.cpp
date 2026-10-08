@@ -985,7 +985,8 @@ void Core::processBLEInputMessage(whad::ble::BleMsg bleMsg) {
                                             bd_addr[3],
                                             bd_addr[2],
                                             bd_addr[1],
-                                            bd_addr[0]
+                                            bd_addr[0],
+                                            FilterMode::RxOnly
             );
             this->bleController->setFollowMode(false);
             this->bleController->sniff();
@@ -1018,7 +1019,8 @@ void Core::processBLEInputMessage(whad::ble::BleMsg bleMsg) {
                 bd_address[3],
                 bd_address[2],
                 bd_address[1],
-                bd_address[0]
+                bd_address[0],
+                FilterMode::RxOnly
             );
             this->bleController->setFollowMode(true);
             this->bleController->sniff();
@@ -2297,7 +2299,6 @@ void core_send_bytes(uint8_t *p_bytes, int size)
 {
     if (Core::instance != NULL)
     {
-        //Core::instance->getLedModule()->off(LED2);
         Core::instance->getSerialModule()->send(p_bytes, size);
     }
     else
@@ -2479,7 +2480,7 @@ void Core::pushMessageToQueue(Message *msg) {
 Message* Core::popMessageFromQueue() {
 	if (this->messageQueue.size == 0) return NULL;
 	else {
-		MessageQueueElement* element = this->messageQueue.firstElement;
+	aMessageQueueElement* element = this->messageQueue.firstElement;
 		Message* msg = element->message;
 		this->messageQueue.firstElement = element->nextElement;
 		this->messageQueue.size = this->messageQueue.size - 1;
@@ -2500,29 +2501,20 @@ void Core::loop() {
 	while (true) {
 
 		this->serialModule->process();
-		//this->getLedModule()->on(LED1);
 
 		/* Check if we receveived a WHAD message. */
 		if (whad_get_message(&msg) == WHAD_SUCCESS)
 		{
-		    //this->getLedModule()->off(LED1);
-		    //this->getLedModule()->on(LED2);
+            /* Process message. */
 		    this->processInputMessage(msg);
 		}
+
+        /* Check if we have a message to send to host. */
 		if (message != NULL) {
-		  if (whad_send_message(message) == WHAD_ERROR)
-		  {
-		      //this->getLedModule()->on(LED1);
-		  }
+		  whad_send_message(message);
 		  free(message);
-		  message = this->popMessageFromQueue();
-		}
-		else {
-		  message = this->popMessageFromQueue();
-		}
-		// Even if we miss an event enabling USB, USB event would wake us up.
-		__WFE();
-		// Clear SEV flag if CPU was woken up by event
-		__SEV();
+        }
+        
+        message = this->popMessageFromQueue();
     }
 }
