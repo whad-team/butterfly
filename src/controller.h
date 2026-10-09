@@ -19,6 +19,7 @@ class Controller {
 		virtual void start() = 0;
 		virtual void stop() = 0;
 		virtual void onReceive(uint32_t timestamp,uint8_t size,uint8_t *buffer,CrcValue crcValue,uint8_t rssi) = 0;
+        void onSent(uint32_t timestamp);
 		virtual void onJam(uint32_t timestamp) = 0;
 		virtual void onMatch(uint8_t *buffer, size_t size) = 0;
 		virtual void onEnergyDetection(uint32_t timestamp, uint8_t value) = 0;

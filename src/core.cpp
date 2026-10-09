@@ -2480,7 +2480,7 @@ void Core::pushMessageToQueue(Message *msg) {
 Message* Core::popMessageFromQueue() {
 	if (this->messageQueue.size == 0) return NULL;
 	else {
-	aMessageQueueElement* element = this->messageQueue.firstElement;
+	    MessageQueueElement* element = this->messageQueue.firstElement;
 		Message* msg = element->message;
 		this->messageQueue.firstElement = element->nextElement;
 		this->messageQueue.size = this->messageQueue.size - 1;

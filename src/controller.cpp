@@ -42,6 +42,16 @@ void Controller::sendDebug(const char* msg) {
     delete message;
 }
 
+/**
+ * @brief   Called when a packet has been sent by the radio.
+ *
+ * @param[in]   timestamp   Timestamp (us) when the packet has been sent
+ * @param[in]   size        Packet size
+ * @param[in]   buffer      Packet bytes
+ */
+
+void Controller::onSent(uint32_t timestamp) {
+}
 
 /**
  * @brief   Create a WHAD notification message from a received packet.

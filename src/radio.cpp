@@ -1750,6 +1750,17 @@ bool Radio::mustSwitchToTx(void) {
     }
 }
 
+
+/**
+ * Device match event handler.
+ *
+ * This event handler determine based on the current filter mode and auto TX feature
+ * if Radio needs to transmit a pending TX buffer once the current payload received.
+ * 
+ * Deciding before the complete reception of the payload saves time and makes the
+ * END event handler faster.
+ **/
+
 void Radio::onDevMatchEvt() {
     this->addrMatch = true;
 
@@ -1768,6 +1779,19 @@ void Radio::onDevMatchEvt() {
             break;
     }
 }
+
+
+/**
+ * Device miss event handler.
+ *
+ * This handler is called when filtering is enabled and current payload does not
+ * match. Decision to switch the radio in TX mode once the current payload received
+ * is solely based on the current filtering mode, auto TX feature and if a pending
+ * TX buffer is present.
+ *
+ * The same conditions applied when the radio was first configured and on device match
+ * through PPI, so we definitely need to set a TX buffer if TX is already planned.
+ **/
 
 void Radio::onDevMissEvt() {
     this->addrMatch = false;
@@ -1798,6 +1822,11 @@ void Radio::onDevMissEvt() {
     }
 }
 
+
+/**
+ * Energy detection event handler.
+ **/
+
 void Radio::onEnergyDetectionEvt() {
     uint8_t sample = NRF_RADIO->EDSAMPLE;
     NRF_TIMER4->TASKS_CAPTURE[5] = 1UL;
@@ -1809,12 +1838,38 @@ void Radio::onEnergyDetectionEvt() {
     }
 }
 
+
+/**
+ * RSSI event handler.
+ *
+ * Updates the current RX descriptor's RSSI.
+ **/
+
 void Radio::onRssiEvt() {
     /* Set current RX descriptor RSSI. */
     if (this->rxDesc != NULL) {
         this->rxDesc->rssi = NRF_RADIO->RSSISAMPLE;
     }
 }
+
+
+/**
+ * END event handler.
+ *
+ * This is the main and more complex event handler that processes
+ * incoming payloads and automatically configures the radio for the
+ * next event (TX or RX).
+ *
+ * It is also in charge to notify the controller that a payload has
+ * been received, taking advantage of the radio' shorts that make it
+ * automatically switch from one mode to another, as well as automatically
+ * handle the next TX or RX event. This gives us a few microseconds to
+ * forward the received payload to the controller before a new payload
+ * is received and this IRQ triggered again.
+ *
+ * This event handler is *very sensitive* to timing, be careful when
+ * modifying it.
+ **/
 
 void Radio::onPacketEvt() {
     /* Retrieve the current timestamp. */
@@ -1998,6 +2053,11 @@ void Radio::onPacketEvt() {
                     
                     /* Next step: process received frame. */
                     setState(RX);
+
+                    /* Notify controller packet has successfully been sent. */
+                    if (this->controller != NULL) {
+                        this->controller->onSent(now);
+                    }
 
                     bsp_board_led_off(0);
                 }

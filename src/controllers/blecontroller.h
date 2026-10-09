@@ -319,6 +319,9 @@ class BLEController : public Controller {
 		AdvertisingData advertisingData;
 		EncryptionData encryptionData;
 
+        /* Active scan */
+        bool scanReqSent; 
+
 	public:
 		static int channelToFrequency(int channel);
 
@@ -521,5 +524,8 @@ class BLEController : public Controller {
 		void onMatch(uint8_t *buffer, size_t size);
 		void onJam(uint32_t timestamp);
 		void onEnergyDetection(uint32_t timestamp, uint8_t value);
+        void onSent(uint32_t timestamp);
+
+        void scanReqFailed();
 };
 #endif

@@ -882,6 +882,7 @@ void BLEController::start() {
 
         /* Configure radio if active scanning is required. */
 		if (this->activeScanning) {
+            this->scanReqSent = false;
 			this->radio->enableAutoTXafterRX();
 			this->radio->setInterFrameSpacing(145);
 			this->radio->setFastRampUpTime(false);
@@ -892,7 +893,7 @@ void BLEController::start() {
 			this->scanningTimer = this->timerModule->getTimer();
 			this->scanningTimer->setMode(REPEATED);
 			this->scanningTimer->setCallback((ControllerCallback)&BLEController::goToNextChannel, this);
-			this->scanningTimer->update(this->scanningInterval);
+			this->scanningTimer->update(1000000); /* 1s */
 			this->scanningTimer->start();
 		}
 	}
@@ -2422,27 +2423,30 @@ void BLEController::connect(uint8_t *address, bool random,  uint32_t accessAddre
 			this->connectionInitiationData.hopIncrement,
 			this->connectionInitiationData.channelMap
 	);
-#if 0
-    BLEPacket::forgeScanRequest(
-            &connection_request,
-            &connection_request_size,
-            this->own.bytes,
-            this->ownRandom,
-            address,
-            random
-    );
-#endif
+
+    /* Disable radio first. */
     this->radio->disable();
 
-	// Configure radio to monitor only advertisements from targeted device (hardware filter needed)
+	/* Configure radio to monitor only advertisements from targeted device (hardware filter needed) */
 	this->setFilter(true, address[0], address[1], address[2], address[3], address[4], address[5], FilterMode::RxTx);
 
-	// Send the packet
+	/* Copy the connection request into radio's TX buffer. */
 	this->radio->updateTXBuffer(connection_request, connection_request_size);
 	free(connection_request);
 
-	// Enter Connection Initiation mode
+	/* Entering connection initiation mode. */
 	this->controllerState = CONNECTION_INITIATION;
+
+    /* 
+     * Enable radio. Radio will be configured in RX mode by default with auto TX and address filtering.
+     * Only a PDU coming from the target BLE device will cause the radio to send our connection request,
+     * and the controller will be notified of this received PDU as soon as it is received (while the radio
+     * is sending the connection request in response).
+     *
+     * Enabling the radio basically starts the automatic connection request transmission and the received
+     * advertising PDU (from our target device) is handled by the controller's onReceive() method, causing
+     * it to send the first connection packet and synchronize with the target device.
+     */
     this->radio->enable();
 }
 
@@ -2594,7 +2598,8 @@ void BLEController::connectionInitiationConnectedSlaveProcessing(BLEPacket *pkt)
 	}
 }
 void BLEController::advertisementScanningProcessing(BLEPacket *pkt) {
-    if (this->activeScanning) {
+    /* If in active scan mode and no scan request sent, let's send a new scan request. */
+    if (this->activeScanning && !this->scanReqSent) {
 		// Build connection request
 		size_t scan_request_size;
 		uint8_t *scan_request;
@@ -2602,6 +2607,9 @@ void BLEController::advertisementScanningProcessing(BLEPacket *pkt) {
 		uint8_t address[6];
 		bool random;
 		if (pkt->extractAdvertiserAddress(address, &random)) {
+            /* Scan request planned for TX. */
+            this->scanReqSent = true;
+
 			BLEPacket::forgeScanRequest(
 					&scan_request,
 					&scan_request_size,
@@ -2610,10 +2618,37 @@ void BLEController::advertisementScanningProcessing(BLEPacket *pkt) {
 					address,
 					random
 			);
-			//bsp_board_led_invert(0);
+
+            /* Configure a timeout timer to discard the scan request if no response is received after a delay. */
+            if (this->timeoutTimer == NULL) {
+                this->timeoutTimer = this->timerModule->getTimer();
+            }
+
+            this->timeoutTimer->setMode(SINGLE_SHOT);
+            this->timeoutTimer->setCallback((ControllerCallback)&BLEController::scanReqFailed, this);
+            this->timeoutTimer->update(this->scanningInterval);
+            this->timeoutTimer->start();
+
+            /*
+             * Reconfigure radio to enable TX filtering with auto TX. In this mode,
+             * radio will continue sending all received PDUs but will send our TX buffer
+             * only if the AdvA field matches the given address.
+             *
+             * Once the scan request sent, TX buffer will be empty and we can send another
+             * scan request for another device.
+             */
+            
+            this->radio->disable();
+            this->setFilter(true, address[0], address[1], address[2], address[3], address[4], address[5], FilterMode::TxOnly);
+            this->radio->setFastRampUpTime(false);
+            this->radio->setInterFrameSpacing(150);
+            this->radio->enableAutoTXafterRX();
+			this->radio->setInterFrameSpacing(145);
+			this->radio->setFastRampUpTime(false);
 			this->radio->updateTXBuffer(scan_request, scan_request_size);
 			free(scan_request);
-		}
+            this->radio->enable();
+        }
 	}
 	// Update the packet direction
 	pkt->updateSource(DIRECTION_UNKNOWN);
@@ -3217,5 +3252,24 @@ whad::ble::Phy BLEController::getPhy() {
 
         default:
             return whad::ble::Phy::Undefined;
+    }
+}
+
+void BLEController::onSent(uint32_t timestamp) {
+    if ((this->controllerState == SCANNING) && this->activeScanning) {
+        /* Scanning request has been sent. */
+        this->scanReqSent = false;
+
+        /* Stop timeout timer. */
+        if (this->timeoutTimer != NULL) {
+            this->timeoutTimer->stop();
+        }
+    }
+}
+
+void BLEController::scanReqFailed() {
+    if ((this->controllerState == SCANNING) && this->activeScanning) {
+        /* Scanning request has been sent. */
+        this->scanReqSent = false;
     }
 }
