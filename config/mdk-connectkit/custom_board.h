@@ -47,23 +47,30 @@ extern "C" {
 #include "nrf_gpio.h"
 
 // LEDs definitions for nRF52840 MDK CONNECT KIT
-#define LEDS_NUMBER    3
+#define LEDS_NUMBER    4
 
-#define LED_1          NRF_GPIO_PIN_MAP(1,10)
-#define LED_2          NRF_GPIO_PIN_MAP(1,11)
-#define LED_3          NRF_GPIO_PIN_MAP(1,12)
-#define LED_START      LED_1
+#define LED1_G          NRF_GPIO_PIN_MAP(1,15)
+#define LED2_R          NRF_GPIO_PIN_MAP(1,10)
+#define LED2_G          NRF_GPIO_PIN_MAP(1,11)
+#define LED2_B          NRF_GPIO_PIN_MAP(1,12)
+#define LED_START      LED_0
 #define LED_STOP       LED_3
 
 #define LEDS_ACTIVE_STATE 0
 
-#define LEDS_LIST { LED_1, LED_2, LED_3 }
+#define LED_1           LED1_G
+#define LED_2           LED2_R
+#define LED_3           LED2_G
+#define LED_4           LED2_B
+
+#define LEDS_LIST { LED_1, LED_2, LED_3, LED_4 }
 
 #define LEDS_INV_MASK  LEDS_MASK
 
-#define BSP_LED_0      42
-#define BSP_LED_1      43
-#define BSP_LED_2      44
+#define BSP_LED_0       LED_1
+#define BSP_LED_1       LED_2
+#define BSP_LED_2       LED_3
+#define BSP_LED_3       LED_4
 
 #define BUTTONS_NUMBER 1
 
