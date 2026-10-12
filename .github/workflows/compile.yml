@@ -30,4 +30,8 @@ jobs:
         rm -rf .sdk/nRF5_SDK_17.1.0_ddde560/components/toolchain/gcc/Makefile.posix
         echo -ne "GNU_INSTALL_ROOT ?= $(pwd)/.toolchain/arm-gnu-toolchain-14.3.rel1-x86_64-arm-none-eabi/bin/\nGNU_VERSION ?= 14.3.1\nGNU_PREFIX ?= arm-none-eabi\n" > .sdk/nRF5_SDK_17.1.0_ddde560/components/toolchain/gcc/Makefile.posix
     - name: make
-      run: make SDK_ROOT=$(pwd)/.sdk/nRF5_SDK_17.1.0_ddde560
+      run: |
+        make SDK_ROOT=$(pwd)/.sdk/nRF5_SDK_17.1.0_ddde560
+        make clean SDK_ROOT=$(pwd)/.sdk/nRF5_SDK_17.1.0_ddde560 && make PLATFORM=BOARD_MDK_DONGLE SDK_ROOT=$(pwd)/.sdk/nRF5_SDK_17.1.0_ddde560 
+        make clean SDK_ROOT=$(pwd)/.sdk/nRF5_SDK_17.1.0_ddde560 && make PLATFORM=BOARD_MDK_CONNECTKIT SDK_ROOT=$(pwd)/.sdk/nRF5_SDK_17.1.0_ddde560 
+
