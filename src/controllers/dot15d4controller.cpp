@@ -438,12 +438,7 @@ void Dot15d4Controller::checkAndExecuteTx(uint64_t current_slot) {
 			}
 
 			this->sendTimer->setMode(SINGLE_SHOT);
-			int32_t offset = 10000 * (
-				this->getNetwork()->getAsn() - this->getNetwork()->getLastSyncASN()
-			 ) - (
-				TimerModule::instance->getTimestamp() - this->getNetwork()->getLastSyncTimestamp()
-			);
-			offset += this->txQueue[i].wait_offset;
+			int32_t offset = this->txQueue[i].wait_offset;
 			
 			if (offset <= 200) {
 				this->sendNow();
