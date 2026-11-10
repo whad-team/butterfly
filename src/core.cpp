@@ -798,7 +798,8 @@ void Core::processBLEInputMessage(whad::ble::BleMsg bleMsg) {
                 bd_address[1],
                 bd_address[0]
             };
-            this->bleController->setOwnAddress(address, false);
+            bool is_random = query.getAddress()->getType() != (whad::ble::AddressType)ble_BleAddrType_PUBLIC;
+            this->bleController->setOwnAddress(address, is_random);
             response = new whad::generic::Success();
         }
         break;
