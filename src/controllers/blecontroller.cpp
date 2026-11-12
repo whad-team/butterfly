@@ -2,6 +2,15 @@
 #include "../core.h"
 #include <whad.h>
 
+// BLE packet counter
+static inline void set_ccm_counter(EncryptionData *e, uint32_t c) {
+	e->counter[0] = (uint8_t)(c);
+	e->counter[1] = (uint8_t)(c >> 8);
+	e->counter[2] = (uint8_t)(c >> 16);
+	e->counter[3] = (uint8_t)(c >> 24);
+	e->counter[4] = 0;
+}
+
 /**
  * Divide round helper.
  **/
@@ -70,6 +79,9 @@ BLEController::BLEController(Radio *radio) : Controller(radio) {
 	this->controllerState = IDLE;
 	this->advertisementsTransmitIndicator = true;
 	this->softwareFilterEnabled = false;
+
+	this->masterQueueHead = 0;
+	this->masterQueueTail = 0;
 
     /* Set legacy channel selection algorithm. */
     this->csa = CSA1;
@@ -220,13 +232,16 @@ void BLEController::setOwnAddress(uint8_t *address, bool random) {
 }
 
 bool BLEController::configureEncryption(uint8_t *key, uint8_t *iv, uint32_t counter) {
-	for (int i=0;i<16;i++) this->encryptionData.key[i] = key[i];
-	for (int i=0;i<8;i++) this->encryptionData.iv[i] = iv[7-i]; //memcpy(this->encryptionData.iv, iv, 8);
+	memcpy(this->encryptionData.key, key, 16);
+	memcpy(this->encryptionData.iv,  iv,  8);
 	this->encryptionData.direction = 0;
+	set_ccm_counter(&this->encryptionData, counter);
 	return true;
 }
 
 bool BLEController::startEncryption() {
+	this->encTxCounter = 0;
+	this->encRxCounter = 0;
 	this->radio->enableEncryption((uint32_t)&(this->encryptionData));
 	return true;
 }
@@ -603,6 +618,9 @@ void BLEController::applyConnectionUpdate() {
 	}
 }
 void BLEController::setAttackPayload(uint8_t *payload, size_t size) {
+	if (size > sizeof(this->attackStatus.payload)) {
+		size = sizeof(this->attackStatus.payload);
+	}
 	for (size_t i=0;i<size;i++) {
 		this->attackStatus.payload[i] = payload[i];
 	}
@@ -610,6 +628,9 @@ void BLEController::setAttackPayload(uint8_t *payload, size_t size) {
 }
 
 void BLEController::setSlavePayload(uint8_t *payload, size_t size) {
+	if (size > sizeof(this->slavePayload.payload)) {
+		size = sizeof(this->slavePayload.payload);
+	}
 	for (size_t i=0;i<size;i++) {
 		this->slavePayload.payload[i] = payload[i];
 	}
@@ -620,13 +641,29 @@ void BLEController::setSlavePayload(uint8_t *payload, size_t size) {
 }
 
 void BLEController::setMasterPayload(uint8_t *payload, size_t size) {
-	for (size_t i=0;i<size;i++) {
-		this->masterPayload.payload[i] = payload[i];
+	if (size > sizeof(this->masterPayload.payload)) {
+		size = sizeof(this->masterPayload.payload);
 	}
-	this->masterPayload.size = size;
+	uint8_t next = (this->masterQueueTail + 1) % MASTER_PAYLOAD_QUEUE_SIZE;
+	if (next != this->masterQueueHead) {
+		BLEPayload *slot = &this->masterPayloadQueue[this->masterQueueTail];
+		memcpy(slot->payload, payload, size);
+		slot->size = size;
+		this->masterQueueTail = next;
+	}
+}
+
+void BLEController::loadNextMasterPayload() {
+	if (this->masterQueueHead == this->masterQueueTail) {
+		return; // queue empty
+	}
+	BLEPayload *slot = &this->masterPayloadQueue[this->masterQueueHead];
+	memcpy(this->masterPayload.payload, slot->payload, slot->size);
+	this->masterPayload.size = slot->size;
 	this->masterPayload.transmitted = false;
 	this->masterPayload.responseReceived = false;
 	this->masterPayload.lastTransmitInstant = 0;
+	this->masterQueueHead = (this->masterQueueHead + 1) % MASTER_PAYLOAD_QUEUE_SIZE;
 }
 
 bool BLEController::stopConnection() {
@@ -1823,6 +1860,10 @@ void BLEController::executeAttack() {
 
 bool BLEController::masterRoleCallback(BLEPacket *pkt) {
 
+	// BLE CCM nonce for a central: encrypt our OUTGOING packet with direction=1
+	this->encryptionData.direction = 1;
+	set_ccm_counter(&this->encryptionData, this->encTxCounter);
+
 	if (!this->masterPayload.transmitted) {
 
 		if ((this->masterPayload.payload[0] & 0x10) != 0) {
@@ -1844,7 +1885,9 @@ bool BLEController::masterRoleCallback(BLEPacket *pkt) {
 		this->temporaryPayload.size = 2;
 		this->radio->send(this->temporaryPayload.payload, this->temporaryPayload.size, BLEController::channelToFrequency(this->channel), this->channel);
 	}
-	this->encryptionData.direction = 1 - this->encryptionData.direction;
+
+	this->encryptionData.direction = 0;
+	set_ccm_counter(&this->encryptionData, this->encRxCounter);
 	return true;
 }
 
@@ -2346,7 +2389,7 @@ void BLEController::connect(uint8_t *address, bool random,  uint32_t accessAddre
 	this->controllerState = CONNECTION_INITIATION;
 
 	// Configure encryption counter
-	this->encryptionData.counter = 0;
+	set_ccm_counter(&this->encryptionData, 0);
 
 	// Configure Hardware to monitor advertisements
 	this->setHardwareConfiguration(0x8e89bed6,0x555555);
@@ -2427,6 +2470,9 @@ void BLEController::initializeConnection() {
 	this->channel = this->nextChannel();
 
 	this->masterPayload.transmitted = true;
+	// Drop any master payloads left queued from a previous connection.
+	this->masterQueueHead = 0;
+	this->masterQueueTail = 0;
 	this->mdSequence = false;
 	this->mdCount = 0;
 
@@ -2745,6 +2791,9 @@ void BLEController::masterSimulationControlFlowProcessing(BLEPacket *pkt) {
 	if (this->simulatedMasterSequenceNumbers.nesn == pkt->extractSN()) {
 		// Increment the local nextExpectedSeqNum counter
 		this->simulatedMasterSequenceNumbers.nesn = (this->simulatedMasterSequenceNumbers.nesn + 1) % 2;
+		if (pkt->extractPayloadLength() > 0) {
+			this->encRxCounter++;
+		}
 	}
 	// If the NESN of the received packet is different than our sn, the slave acknowledged our packet
 	if (this->simulatedMasterSequenceNumbers.sn != pkt->extractNESN()) {
@@ -2755,6 +2804,7 @@ void BLEController::masterSimulationControlFlowProcessing(BLEPacket *pkt) {
 		if (!this->masterPayload.transmitted) {
 			this->masterPayload.lastTransmitInstant = this->connectionEventCount;
 			this->masterPayload.transmitted = true;
+			this->encTxCounter++;
 		}
 
 		// Retransmit the packet if we didn't got a response (if needed !) after 10 connection events
@@ -2766,6 +2816,9 @@ void BLEController::masterSimulationControlFlowProcessing(BLEPacket *pkt) {
 				this->masterPayload.responseReceived = false;
 				this->masterPayload.transmitted = false;
 			}
+		}
+		if (this->masterPayload.transmitted && this->masterQueueHead != this->masterQueueTail) {
+			this->loadNextMasterPayload();
 		}
 	}
 	if (this->mdSequence && this->mdCount > 0) {

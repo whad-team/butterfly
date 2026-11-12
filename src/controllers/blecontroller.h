@@ -201,11 +201,12 @@ typedef struct AdvertisingData {
 	bool connectable;
 } AdvertisingData;
 
-typedef struct EncryptionData {
-	uint8_t key[16];
-	uint32_t counter;
-	uint32_t direction;
-	uint8_t iv[8];
+typedef struct __attribute__((packed)) EncryptionData {
+	uint8_t key[16];       
+	uint8_t counter[5];    // (39-bit packet counter, little-endian)
+	uint8_t _reserved[3];  // (padding; keeps DIRECTION at offset 24)
+	uint8_t direction;     
+	uint8_t iv[8];         
 } EncryptionData;
 
 
@@ -284,6 +285,11 @@ class BLEController : public Controller {
 		BLEPayload masterPayload;
 		BLEPayload temporaryPayload;
 
+		static const uint8_t MASTER_PAYLOAD_QUEUE_SIZE = 8;
+		BLEPayload masterPayloadQueue[MASTER_PAYLOAD_QUEUE_SIZE];
+		volatile uint8_t masterQueueHead;
+		volatile uint8_t masterQueueTail;
+
 		// Advertising interval related
 		uint32_t timestampsFirstChannel[ADV_REPORT_SIZE];
 		uint32_t timestampsThirdChannel[ADV_REPORT_SIZE];
@@ -306,6 +312,9 @@ class BLEController : public Controller {
 
 		AdvertisingData advertisingData;
 		EncryptionData encryptionData;
+		
+		uint32_t encTxCounter;
+		uint32_t encRxCounter;
 
 	public:
 		static int channelToFrequency(int channel);
@@ -435,6 +444,7 @@ class BLEController : public Controller {
 
 		void setSlavePayload(uint8_t *payload, size_t size);
 		void setMasterPayload(uint8_t *payload, size_t size);
+		void loadNextMasterPayload();
 
 		void setConnectionJammingConfiguration(uint32_t accessAddress,uint32_t channel);
 
