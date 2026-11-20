@@ -426,6 +426,14 @@ ifeq ($(PLATFORM),BOARD_PCA10059)
 	$(NRFUTIL) dfu usb-serial -pkg $(OUTPUT_DIRECTORY)/dfu.zip -p $(SERIAL_PORT) -b 115200
 	@echo "Done :)"
 endif
+ifeq ($(PLATFORM),BOARD_XIAO_NRF52840)
+	@echo "Generating DFU package ..."
+	rm -f $(OUTPUT_DIRECTORY)/dfu.zip
+	$(NRFUTIL) pkg generate --hw-version 52 --sd-req 0x00 --debug-mode --application $(OUTPUT_DIRECTORY)/nrf52840_xxaa.hex $(OUTPUT_DIRECTORY)/dfu.zip
+	@echo "Flashing device ..."
+	$(NRFUTIL) dfu usb-serial -pkg $(OUTPUT_DIRECTORY)/dfu.zip -p $(SERIAL_PORT) -b 115200
+	@echo "Done :)"
+endif
 ifeq ($(PLATFORM),BOARD_MDK_DONGLE)
 ifneq ($(MDK_MOUNTPOINT),)
 	@echo "Generating DFU package ..."
