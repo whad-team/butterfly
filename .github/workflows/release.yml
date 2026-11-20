@@ -45,6 +45,8 @@ jobs:
         make dist PLATFORM=BOARD_MDK_DONGLE NRFUTIL=.tool/nrfutil SDK_ROOT=$(pwd)/.sdk/nRF5_SDK_17.1.0_ddde560
         make clean SDK_ROOT=$(pwd)/.sdk/nRF5_SDK_17.1.0_ddde560
         make dist PLATFORM=BOARD_MDK_CONNECTKIT NRFUTIL=.tool/nrfutil SDK_ROOT=$(pwd)/.sdk/nRF5_SDK_17.1.0_ddde560
+        make clean SDK_ROOT=$(pwd)/.sdk/nRF5_SDK_17.1.0_ddde560
+        make dist PLATFORM=BOARD_XIAO_NRF52840 NRFUTIL=.tool/nrfutil SDK_ROOT=$(pwd)/.sdk/nRF5_SDK_17.1.0_ddde560
     - name: Pushing release
       uses: softprops/action-gh-release@v2
       if: github.ref_type == 'tag'
@@ -57,6 +59,8 @@ jobs:
           dist/butterfly-mdk-fwupgrade.uf2
           dist/butterfly-mdk-connectkit.hex
           dist/butterfly-mdk-connectkit-fwupgrade.uf2
+          dist/butterfly-xiao-fwupgrade.zip
+          dist/butterfly-xiao.hex
           dist/butterfly.hex
           dist/butterfly-fwupgrade.zip
           
