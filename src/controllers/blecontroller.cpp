@@ -80,7 +80,8 @@ BLEController::BLEController(Radio *radio) : Controller(radio) {
 	this->setOwnAddress(oaddr, 6);
 
     /* No advertising PDU. */
-    this->adv_ind = NULL;
+    this->pending_txpdu = NULL;
+    this->pending_txpdu_length = 0;
 
 }
 
@@ -1193,10 +1194,11 @@ void BLEController::stop() {
 	this->sequenceModule->reset();
 	this->radio->disable();
 
-    /* Free advertising PDU. */
-    if (this->adv_ind != NULL) {
-        free(this->adv_ind);
-        this->adv_ind = NULL;
+    /* Radio is stopped, free pending TX PDU. */
+    if (this->pending_txpdu != NULL) {
+        free(this->pending_txpdu);
+        this->pending_txpdu = NULL;
+        this->pending_txpdu_length = 0;
     }
 }
 
@@ -1528,17 +1530,17 @@ bool BLEController::newAdvertisingTransmission() {
 		this->setChannel(37);
 	}
 
-    /* Free previous advertising PDU. */
-    if (this->adv_ind != NULL) {
-        free(this->adv_ind);
+    /* Consider our last pending PDU sent, so we free the previous buffer. */
+    if (this->pending_txpdu != NULL) {
+        free(this->pending_txpdu);
     }
 
 	// Configure radio to monitor only advertisements from targeted device (hardware filter needed)
 	this->setFilter(false, this->own.bytes[5], this->own.bytes[4],this->own.bytes[3], this->own.bytes[2], this->own.bytes[1],this->own.bytes[0]);
 
 	this->advertisingData.lastAdvertisingEvent = this->timerModule->getTimestamp();
-	BLEPacket::forgeAdvInd(&this->adv_ind, &this->adv_ind_size, this->own.bytes, this->ownRandom, this->advertisingData.advertisingData, this->advertisingData.advertisingDataSize);
-	this->radio->send(this->adv_ind, this->adv_ind_size, BLEController::channelToFrequency(this->channel),this->channel);
+	BLEPacket::forgeAdvInd(&this->pending_txpdu, &this->pending_txpdu_length, this->own.bytes, this->ownRandom, this->advertisingData.advertisingData, this->advertisingData.advertisingDataSize);
+	this->radio->send(this->pending_txpdu, this->pending_txpdu_length, BLEController::channelToFrequency(this->channel),this->channel);
 	bsp_board_led_invert(0);
 	return true;
 }
