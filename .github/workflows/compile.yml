@@ -34,4 +34,5 @@ jobs:
         make SDK_ROOT=$(pwd)/.sdk/nRF5_SDK_17.1.0_ddde560
         make clean SDK_ROOT=$(pwd)/.sdk/nRF5_SDK_17.1.0_ddde560 && make PLATFORM=BOARD_MDK_DONGLE SDK_ROOT=$(pwd)/.sdk/nRF5_SDK_17.1.0_ddde560 
         make clean SDK_ROOT=$(pwd)/.sdk/nRF5_SDK_17.1.0_ddde560 && make PLATFORM=BOARD_MDK_CONNECTKIT SDK_ROOT=$(pwd)/.sdk/nRF5_SDK_17.1.0_ddde560 
+        make clean SDK_ROOT=$(pwd)/.sdk/nRF5_SDK_17.1.0_ddde560 && make PLATFORM=BOARD_XIAO_NRF52840 SDK_ROOT=$(pwd)/.sdk/nRF5_SDK_17.1.0_ddde560 
 
