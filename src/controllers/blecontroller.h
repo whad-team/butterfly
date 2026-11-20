@@ -307,6 +307,10 @@ class BLEController : public Controller {
 		AdvertisingData advertisingData;
 		EncryptionData encryptionData;
 
+        /* Advertising PDU. */
+        uint8_t *adv_ind;
+        size_t adv_ind_size;
+
 	public:
 		static int channelToFrequency(int channel);
 

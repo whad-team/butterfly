@@ -79,6 +79,9 @@ BLEController::BLEController(Radio *radio) : Controller(radio) {
 	uint8_t oaddr[] = {0x11,	0x22, 0x33, 0x44,	0x55, 0x66};
 	this->setOwnAddress(oaddr, 6);
 
+    /* No advertising PDU. */
+    this->adv_ind = NULL;
+
 }
 
 bool BLEController::deleteSequence(uint8_t id) {
@@ -1189,6 +1192,12 @@ void BLEController::stop() {
 	this->releaseTimers();
 	this->sequenceModule->reset();
 	this->radio->disable();
+
+    /* Free advertising PDU. */
+    if (this->adv_ind != NULL) {
+        free(this->adv_ind);
+        this->adv_ind = NULL;
+    }
 }
 
 void BLEController::sniff() {
@@ -1519,16 +1528,18 @@ bool BLEController::newAdvertisingTransmission() {
 		this->setChannel(37);
 	}
 
+    /* Free previous advertising PDU. */
+    if (this->adv_ind != NULL) {
+        free(this->adv_ind);
+    }
+
 	// Configure radio to monitor only advertisements from targeted device (hardware filter needed)
 	this->setFilter(false, this->own.bytes[5], this->own.bytes[4],this->own.bytes[3], this->own.bytes[2], this->own.bytes[1],this->own.bytes[0]);
 
 	this->advertisingData.lastAdvertisingEvent = this->timerModule->getTimestamp();
-	uint8_t *adv_ind;
-	size_t adv_ind_size;
-	BLEPacket::forgeAdvInd(&adv_ind, &adv_ind_size, this->own.bytes, this->ownRandom, this->advertisingData.advertisingData, this->advertisingData.advertisingDataSize);
-	this->radio->send(adv_ind, adv_ind_size, BLEController::channelToFrequency(this->channel),this->channel);
+	BLEPacket::forgeAdvInd(&this->adv_ind, &this->adv_ind_size, this->own.bytes, this->ownRandom, this->advertisingData.advertisingData, this->advertisingData.advertisingDataSize);
+	this->radio->send(this->adv_ind, this->adv_ind_size, BLEController::channelToFrequency(this->channel),this->channel);
 	bsp_board_led_invert(0);
-	free(adv_ind);
 	return true;
 }
 
