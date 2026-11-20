@@ -388,6 +388,11 @@ ifeq ($(PLATFORM),BOARD_PCA10059)
 	cp $(OUTPUT_DIRECTORY)/nrf52840_xxaa.hex $(DIST_DIRECTORY)/butterfly.hex
 	$(NRFUTIL) pkg generate --hw-version 52 --sd-req 0x00 --debug-mode --application $(OUTPUT_DIRECTORY)/nrf52840_xxaa.hex $(DIST_DIRECTORY)/butterfly-fwupgrade.zip
 endif
+ifeq ($(PLATFORM),BOARD_XIAO_NRF52840)
+	mkdir -p $(DIST_DIRECTORY)
+	cp $(OUTPUT_DIRECTORY)/nrf52840_xxaa.hex $(DIST_DIRECTORY)/butterfly-xiao.hex
+	$(NRFUTIL) pkg generate --hw-version 52 --sd-req 0x00 --debug-mode --application $(OUTPUT_DIRECTORY)/nrf52840_xxaa.hex $(DIST_DIRECTORY)/butterfly-xiao-fwupgrade.zip
+endif
 ifeq ($(PLATFORM),BOARD_MDK_DONGLE)
 	mkdir -p $(DIST_DIRECTORY)
 	cp $(OUTPUT_DIRECTORY)/nrf52840_xxaa.hex $(DIST_DIRECTORY)/butterfly-mdk.hex
@@ -419,6 +424,14 @@ create_builddir:
 
 send: create_builddir
 ifeq ($(PLATFORM),BOARD_PCA10059)
+	@echo "Generating DFU package ..."
+	rm -f $(OUTPUT_DIRECTORY)/dfu.zip
+	$(NRFUTIL) pkg generate --hw-version 52 --sd-req 0x00 --debug-mode --application $(OUTPUT_DIRECTORY)/nrf52840_xxaa.hex $(OUTPUT_DIRECTORY)/dfu.zip
+	@echo "Flashing device ..."
+	$(NRFUTIL) dfu usb-serial -pkg $(OUTPUT_DIRECTORY)/dfu.zip -p $(SERIAL_PORT) -b 115200
+	@echo "Done :)"
+endif
+ifeq ($(PLATFORM),BOARD_XIAO_NRF52840)
 	@echo "Generating DFU package ..."
 	rm -f $(OUTPUT_DIRECTORY)/dfu.zip
 	$(NRFUTIL) pkg generate --hw-version 52 --sd-req 0x00 --debug-mode --application $(OUTPUT_DIRECTORY)/nrf52840_xxaa.hex $(OUTPUT_DIRECTORY)/dfu.zip
