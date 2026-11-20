@@ -54,7 +54,6 @@ jobs:
         token: ${{ secrets.GITHUB_TOKEN }}
         files: |
           dist/butterfly-mdk.hex
-          dist/butterfly-mdk-connectkit.hex
           dist/butterfly-mdk-fwupgrade.uf2
           dist/butterfly-mdk-connectkit.hex
           dist/butterfly-mdk-connectkit-fwupgrade.uf2
