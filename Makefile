@@ -189,49 +189,6 @@ ifeq ($(PLATFORM),BOARD_MDK_CONNECTKIT)
 	SRC_FILES += $(SDK_ROOT)/components/libraries/timer/app_timer.c
 endif
 
-ifeq ($(PLATFORM),BOARD_MDK_CONNECTKIT)
-    LINKER_FILE := config/mdk-connectkit/mdk-connectkit.ld
-    CONF_DIR := config/mdk-connectkit
-    MDK_MOUNTPOINT := $(shell mount | grep UF2BOOT | awk '{print $$3}')
-
-	# C flags common to all targets
-	CFLAGS += $(OPT)
-	CFLAGS += -DBOARD_CUSTOM
-	CFLAGS += -DNRF52840_MDK_CONNECTKIT
-	#CFLAGS += -DCONFIG_GPIO_AS_PINRESET
-	CFLAGS += -DDEBUG
-	CFLAGS += -DDEBUG_NRF
-	CFLAGS += -DFLOAT_ABI_HARD
-	CFLAGS += -DNRF52840_XXAA
-	CFLAGS += -DSWI_DISABLE0
-	CFLAGS += -mcpu=cortex-m4
-	CFLAGS += -mthumb -mabi=aapcs
-	CFLAGS += -Wall -Werror
-	CFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
-	# keep every function in a separate section, this allows linker to discard unused ones
-	CFLAGS += -ffunction-sections -fdata-sections -fno-strict-aliasing
-	CFLAGS += -fno-builtin -fshort-enums
-
-	# C++ flags common to all targets
-	CXXFLAGS += $(OPT)
-
-	# Assembler flags common to all targets
-	ASMFLAGS += -g3
-	ASMFLAGS += -mcpu=cortex-m4
-	ASMFLAGS += -mthumb -mabi=aapcs
-	ASMFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
-	ASMFLAGS += -DBOARD_CUSTOM
-	ASMFLAGS += -DNRF52840_MDK_DONGLE
-	#ASMFLAGS += -DCONFIG_GPIO_AS_PINRESET
-	ASMFLAGS += -DDEBUG
-	ASMFLAGS += -DDEBUG_NRF
-	ASMFLAGS += -DFLOAT_ABI_HARD
-	ASMFLAGS += -DNRF52840_XXAA
-	ASMFLAGS += -DSWI_DISABLE0
-
-	SRC_FILES += $(SDK_ROOT)/components/libraries/timer/app_timer.c
-endif
-
 
 PROJ_DIR := src
 WHAD_DIR := whad-lib
