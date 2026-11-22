@@ -44,6 +44,7 @@ class Timer {
     int getDuration();
     void setUsed(bool used);
     void release();
+    int getId();
 };
 
 

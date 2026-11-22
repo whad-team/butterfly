@@ -162,11 +162,11 @@ void Timer::stop() {
     //NVIC_DisableIRQ(TIMER4_IRQn);
 		if (this->base == 4) {
 	    NRF_TIMER4->CC[this->id] = 0;
-	    NRF_TIMER4->INTENCLR |= 1 << (16+this->id);
+	    NRF_TIMER4->INTENCLR = 1 << (16+this->id);
 		}
 		else if (this->base == 3) {
 			NRF_TIMER3->CC[this->id] = 0;
-	    NRF_TIMER3->INTENCLR |= 1 << (16+this->id);
+	    NRF_TIMER3->INTENCLR = 1 << (16+this->id);
 		}
     //NVIC_ClearPendingIRQ(TIMER4_IRQn);
     //NVIC_EnableIRQ(TIMER4_IRQn);
@@ -191,6 +191,10 @@ TimerMode Timer::getMode() {
 
 int Timer::getDuration() {
   return this->duration;
+}
+
+int Timer::getId() {
+    return this->id;
 }
 
 extern "C" void TIMER3_IRQHandler(void) {
