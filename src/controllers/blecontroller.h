@@ -121,7 +121,8 @@ typedef struct BLEPayload {
 	size_t size;
 	bool responseReceived;
 	uint16_t lastTransmitInstant;
-	bool transmitted;
+	volatile bool transmitted;
+    volatile bool loaded;
 } BLEPayload;
 
 typedef struct CandidateAccessAddresses {
@@ -310,6 +311,7 @@ class BLEController : public Controller {
         /* Pending TX PDU tracking. */
         uint8_t *pending_txpdu;
         size_t pending_txpdu_length;
+        bool centralRetransmission;
 
 	public:
 		static int channelToFrequency(int channel);
@@ -474,6 +476,7 @@ class BLEController : public Controller {
 		void disconnect();
 
 		bool sendFirstConnectionPacket();
+		bool prepareSlaveConnection();
 		void initializeConnection();
 
 		// Packets processing methods
