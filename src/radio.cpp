@@ -1336,6 +1336,33 @@ extern "C" void RADIO_IRQHandler(void) {
 					if (bufferSize <= 2+Radio::instance->getPayloadLength()) {
 						uint8_t *buffer = (uint8_t *)malloc(sizeof(uint8_t)*bufferSize);
 						memcpy(buffer,Radio::instance->rxBuffer,bufferSize);
+
+						/*
+						 * Temporary fix: with auto-TX after RX, the END->DISABLE->TXEN shorts
+						 * already started the TX ramp-up in hardware, and PACKETPTR is latched
+						 * on START (~T_IFS after END). If onReceive() takes too long, the radio
+						 * transmits rxBuffer (echoing the received PDU). Point PACKETPTR to
+						 * txBuffer right away; the block after onReceive() is left unchanged.
+						 *
+						 * autoTX records whether the hardware is really heading to TX right now,
+						 * i.e. whether the DISABLED->TXEN short was active when this reception
+						 * ended.
+						 *
+						 * Note (issue #38, to review): the software flag isAutoTXafterRXenabled()
+						 * is not enough. After our TX, the shorts are set to DISABLED->RXEN and
+						 * the TX branch does not restore DISABLED->TXEN (only fastFrequencyChange()
+						 * does, at the next hop). If the central sends a second PDU within the
+						 * same connection event, the radio goes back to RX without replying;
+						 * trusting the software flag here would then point PACKETPTR to txBuffer
+						 * and set state=TX while receiving, so the next received PDU lands in
+						 * txBuffer and gets echoed back. Current limitation: one RX/TX exchange
+						 * per connection event (the central retransmits at the next event).
+						 */
+						bool autoTX = (NRF_RADIO->SHORTS & RADIO_SHORTS_DISABLED_TXEN_Msk) != 0;
+						if (autoTX) {
+							NRF_RADIO->PACKETPTR = (uint32_t)(Radio::instance->txBuffer);
+						}
+
 						CrcValue crcValue;
 						crcValue.validity = UNKNOWN_CRC;
 						uint8_t rssi = 0x00;
@@ -1352,11 +1379,21 @@ extern "C" void RADIO_IRQHandler(void) {
 						controller->onReceive(Radio::instance->currentTimestamp,bufferSize,buffer,crcValue, rssi);
 
 						free(buffer);
-						if (Radio::instance->isAutoTXafterRXenabled()) {
+
+						/*
+						 * Only switch to TX if the hardware was heading to TX when this reception
+						 * ended (see autoTX above) and auto-TX is still enabled after onReceive().
+						 * If the controller enabled it during onReceive(), it also called reload(),
+                         * which restarted RX with PACKETPTR=rxBuffer and state=RX: forcing
+                         * PACKETPTR=txBuffer/state=TX here would make the next received PDU overwrite
+                         * txBuffer and be echoed back.
+						 */
+						if (autoTX && Radio::instance->isAutoTXafterRXenabled()) {
 							NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_RXEN_Msk;
 							NRF_RADIO->PACKETPTR = (uint32_t)(Radio::instance->txBuffer);
 							Radio::instance->setState(TX);
 						}
+
 						if (Radio::instance->isRssiEnabled()) {
 							NRF_RADIO->SHORTS |= RADIO_SHORTS_ADDRESS_RSSISTART_Msk;
 						}

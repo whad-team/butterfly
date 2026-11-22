@@ -79,6 +79,12 @@ BLEController::BLEController(Radio *radio) : Controller(radio) {
 	uint8_t oaddr[] = {0x11,	0x22, 0x33, 0x44,	0x55, 0x66};
 	this->setOwnAddress(oaddr, true);
 
+    /* No advertising PDU. */
+    this->pending_txpdu = NULL;
+    this->pending_txpdu_length = 0;
+
+    /* No retransmission (yet). */
+    this->centralRetransmission = false;
 }
 
 bool BLEController::deleteSequence(uint8_t id) {
@@ -614,6 +620,7 @@ void BLEController::setSlavePayload(uint8_t *payload, size_t size) {
 		this->slavePayload.payload[i] = payload[i];
 	}
 	this->slavePayload.size = size;
+    this->slavePayload.loaded = false;
 	this->slavePayload.transmitted = false;
 	this->slavePayload.responseReceived = false;
 	this->slavePayload.lastTransmitInstant = 0;
@@ -640,9 +647,11 @@ bool BLEController::stopConnection() {
 	this->clearConnectionUpdate();
 	this->clearPhyUpdate();
     // If we were simulating slave, exit slave mode
-	if (this->controllerState == SIMULATING_SLAVE || this->controllerState == PERFORMING_MITM) this->exitSlaveMode();
+	if (this->controllerState == SIMULATING_SLAVE || this->controllerState == PERFORMING_MITM || this->controllerState == CONNECTION_INITIATION_SLAVE) this->exitSlaveMode();
 	this->masterPayload.transmitted = true;
+    this->masterPayload.loaded = false;
 	this->slavePayload.transmitted = true;
+    this->slavePayload.loaded = false;
 	// Reconfigure radio to receive advertisements
 	this->setHardwareConfiguration(0x8e89bed6,0x555555);
 
@@ -669,8 +678,6 @@ bool BLEController::goToNextChannel() {
 	if (this->controllerState != SNIFFING_ADVERTISEMENTS && this->controllerState != SCANNING) {
 		// If we have not observed at least one packet, increase desyncCounter by one, otherwise resets this counter
 		this->desyncCounter = (this->packetCount == 0 ? this->desyncCounter + 1 : 0);
-
-
 
 		if (this->controllerState != SIMULATING_MASTER && this->desyncCounter == 1) {
 
@@ -1189,6 +1196,13 @@ void BLEController::stop() {
 	this->releaseTimers();
 	this->sequenceModule->reset();
 	this->radio->disable();
+
+    /* Radio is stopped, free pending TX PDU. */
+    if (this->pending_txpdu != NULL) {
+        free(this->pending_txpdu);
+        this->pending_txpdu = NULL;
+        this->pending_txpdu_length = 0;
+    }
 }
 
 void BLEController::sniff() {
@@ -1519,16 +1533,18 @@ bool BLEController::newAdvertisingTransmission() {
 		this->setChannel(37);
 	}
 
+    /* Consider our last pending PDU sent, so we free the previous buffer. */
+    if (this->pending_txpdu != NULL) {
+        free(this->pending_txpdu);
+    }
+
 	// Configure radio to monitor only advertisements from targeted device (hardware filter needed)
 	this->setFilter(false, this->own.bytes[5], this->own.bytes[4],this->own.bytes[3], this->own.bytes[2], this->own.bytes[1],this->own.bytes[0]);
 
 	this->advertisingData.lastAdvertisingEvent = this->timerModule->getTimestamp();
-	uint8_t *adv_ind;
-	size_t adv_ind_size;
-	BLEPacket::forgeAdvInd(&adv_ind, &adv_ind_size, this->own.bytes, this->ownRandom, this->advertisingData.advertisingData, this->advertisingData.advertisingDataSize);
-	this->radio->send(adv_ind, adv_ind_size, BLEController::channelToFrequency(this->channel),this->channel);
+	BLEPacket::forgeAdvInd(&this->pending_txpdu, &this->pending_txpdu_length, this->own.bytes, this->ownRandom, this->advertisingData.advertisingData, this->advertisingData.advertisingDataSize);
+	this->radio->send(this->pending_txpdu, this->pending_txpdu_length, BLEController::channelToFrequency(this->channel),this->channel);
 	bsp_board_led_invert(0);
-	free(adv_ind);
 	return true;
 }
 
@@ -1665,7 +1681,12 @@ bool BLEController::checkSynchronization() {
 			);
 		}
 		else {
-			// Reconfigure radio to receive advertisements
+            /* Exit slave mode if connection failed. */
+            if (this->controllerState == CONNECTION_INITIATION_SLAVE) {
+                this->exitSlaveMode();
+            }
+			
+            // Reconfigure radio to receive advertisements
 			this->setHardwareConfiguration(0x8e89bed6,0x555555);
 			
             // Reset the channel
@@ -1726,7 +1747,9 @@ void BLEController::prepareMasterRelatedHijacking() {
 
 void BLEController::startAttack(BLEAttack attack) {
 	this->slavePayload.transmitted = true;
+    this->slavePayload.loaded = false;
 	this->masterPayload.transmitted = true;
+    this->masterPayload.loaded = false;
 
 	this->attackStatus.attack = attack;
 	this->attackStatus.running = true;
@@ -1849,21 +1872,26 @@ bool BLEController::masterRoleCallback(BLEPacket *pkt) {
 }
 
 bool BLEController::slaveRoleCallback(BLEPacket *pkt) {
-	this->updateSimulatedSlaveSequenceNumbers(this->masterSequenceNumbers.nesn, (this->simulatedSlaveSequenceNumbers.nesn + 1) % 2);
+    if (this->controllerState == PERFORMING_MITM) {
+        this->updateSimulatedSlaveSequenceNumbers(
+                this->masterSequenceNumbers.nesn,
+                (this->masterSequenceNumbers.sn == this->simulatedSlaveSequenceNumbers.nesn)?((this->simulatedSlaveSequenceNumbers.nesn + 1) % 2):this->simulatedSlaveSequenceNumbers.nesn
+        );
 
-	if (!this->slavePayload.transmitted) {
-		this->slavePayload.payload[0] = (this->slavePayload.payload[0] & 0xF3) | (this->simulatedSlaveSequenceNumbers.nesn  << 2) | (this->simulatedSlaveSequenceNumbers.sn << 3);
-		this->radio->updateTXBuffer(this->slavePayload.payload,this->slavePayload.size);
-		this->slavePayload.transmitted = true;
-		//Core::instance->pushMessageToQueue(new SendPayloadResponse(0x02,true));
-	}
-	else {
-		uint8_t tx_buffer[2];
-		tx_buffer[0] = (0x01 & 0xF3) | (this->simulatedSlaveSequenceNumbers.nesn  << 2) | (this->simulatedSlaveSequenceNumbers.sn << 3);
-		tx_buffer[1] = 0x00;
-		this->radio->updateTXBuffer(tx_buffer,2);
-	}
-	return false;
+        if (!this->slavePayload.transmitted) {
+            this->slavePayload.payload[0] = (this->slavePayload.payload[0] & 0xF3) | (this->simulatedSlaveSequenceNumbers.nesn  << 2) | (this->simulatedSlaveSequenceNumbers.sn << 3);
+            this->radio->updateTXBuffer(this->slavePayload.payload,this->slavePayload.size);
+            this->slavePayload.transmitted = true;
+            //Core::instance->pushMessageToQueue(new SendPayloadResponse(0x02,true));
+        }
+        else {
+            uint8_t tx_buffer[2];
+            tx_buffer[0] = (0x01 & 0xF3) | (this->simulatedSlaveSequenceNumbers.nesn  << 2) | (this->simulatedSlaveSequenceNumbers.sn << 3);
+            tx_buffer[1] = 0x00;
+            this->radio->updateTXBuffer(tx_buffer,2);
+        }
+    }
+    return false;
 }
 
 void BLEController::checkAttackSuccess() {
@@ -2479,6 +2507,27 @@ bool BLEController::sendFirstConnectionPacket() {
 	return false;
 }
 
+/**
+ * Called by initTimer shortly before the first transmit window opens, once a
+ * CONNECT_REQ has been received while advertising.
+ *
+ * Switches the radio to slave mode (no fast ramp-up, T_IFS = 145us, auto-TX
+ * after RX). This must run from timer context: calling enterSlaveMode() (and
+ * thus Radio::reload()) from within RADIO_IRQHandler makes the handler re-point
+ * PACKETPTR to the TX buffer on top of the freshly restarted RX.
+ */
+bool BLEController::prepareSlaveConnection() {
+    char msg[256];
+    snprintf(msg, 256, "prepareSlaveConnection");
+    Core::instance->sendVerbose((const char *)msg);
+	if (this->controllerState == CONNECTION_INITIATION_SLAVE) {
+		this->enterSlaveMode();
+        snprintf(msg, 256, "Slave mode entered");
+        Core::instance->sendVerbose((const char *)msg);
+	}
+	return false;
+}
+
 void BLEController::connectionInitiationAdvertisementProcessing(BLEPacket *pkt) {
 
 	// Update the packet direction
@@ -2523,13 +2572,17 @@ void BLEController::connectionInitiationConnectedSlaveProcessing(BLEPacket *pkt)
 		bsp_board_led_on(0);
 		bsp_board_led_on(1);
 		this->slavePayload.transmitted = true;
+        this->slavePayload.loaded = false;
 		this->slavePayload.responseReceived = false;
 
 		this->setEmptyTransmitIndicator(false);
 
 		this->controllerState = SIMULATING_SLAVE;
-		this->enterSlaveMode();
 		this->sendSlaveConnectedReport();
+
+        /* Update packet direction and process it. */
+        pkt->updateSource(DIRECTION_MASTER_TO_SLAVE);
+        this->masterPacketProcessing(pkt);
 	}
 }
 void BLEController::advertisementScanningProcessing(BLEPacket *pkt) {
@@ -2858,13 +2911,21 @@ void BLEController::connectionPacketProcessing(BLEPacket *pkt) {
 		}
 	}
 
-	// Decide if the packet must be transmitted to host
-	if (pkt->extractPayloadLength() > 0 || this->emptyTransmitIndicator) {
+	/* Send packet to host if conditions are met (not a retransmitted packet and exclude empty packets if required). */
+	if (!this->centralRetransmission && (pkt->extractPayloadLength() > 0 || this->emptyTransmitIndicator)) {
 		this->addPacket(pkt);
 	}
 }
 
 void BLEController::advertisementPacketProcessing(BLEPacket *pkt) {
+    
+    /* Consider our previous pending TX PDU sent. */
+    if (this->pending_txpdu != NULL) {
+        free(this->pending_txpdu);
+        this->pending_txpdu = NULL;
+        this->pending_txpdu_length = 0;
+    }
+
 	// If the packet doesn't match the filter, drop it
 	if (this->softwareFilterEnabled && !pkt->checkAdvertiserAddress(this->filter)) return;
 
@@ -2877,20 +2938,16 @@ void BLEController::advertisementPacketProcessing(BLEPacket *pkt) {
 	}
 
 	else if (this->controllerState == ADVERTISING) {
-
 		if (pkt->extractAdvertisementType() == SCAN_REQ) {
 			nrf_delay_us(60);
-			uint8_t *scan_rsp;
-			size_t scan_rsp_size;
-			BLEPacket::forgeScanResponse(&scan_rsp, &scan_rsp_size, this->own.bytes, this->ownRandom, this->advertisingData.scanData, this->advertisingData.scanDataSize, (pkt->getPacketBuffer()[4] & 0x80) >> 7);
-			this->radio->send(scan_rsp, scan_rsp_size, BLEController::channelToFrequency(this->channel), this->channel);
-			nrf_delay_us(8*(scan_rsp_size+4+3));
-			//bsp_board_led_invert(1);
-			free(scan_rsp);
+			BLEPacket::forgeScanResponse(&this->pending_txpdu, &this->pending_txpdu_length, this->own.bytes, this->ownRandom, this->advertisingData.scanData, this->advertisingData.scanDataSize, (pkt->getPacketBuffer()[4] & 0x80) >> 7);
+			this->radio->send(this->pending_txpdu, this->pending_txpdu_length, BLEController::channelToFrequency(this->channel), this->channel);
+			nrf_delay_us(8*(this->pending_txpdu_length+4+3));
 		}
 		else if (pkt->extractAdvertisementType() == CONNECT_REQ) {
 			if (this->follow) {
 				this->releaseTimers();
+
 				// Start following the connection
 				this->followConnection(
                     (pkt->extractChSel()==1)?CSA2:CSA1,
@@ -2904,12 +2961,22 @@ void BLEController::advertisementPacketProcessing(BLEPacket *pkt) {
                     pkt->extractWindowOffset(),
                     pkt->extractWindowSize()
 				);
-				this->radio->setFastRampUpTime(true);
-				this->radio->reload();
+
+                /* Save advertiser address and switch to connection initiation state. */
 				pkt->extractAdvertiserAddress(this->connectionInitiationData.responder.bytes, &this->connectionInitiationData.responderRandom);
 				this->controllerState = CONNECTION_INITIATION_SLAVE;
 
-			}
+                /* Reset SN/NESN. */
+                this->updateMasterSequenceNumbers(pkt->extractSN(), pkt->extractNESN());
+                this->updateSimulatedSlaveSequenceNumbers(0, 1);
+
+                /* Prepare an empty TX PDU (first answer). */
+                uint8_t empty_pdu[] = {0x05, 0x00};
+                this->radio->updateTXBuffer(empty_pdu, 2);
+                
+                /* Put radio in slave mode. */
+                this->enterSlaveMode();
+            }
 		}
 		pkt->updateSource(DIRECTION_UNKNOWN);
 		this->addPacket(pkt);
@@ -3077,6 +3144,7 @@ void BLEController::hopIncrementRecoveryProcessing(uint32_t timestamp, uint8_t s
 
 void BLEController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer, CrcValue crcValue, uint8_t rssi) {
 	int32_t relativeTimestamp = (this->accessAddress != 0x8e89bed6 ? (int32_t)(timestamp - this->lastAnchorPoint) : 0);
+
 	if (this->controllerState == SNIFFING_ACCESS_ADDRESS) {
 		this->accessAddressProcessing(timestamp, size , buffer, crcValue, rssi);
 	}
@@ -3093,6 +3161,71 @@ void BLEController::onReceive(uint32_t timestamp, uint8_t size, uint8_t *buffer,
 		this->hopIncrementRecoveryProcessing(timestamp, size, buffer ,crcValue, rssi);
 	}
 	else if (crcValue.validity == VALID_CRC) {
+        /* Consider this packet as a new one. */ 
+        this->centralRetransmission = false;
+
+        /* 
+         * When simulating a peripheral, we need to quickly handle PDU fetch and retransmission
+         * so that if the processing code takes too much time, we set the TX buffer with at least
+         * an empty PDU or a pending PDU, depending on the current state.
+         *
+         * We do this because radio has TX-after-RX state enabled, meaning it waits about 150us
+         * before sending the content of its TX buffer.
+         *
+         * slaveRoleCallback was originally used for this, but since it is used when performing
+         * MitM attacks, we thought it was smarter to do our own implementation to avoid any regression
+         * or other issues that may have appeared due to unexpected behavior.
+         */
+        if (this->controllerState == SIMULATING_SLAVE) {
+            uint8_t central_sn = (buffer[0] >> 3) & 1;
+            uint8_t central_nesn = (buffer[0] >> 2) & 1;
+
+            /* Determine if current packet has been retransmitted by central. */
+            this->centralRetransmission = (central_sn != this->simulatedSlaveSequenceNumbers.nesn);
+
+            /* If central's SN equals our NESN, we flip our NESN (central accept new data). */
+            if (central_sn == this->simulatedSlaveSequenceNumbers.nesn) {
+                this->simulatedSlaveSequenceNumbers.nesn = (this->simulatedSlaveSequenceNumbers.nesn + 1) % 2;
+            }
+
+            /* If central's NESN is different from our SN, our previous PDU has been successfully received. */
+            if (central_nesn != this->simulatedSlaveSequenceNumbers.sn) {
+                /* Update our current sequence number for the next transmission. */
+                this->simulatedSlaveSequenceNumbers.sn = (this->simulatedSlaveSequenceNumbers.sn + 1) % 2;
+
+                /* Mark current slave payload as transmitted. */
+                if (this->slavePayload.loaded) {
+                    this->slavePayload.transmitted = true;
+                    this->slavePayload.loaded = false;
+                }
+
+                /* If a PDU is pending, load it into the TX buffer and mark it loaded. */
+                if (!this->slavePayload.transmitted && !this->slavePayload.loaded) {
+                    /* Update SN/NESN fields in PDU header. */
+                    this->slavePayload.payload[0] = (this->slavePayload.payload[0] & 0xF3) | (this->simulatedSlaveSequenceNumbers.nesn << 2) | (this->simulatedSlaveSequenceNumbers.sn << 3);
+
+                    /* Writes PDU in radio's TX buffer. */
+                    this->radio->updateTXBuffer(this->slavePayload.payload, this->slavePayload.size);
+
+                    /* Mark current slave payload as loaded. */
+                    this->slavePayload.loaded = true;
+                } else {
+                    /* No pending PDU, build and send an empty payload. */
+                    uint8_t empty_pdu[2];
+                    empty_pdu[0] = 0x01 | (this->simulatedSlaveSequenceNumbers.nesn << 2) | (this->simulatedSlaveSequenceNumbers.sn << 3);
+                    empty_pdu[1] = 0x00;
+                    this->radio->updateTXBuffer(empty_pdu, 2);
+                }
+
+            } else {
+                /* Refresh NESN for retransmission (patching Radio's TX Buffer). */
+                uint8_t header = this->radio->txBuffer[0];
+                header = (header & ~0x04) | (this->simulatedSlaveSequenceNumbers.nesn << 2);
+                this->radio->txBuffer[0] = header;
+            }
+        }
+
+        /* Process incoming packet. */
 		BLEPacket *pkt = new BLEPacket(this->accessAddress,buffer, size,timestamp, relativeTimestamp, 0, this->channel,rssi, crcValue);
 		if (pkt->isAdvertisement()) {
 			// If the packet is an advertisement, call onAdvertisementPacket method
